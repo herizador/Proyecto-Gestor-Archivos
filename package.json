@@ -12,12 +12,12 @@
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "@aws-sdk/client-s3": "*",
-    "@aws-sdk/s3-request-presigner": "*",
-    "@supabase/ssr": "*",
-    "@supabase/supabase-js": "*",
-    "date-fns": "*",
-    "lucide-react": "*"
+    "@aws-sdk/client-s3": "^3.1052.0",
+    "@aws-sdk/s3-request-presigner": "^3.1052.0",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.106.1",
+    "date-fns": "^4.2.1",
+    "lucide-react": "^1.16.0"
   },
   "devDependencies": {
     "@types/node": "^20",
