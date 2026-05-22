@@ -11,7 +11,13 @@
   "dependencies": {
     "next": "16.2.6",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "@aws-sdk/client-s3": "*",
+    "@aws-sdk/s3-request-presigner": "*",
+    "@supabase/ssr": "*",
+    "@supabase/supabase-js": "*",
+    "date-fns": "*",
+    "lucide-react": "*"
   },
   "devDependencies": {
     "@types/node": "^20",
