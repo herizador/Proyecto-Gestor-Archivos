@@ -3,7 +3,13 @@
 // Para regenerar automáticamente: npx supabase gen types typescript --project-id <id>
 // =============================================================================
 
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
   public: {
@@ -30,6 +36,7 @@ export type Database = {
           avatar_url?: string | null
           fecha_registro?: string
         }
+        Relationships: []
       }
       carpetas: {
         Row: {
@@ -56,6 +63,22 @@ export type Database = {
           carpeta_padre_id?: string | null
           fecha_creacion?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: 'carpetas_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'perfiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'carpetas_carpeta_padre_id_fkey'
+            columns: ['carpeta_padre_id']
+            isOneToOne: false
+            referencedRelation: 'carpetas'
+            referencedColumns: ['id']
+          },
+        ]
       }
       archivos: {
         Row: {
@@ -94,6 +117,22 @@ export type Database = {
           fecha_subida?: string
           fecha_papelera?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: 'archivos_carpeta_id_fkey'
+            columns: ['carpeta_id']
+            isOneToOne: false
+            referencedRelation: 'carpetas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'archivos_subido_por_fkey'
+            columns: ['subido_por']
+            isOneToOne: false
+            referencedRelation: 'perfiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
       historial_actividad: {
         Row: {
@@ -110,9 +149,19 @@ export type Database = {
           detalles?: Json | null
           fecha_evento?: string
         }
-        Update: never // La bitácora es inmutable
+        Update: Record<string, never>
+        Relationships: [
+          {
+            foreignKeyName: 'historial_actividad_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'perfiles'
+            referencedColumns: ['id']
+          },
+        ]
       }
     }
+    Views: Record<string, never>
     Functions: {
       get_storage_usage: {
         Args: Record<string, never>

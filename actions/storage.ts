@@ -1,10 +1,11 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import type { ActivityAction, Json } from '@/types/database'
 
 export async function logActivity(params: {
-  accion: string
-  detalles?: Record<string, unknown>
+  accion: ActivityAction
+  detalles?: Json
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { Lock, FileX } from 'lucide-react'
 import FileCard from '@/components/FileCard'
 import UploadModalWrapper from '../UploadModalWrapper'
@@ -7,7 +8,9 @@ export default async function CajaFuertePage() {
   const supabase = await createClient()
 
   const { data: { user } } = await supabase.auth.getUser()
-  const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user?.id).single()
+  if (!user) redirect('/login')
+
+  const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single()
   
   const isAdmin = perfil?.rol === 'admin'
 
@@ -18,7 +21,7 @@ export default async function CajaFuertePage() {
   const { data: archivos } = await supabase
     .from('archivos')
     .select('*, subido_por_perfil:perfiles(nombre_completo)')
-    .eq('subido_por', user?.id)
+    .eq('subido_por', user.id)
     .like('ruta_r2', '%/privado/%')
     .order('fecha_subida', { ascending: false })
 

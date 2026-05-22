@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import { FolderHeart, Plus } from 'lucide-react'
 import FileCard from '@/components/FileCard'
 import UploadModalWrapper from './UploadModalWrapper' // Wrapper de cliente para el estado del modal
@@ -9,10 +10,12 @@ export default async function DashboardComun() {
 
   // 1. Obtener usuario y rol
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
   const { data: perfil } = await supabase
     .from('perfiles')
     .select('rol')
-    .eq('id', user?.id)
+    .eq('id', user.id)
     .single()
   
   const isAdmin = perfil?.rol === 'admin'
@@ -64,7 +67,7 @@ export default async function DashboardComun() {
               key={file.id} 
               file={file} 
               isAdmin={isAdmin} 
-              isOwner={file.subido_por === user?.id} 
+              isOwner={file.subido_por === user.id} 
             />
           ))}
         </div>
