@@ -26,10 +26,12 @@ export default function UploadModal({
     setLoading(true)
     setError(null)
 
+    const contentType = file.type || 'application/octet-stream'
+
     // 1. Pedir URL pre-firmada al servidor
     const { uploadUrl, key, error: urlError } = await getUploadUrl({
       fileName: file.name,
-      contentType: file.type || 'application/octet-stream',
+      contentType,
       fileSize: file.size,
       carpetaId,
       scope,
@@ -42,13 +44,12 @@ export default function UploadModal({
     }
 
     try {
-      // 2. Subir directamente a Cloudflare R2
+      // 2. Subir directamente a Cloudflare R2 (solo headers incluidos en la firma)
       const r2Response = await fetch(uploadUrl, {
         method: 'PUT',
         body: file,
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream',
-        },
+        headers: { 'Content-Type': contentType },
+        credentials: 'omit',
       })
 
       if (!r2Response.ok) {
@@ -60,7 +61,7 @@ export default function UploadModal({
         nombreOriginal: file.name,
         rutaR2: key,
         tamanoBytes: file.size,
-        tipoMime: file.type || 'application/octet-stream',
+        tipoMime: contentType,
         carpetaId,
       })
 
