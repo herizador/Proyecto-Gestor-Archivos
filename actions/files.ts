@@ -1,7 +1,8 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { getPresignedUploadUrl, getPresignedDownloadUrl, deleteFromR2, buildR2Key } from '@/lib/r2/client'
+import { getPresignedUploadUrl, getPresignedViewUrl, getPresignedDownloadUrl, deleteFromR2, buildR2Key } from '@/lib/r2/client'
+import { logActivity } from '@/actions/storage'
 import { revalidatePath } from 'next/cache'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20 MB
@@ -71,7 +72,41 @@ export async function registrarArchivo(params: {
 }
 
 // ---------------------------------------------------------------------------
-// Obtener URL pre-firmada de descarga + registrar en historial
+// Obtener URL pre-firmada para visualizar + auditar
+// ---------------------------------------------------------------------------
+export async function visualizarArchivo(archivoId: string) {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'No autenticado.' }
+
+  const { data: archivo, error } = await supabase
+    .from('archivos')
+    .select('ruta_r2, nombre_original')
+    .eq('id', archivoId)
+    .eq('estado', 'activo')
+    .single()
+
+  if (error || !archivo) return { error: 'Archivo no encontrado o sin permisos.' }
+
+  try {
+    const url = await getPresignedViewUrl(archivo.ruta_r2)
+
+    await logActivity({
+      accion: 'VISUALIZAR_ARCHIVO',
+      detalles: {
+        archivo_id: archivoId,
+        nombre_original: archivo.nombre_original,
+      },
+    })
+
+    return { url }
+  } catch {
+    return { error: 'Error al generar enlace de visualización.' }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Obtener URL pre-firmada de descarga + auditar
 // ---------------------------------------------------------------------------
 export async function descargarArchivo(archivoId: string) {
   const supabase = await createClient()
@@ -80,18 +115,17 @@ export async function descargarArchivo(archivoId: string) {
 
   const { data: archivo, error } = await supabase
     .from('archivos')
-    .select('ruta_r2, nombre_original, carpeta_id')
+    .select('ruta_r2, nombre_original')
     .eq('id', archivoId)
+    .eq('estado', 'activo')
     .single()
 
   if (error || !archivo) return { error: 'Archivo no encontrado o sin permisos.' }
 
   try {
-    const url = await getPresignedDownloadUrl(archivo.ruta_r2)
+    const url = await getPresignedDownloadUrl(archivo.ruta_r2, archivo.nombre_original)
 
-    // Registrar descarga en historial
-    await supabase.from('historial_actividad').insert({
-      usuario_id: user.id,
+    await logActivity({
       accion: 'DESCARGAR_ARCHIVO',
       detalles: {
         archivo_id: archivoId,
@@ -99,7 +133,7 @@ export async function descargarArchivo(archivoId: string) {
       },
     })
 
-    return { url }
+    return { url, nombreOriginal: archivo.nombre_original }
   } catch {
     return { error: 'Error al generar enlace de descarga.' }
   }
@@ -120,6 +154,8 @@ export async function moverAPapelera(archivoId: string) {
 
   if (error) return { error: error.message }
   revalidatePath('/')
+  revalidatePath('/papelera')
+  revalidatePath('/mi-caja-fuerte')
   return { success: true }
 }
 
@@ -138,6 +174,8 @@ export async function restaurarArchivo(archivoId: string) {
 
   if (error) return { error: error.message }
   revalidatePath('/')
+  revalidatePath('/papelera')
+  revalidatePath('/mi-caja-fuerte')
   return { success: true }
 }
 
@@ -168,6 +206,8 @@ export async function eliminarArchivoPermanente(archivoId: string) {
   if (error) return { error: error.message }
 
   revalidatePath('/')
+  revalidatePath('/papelera')
+  revalidatePath('/mi-caja-fuerte')
   return { success: true }
 }
 

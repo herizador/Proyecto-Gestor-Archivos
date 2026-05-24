@@ -1,22 +1,41 @@
 'use client'
 
-import { FileText, Image, Download, Trash2, RefreshCw } from 'lucide-react'
+import { FileText, Image, Download, Trash2, Eye } from 'lucide-react'
 import { ArchivoConAutor } from '@/types/database'
-import { descargarArchivo, moverAPapelera, restaurarArchivo } from '@/actions/files'
+import { visualizarArchivo, descargarArchivo, moverAPapelera } from '@/actions/files'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 export default function FileCard({ file, isAdmin, isOwner }: { file: ArchivoConAutor, isAdmin: boolean, isOwner: boolean }) {
   const [loading, setLoading] = useState(false)
+  const router = useRouter()
 
   const isImage = file.tipo_mime.startsWith('image/')
   const sizeKb = (file.tamano_bytes / 1024).toFixed(1)
 
-  async function handleDownload() {
+  async function handleView() {
     setLoading(true)
-    const { url, error } = await descargarArchivo(file.id)
+    const { url, error } = await visualizarArchivo(file.id)
     setLoading(false)
     if (url) {
-      window.open(url, '_blank')
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } else {
+      alert(error || 'Error al visualizar')
+    }
+  }
+
+  async function handleDownload() {
+    setLoading(true)
+    const { url, nombreOriginal, error } = await descargarArchivo(file.id)
+    setLoading(false)
+    if (url) {
+      const link = document.createElement('a')
+      link.href = url
+      link.download = nombreOriginal ?? file.nombre_original
+      link.rel = 'noopener'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
     } else {
       alert(error || 'Error al descargar')
     }
@@ -25,15 +44,14 @@ export default function FileCard({ file, isAdmin, isOwner }: { file: ArchivoConA
   async function handleTrash() {
     if (confirm('¿Mover este archivo a la papelera?')) {
       setLoading(true)
-      await moverAPapelera(file.id)
+      const result = await moverAPapelera(file.id)
       setLoading(false)
+      if (result.error) {
+        alert(result.error)
+      } else {
+        router.refresh()
+      }
     }
-  }
-
-  async function handleRestore() {
-    setLoading(true)
-    await restaurarArchivo(file.id)
-    setLoading(false)
   }
 
   return (
@@ -55,27 +73,17 @@ export default function FileCard({ file, isAdmin, isOwner }: { file: ArchivoConA
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
-        {file.estado === 'activo' ? (
-          <>
-            <button className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center' }} onClick={handleDownload} disabled={loading}>
-              <Download size={14} /> Descargar
-            </button>
-            {(isAdmin || isOwner) && (
-              <button className="btn btn-danger btn-icon" onClick={handleTrash} disabled={loading} title="Mover a papelera">
-                <Trash2 size={14} />
-              </button>
-            )}
-          </>
-        ) : (
-          <>
-             <span className="badge badge-papelera" style={{ flex: 1, justifyContent: 'center' }}>En Papelera</span>
-             {(isAdmin || isOwner) && (
-              <button className="btn btn-ghost btn-icon" onClick={handleRestore} disabled={loading} title="Restaurar">
-                <RefreshCw size={14} />
-              </button>
-            )}
-          </>
+      <div style={{ display: 'flex', gap: '8px', marginTop: 'auto', flexWrap: 'wrap' }}>
+        <button className="btn btn-ghost btn-sm" style={{ flex: 1, justifyContent: 'center', minWidth: '90px' }} onClick={handleView} disabled={loading}>
+          <Eye size={14} /> Visualizar
+        </button>
+        <button className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center', minWidth: '90px' }} onClick={handleDownload} disabled={loading}>
+          <Download size={14} /> Descargar
+        </button>
+        {(isAdmin || isOwner) && (
+          <button className="btn btn-danger btn-icon" onClick={handleTrash} disabled={loading} title="Mover a papelera">
+            <Trash2 size={14} />
+          </button>
         )}
       </div>
     </div>

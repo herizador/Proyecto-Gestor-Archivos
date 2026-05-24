@@ -20,11 +20,36 @@ export const r2Client = new S3Client({
 
 const BUCKET = process.env.CLOUDFLARE_R2_BUCKET_NAME ?? 'gestor-archivos-familia'
 
+function sanitizeFileNameForDisposition(fileName: string): string {
+  return fileName.replace(/["\\]/g, '_')
+}
+
 /**
- * Genera una URL pre-firmada de DESCARGA válida por `expiresIn` segundos (por defecto 15 min).
+ * Genera una URL pre-firmada para VISUALIZAR en el navegador (inline).
  */
-export async function getPresignedDownloadUrl(key: string, expiresIn = 900): Promise<string> {
-  const command = new GetObjectCommand({ Bucket: BUCKET, Key: key })
+export async function getPresignedViewUrl(key: string, expiresIn = 900): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ResponseContentDisposition: 'inline',
+  })
+  return getSignedUrl(r2Client, command, { expiresIn })
+}
+
+/**
+ * Genera una URL pre-firmada de DESCARGA con nombre de archivo forzado (attachment).
+ */
+export async function getPresignedDownloadUrl(
+  key: string,
+  fileName: string,
+  expiresIn = 900
+): Promise<string> {
+  const safeName = sanitizeFileNameForDisposition(fileName)
+  const command = new GetObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    ResponseContentDisposition: `attachment; filename="${safeName}"`,
+  })
   return getSignedUrl(r2Client, command, { expiresIn })
 }
 

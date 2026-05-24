@@ -180,6 +180,7 @@ export type ActivityAction =
   | 'LOGIN'
   | 'LOGOUT'
   | 'SUBIR_ARCHIVO'
+  | 'VISUALIZAR_ARCHIVO'
   | 'DESCARGAR_ARCHIVO'
   | 'ELIMINAR'
   | 'RESTAURAR'

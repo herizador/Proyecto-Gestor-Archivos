@@ -22,6 +22,7 @@ export default async function CajaFuertePage() {
     .from('archivos')
     .select('*, subido_por_perfil:perfiles(nombre_completo)')
     .eq('subido_por', user.id)
+    .eq('estado', 'activo')
     .like('ruta_r2', '%/privado/%')
     .order('fecha_subida', { ascending: false })
 
