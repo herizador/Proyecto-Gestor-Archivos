@@ -3,6 +3,7 @@
 import { FileText, Image, Download, Trash2, Eye } from 'lucide-react'
 import { ArchivoConAutor } from '@/types/database'
 import { visualizarArchivo, descargarArchivo, moverAPapelera } from '@/actions/files'
+import { normalizePresignedUrlForBrowser } from '@/lib/presigned-url'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -17,10 +18,11 @@ export default function FileCard({ file, isAdmin, isOwner }: { file: ArchivoConA
     setLoading(true)
     const { url, error } = await visualizarArchivo(file.id)
     setLoading(false)
-    if (url) {
-      window.open(url, '_blank', 'noopener,noreferrer')
+    const safeUrl = url ? normalizePresignedUrlForBrowser(url) : null
+    if (safeUrl) {
+      window.open(safeUrl, '_blank', 'noopener,noreferrer')
     } else {
-      alert(error || 'Error al visualizar')
+      alert(error || 'Enlace de visualización no válido.')
     }
   }
 
@@ -28,16 +30,17 @@ export default function FileCard({ file, isAdmin, isOwner }: { file: ArchivoConA
     setLoading(true)
     const { url, nombreOriginal, error } = await descargarArchivo(file.id)
     setLoading(false)
-    if (url) {
+    const safeUrl = url ? normalizePresignedUrlForBrowser(url) : null
+    if (safeUrl) {
       const link = document.createElement('a')
-      link.href = url
+      link.href = safeUrl
       link.download = nombreOriginal ?? file.nombre_original
       link.rel = 'noopener'
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
     } else {
-      alert(error || 'Error al descargar')
+      alert(error || 'Enlace de descarga no válido.')
     }
   }
 

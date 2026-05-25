@@ -1,5 +1,6 @@
 import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { toBrowserSafePresignedUrl } from '@/lib/presigned-url'
 
 if (!process.env.CLOUDFLARE_R2_ENDPOINT) throw new Error('CLOUDFLARE_R2_ENDPOINT no definido')
 if (!process.env.CLOUDFLARE_R2_ACCESS_KEY_ID) throw new Error('CLOUDFLARE_R2_ACCESS_KEY_ID no definido')
@@ -20,6 +21,14 @@ export const r2Client = new S3Client({
 
 const BUCKET = process.env.CLOUDFLARE_R2_BUCKET_NAME ?? 'gestor-archivos-familia'
 
+async function presignAndNormalize(
+  command: GetObjectCommand | PutObjectCommand,
+  expiresIn: number
+): Promise<string> {
+  const signed = await getSignedUrl(r2Client, command, { expiresIn })
+  return toBrowserSafePresignedUrl(signed)
+}
+
 function sanitizeFileNameForDisposition(fileName: string): string {
   return fileName.replace(/["\\]/g, '_')
 }
@@ -33,7 +42,7 @@ export async function getPresignedViewUrl(key: string, expiresIn = 900): Promise
     Key: key,
     ResponseContentDisposition: 'inline',
   })
-  return getSignedUrl(r2Client, command, { expiresIn })
+  return presignAndNormalize(command, expiresIn)
 }
 
 /**
@@ -50,7 +59,7 @@ export async function getPresignedDownloadUrl(
     Key: key,
     ResponseContentDisposition: `attachment; filename="${safeName}"`,
   })
-  return getSignedUrl(r2Client, command, { expiresIn })
+  return presignAndNormalize(command, expiresIn)
 }
 
 /**
@@ -66,7 +75,7 @@ export async function getPresignedUploadUrl(
     Key: key,
     ContentType: contentType,
   })
-  return getSignedUrl(r2Client, command, { expiresIn })
+  return presignAndNormalize(command, expiresIn)
 }
 
 /**
