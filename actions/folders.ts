@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { logActivity } from '@/actions/storage'
 import { revalidatePath } from 'next/cache'
 
 export async function crearCarpeta(params: {
@@ -20,7 +21,19 @@ export async function crearCarpeta(params: {
   })
 
   if (error) return { error: error.message }
+
+  await logActivity({
+    accion: 'CREAR_CARPETA',
+    detalles: {
+      nombre: params.nombre,
+      es_privada: params.esPrivada,
+      carpeta_padre_id: params.carpetaPadreId,
+    },
+  })
+
   revalidatePath('/')
+  revalidatePath('/familia')
+  revalidatePath('/mi-caja-fuerte')
   return { success: true }
 }
 

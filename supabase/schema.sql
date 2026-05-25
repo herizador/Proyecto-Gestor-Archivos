@@ -97,7 +97,7 @@ CREATE INDEX IF NOT EXISTS idx_archivos_estado      ON public.archivos(estado);
 CREATE TABLE IF NOT EXISTS public.historial_actividad (
   id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
   usuario_id   UUID        REFERENCES public.perfiles(id) ON DELETE SET NULL,
-  accion       TEXT        NOT NULL,  -- 'LOGIN', 'SUBIR_ARCHIVO', 'DESCARGAR_ARCHIVO', 'ELIMINAR', 'RESTAURAR', 'MOVER', 'CAMBIAR_PRIVACIDAD'
+  accion       TEXT        NOT NULL,  -- 'LOGIN', 'SUBIR_ARCHIVO', 'MOVER_A_PAPELERA', 'ELIMINAR_PERMANENTE', 'RESTAURAR', etc.
   detalles     JSONB,                 -- Datos extra: nombre del archivo, carpeta, IP, etc.
   fecha_evento TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -155,7 +155,7 @@ BEGIN
     VALUES (
       NEW.subido_por,
       CASE
-        WHEN NEW.estado = 'papelera' THEN 'ELIMINAR'
+        WHEN NEW.estado = 'papelera' THEN 'MOVER_A_PAPELERA'
         WHEN NEW.estado = 'activo'   THEN 'RESTAURAR'
         ELSE 'CAMBIAR_ESTADO'
       END,

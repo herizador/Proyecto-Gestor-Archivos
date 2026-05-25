@@ -45,7 +45,7 @@ export default async function HistorialPage() {
                 </td>
                 <td>
                   <span className={`badge ${
-                    evento.accion.includes('ELIMINAR') || evento.accion.includes('PAPELERA') ? 'badge-papelera' : 
+                    evento.accion.includes('ELIMINAR') || evento.accion.includes('PAPELERA') ? 'badge-papelera' :
                     evento.accion === 'LOGIN' ? 'badge-admin' : 'badge-activo'
                   }`}>
                     {evento.accion}

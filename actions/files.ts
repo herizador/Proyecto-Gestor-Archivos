@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getPresignedUploadUrl, getPresignedViewUrl, getPresignedDownloadUrl, deleteFromR2, buildR2Key } from '@/lib/r2/client'
 import { logActivity } from '@/actions/storage'
+import type { ArchivoConAutor } from '@/types/database'
 import { revalidatePath } from 'next/cache'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20 MB
@@ -140,6 +141,31 @@ export async function descargarArchivo(archivoId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Búsqueda global de archivos activos por nombre
+// ---------------------------------------------------------------------------
+export async function buscarArchivos(termino: string) {
+  const trimmed = termino.trim()
+  if (!trimmed) return { data: [] as ArchivoConAutor[] }
+
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'No autenticado.', data: [] as ArchivoConAutor[] }
+
+  const escaped = trimmed.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+
+  const { data, error } = await supabase
+    .from('archivos')
+    .select('*, subido_por_perfil:perfiles(nombre_completo)')
+    .eq('estado', 'activo')
+    .ilike('nombre_original', `%${escaped}%`)
+    .order('fecha_subida', { ascending: false })
+    .limit(50)
+
+  if (error) return { error: error.message, data: [] as ArchivoConAutor[] }
+  return { data: (data ?? []) as ArchivoConAutor[] }
+}
+
+// ---------------------------------------------------------------------------
 // Mover archivo a la papelera (borrado lógico)
 // ---------------------------------------------------------------------------
 export async function moverAPapelera(archivoId: string) {
@@ -192,7 +218,7 @@ export async function eliminarArchivoPermanente(archivoId: string) {
 
   const { data: archivo, error: fetchError } = await supabase
     .from('archivos')
-    .select('ruta_r2')
+    .select('ruta_r2, nombre_original')
     .eq('id', archivoId)
     .single()
 
@@ -204,6 +230,14 @@ export async function eliminarArchivoPermanente(archivoId: string) {
   // 2. Borrar de BD
   const { error } = await supabase.from('archivos').delete().eq('id', archivoId)
   if (error) return { error: error.message }
+
+  await logActivity({
+    accion: 'ELIMINAR_PERMANENTE',
+    detalles: {
+      archivo_id: archivoId,
+      nombre_original: archivo.nombre_original,
+    },
+  })
 
   revalidatePath('/')
   revalidatePath('/papelera')
