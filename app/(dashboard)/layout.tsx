@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { ShieldCheck, FolderHeart, Users, Lock, LogOut, ShieldAlert, Trash2 } from 'lucide-react'
 import { logout } from '@/actions/auth'
+import MobileNavigation from '@/components/MobileNavigation'
 
 export default async function DashboardLayout({
   children,
@@ -26,6 +27,9 @@ export default async function DashboardLayout({
 
   return (
     <div className="dashboard-layout">
+      {/* NAVEGACIÓN MÓVIL (COMPONENTE CLIENTE) */}
+      <MobileNavigation perfil={perfil} isAdmin={isAdmin} />
+
       {/* SIDEBAR */}
       <aside className="sidebar">
         <div className="sidebar-logo">

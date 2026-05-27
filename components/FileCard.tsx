@@ -18,9 +18,8 @@ export default function FileCard({ file, isAdmin, isOwner }: { file: ArchivoConA
     setLoading(true)
     const { url, error } = await visualizarArchivo(file.id)
     setLoading(false)
-    const safeUrl = url ? normalizePresignedUrlForBrowser(url) : null
-    if (safeUrl) {
-      window.open(safeUrl, '_blank', 'noopener,noreferrer')
+    if (url) {
+      window.open(url, '_blank', 'noopener,noreferrer')
     } else {
       alert(error || 'Enlace de visualización no válido.')
     }
@@ -30,10 +29,9 @@ export default function FileCard({ file, isAdmin, isOwner }: { file: ArchivoConA
     setLoading(true)
     const { url, nombreOriginal, error } = await descargarArchivo(file.id)
     setLoading(false)
-    const safeUrl = url ? normalizePresignedUrlForBrowser(url) : null
-    if (safeUrl) {
+    if (url) {
       const link = document.createElement('a')
-      link.href = safeUrl
+      link.href = url
       link.download = nombreOriginal ?? file.nombre_original
       link.rel = 'noopener'
       document.body.appendChild(link)
@@ -58,34 +56,34 @@ export default function FileCard({ file, isAdmin, isOwner }: { file: ArchivoConA
   }
 
   return (
-    <div className="card card-hover" style={{ display: 'flex', flexDirection: 'column', padding: '16px' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: '16px' }}>
-        <div style={{ padding: '12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', color: 'var(--color-accent)' }}>
+    <div className="card card-hover file-card">
+      <div className="file-card-header">
+        <div className={`file-card-icon-wrap ${isImage ? 'image-icon' : ''}`}>
           {isImage ? <Image size={24} /> : <FileText size={24} />}
         </div>
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <h3 style={{ fontSize: '0.9rem', fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+        <div className="file-card-details">
+          <h3 className="file-card-name" title={file.nombre_original}>
             {file.nombre_original}
           </h3>
-          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
+          <p className="file-card-meta">
             {sizeKb} KB • {new Date(file.fecha_subida).toLocaleDateString()}
           </p>
-          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-subtle)', marginTop: '2px' }}>
+          <p className="file-card-author">
             Por: {file.subido_por_perfil?.nombre_completo || 'Desconocido'}
           </p>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: '8px', marginTop: 'auto', flexWrap: 'wrap' }}>
-        <button className="btn btn-ghost btn-sm" style={{ flex: 1, justifyContent: 'center', minWidth: '90px' }} onClick={handleView} disabled={loading}>
-          <Eye size={14} /> Visualizar
+      <div className="file-actions-group">
+        <button className="btn btn-ghost btn-action" onClick={handleView} disabled={loading} title="Visualizar archivo">
+          <Eye size={16} /> <span>Visualizar</span>
         </button>
-        <button className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center', minWidth: '90px' }} onClick={handleDownload} disabled={loading}>
-          <Download size={14} /> Descargar
+        <button className="btn btn-primary btn-action" onClick={handleDownload} disabled={loading} title="Descargar archivo">
+          <Download size={16} /> <span>Descargar</span>
         </button>
         {(isAdmin || isOwner) && (
-          <button className="btn btn-danger btn-icon" onClick={handleTrash} disabled={loading} title="Mover a papelera">
-            <Trash2 size={14} />
+          <button className="btn btn-danger btn-action btn-action-danger" onClick={handleTrash} disabled={loading} title="Mover a papelera">
+            <Trash2 size={16} />
           </button>
         )}
       </div>
