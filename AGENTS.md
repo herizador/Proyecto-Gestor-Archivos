@@ -62,4 +62,4 @@ npm run lint     # ESLint (no prettier/biome)
 Required vars (see `.env.example`):
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `CLOUDFLARE_R2_ENDPOINT`, `CLOUDFLARE_R2_ACCESS_KEY_ID`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY`, `CLOUDFLARE_R2_BUCKET_NAME`
-- `NEXT_PUBLIC_BASE_URL` (for share link generation, defaults to `http://localhost:3000`)
+- `NEXT_PUBLIC_APP_URL` (for share link generation, defaults to `http://localhost:3000`)
