@@ -5,6 +5,7 @@ import { ArchivoConAutor } from '@/types/database'
 import { restaurarArchivo, eliminarArchivoPermanente } from '@/actions/files'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import DateDisplay from '@/components/DateDisplay'
 
 export default function TrashFileCard({
   file,
@@ -58,7 +59,7 @@ export default function TrashFileCard({
             {file.nombre_original}
           </h3>
           <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-            {sizeKb} KB • Eliminado {file.fecha_papelera ? new Date(file.fecha_papelera).toLocaleDateString() : '—'}
+            {sizeKb} KB • Eliminado {file.fecha_papelera ? <DateDisplay date={file.fecha_papelera} /> : '—'}
           </p>
           <p style={{ fontSize: '0.75rem', color: 'var(--color-text-subtle)', marginTop: '2px' }}>
             Por: {file.subido_por_perfil?.nombre_completo || 'Desconocido'}

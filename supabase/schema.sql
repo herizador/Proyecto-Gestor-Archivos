@@ -217,8 +217,8 @@ CREATE TABLE IF NOT EXISTS public.enlaces_compartidos (
   id                 UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
   creado_por         UUID        NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
   tipo_recurso       TEXT        NOT NULL DEFAULT 'multiple',
-  archivos_compartidos JSONB   NOT NULL DEFAULT '[]',
-  carpetas_compartidas JSONB   NOT NULL DEFAULT '[]',
+  archivos_ids       TEXT        NOT NULL DEFAULT '[]',
+  carpetas_ids       TEXT        NOT NULL DEFAULT '[]',
   token_acceso       TEXT        NOT NULL UNIQUE,
   expiracion         TIMESTAMPTZ,
   fecha_creacion     TIMESTAMPTZ NOT NULL DEFAULT NOW()

@@ -5,6 +5,7 @@ import { ArchivoConAutor } from '@/types/database'
 import { visualizarArchivo, descargarArchivo, moverAPapelera } from '@/actions/files'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import DateDisplay from '@/components/DateDisplay'
 
 export default function FileCard({
   file, isAdmin, isOwner, selected, onToggleSelect,
@@ -86,7 +87,7 @@ export default function FileCard({
                 {file.nombre_original}
               </h3>
               <p className="file-card-meta">
-                {sizeKb} KB • {new Date(file.fecha_subida).toLocaleDateString()}
+                {sizeKb} KB • <DateDisplay date={file.fecha_subida} />
               </p>
               <p className="file-card-author">
                 Por: {file.subido_por_perfil?.nombre_completo || 'Desconocido'}

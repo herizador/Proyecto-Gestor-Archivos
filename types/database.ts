@@ -165,8 +165,8 @@ export type Database = {
           id: string
           creado_por: string
           tipo_recurso: string
-          archivos_compartidos: Json
-          carpetas_compartidas: Json
+          archivos_ids: string
+          carpetas_ids: string
           token_acceso: string
           expiracion: string | null
           fecha_creacion: string
@@ -175,8 +175,8 @@ export type Database = {
           id?: string
           creado_por: string
           tipo_recurso?: string
-          archivos_compartidos?: Json
-          carpetas_compartidas?: Json
+          archivos_ids?: string
+          carpetas_ids?: string
           token_acceso: string
           expiracion?: string | null
           fecha_creacion?: string
@@ -185,8 +185,8 @@ export type Database = {
           id?: string
           creado_por?: string
           tipo_recurso?: string
-          archivos_compartidos?: Json
-          carpetas_compartidas?: Json
+          archivos_ids?: string
+          carpetas_ids?: string
           token_acceso?: string
           expiracion?: string | null
           fecha_creacion?: string

@@ -3,6 +3,7 @@
 import { Folder } from 'lucide-react'
 import Link from 'next/link'
 import type { Carpeta } from '@/types/database'
+import DateDisplay from '@/components/DateDisplay'
 
 type CarpetaConAutor = Carpeta & {
   creado_por_perfil?: { nombre_completo: string } | null
@@ -42,7 +43,7 @@ export default function FolderCard({
         </div>
         <h3 className="folder-card-name">{carpeta.nombre}</h3>
         <p className="folder-card-meta">
-          {new Date(carpeta.fecha_creacion).toLocaleDateString()}
+          <DateDisplay date={carpeta.fecha_creacion} />
         </p>
       </Link>
     </div>

@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server'
 import { logActivity } from '@/actions/storage'
 import { getPresignedViewUrl } from '@/lib/r2/client'
 import { revalidatePath } from 'next/cache'
-import crypto from 'crypto'
 
 export async function generarEnlaceCompartido(params: {
   archivoIds: string[]
@@ -26,24 +25,11 @@ export async function generarEnlaceCompartido(params: {
   if (params.archivoIds.length === 1 && params.carpetaIds.length === 0) tipoRecurso = 'archivo'
   else if (params.carpetaIds.length === 1 && params.archivoIds.length === 0) tipoRecurso = 'carpeta'
 
-  const { data: archivos } = await supabase
-    .from('archivos')
-    .select('id, nombre_original')
-    .in('id', params.archivoIds)
-
-  const { data: carpetas } = await supabase
-    .from('carpetas')
-    .select('id, nombre')
-    .in('id', params.carpetaIds)
-
-  const archivosCompartidos = (archivos ?? []).map(a => ({ id: a.id, nombre: a.nombre_original }))
-  const carpetasCompartidas = (carpetas ?? []).map(c => ({ id: c.id, nombre: c.nombre }))
-
   const { error: insertError } = await supabase.from('enlaces_compartidos').insert({
     creado_por: user.id,
     tipo_recurso: tipoRecurso,
-    archivos_compartidos: archivosCompartidos,
-    carpetas_compartidas: carpetasCompartidas,
+    archivos_ids: JSON.stringify(params.archivoIds),
+    carpetas_ids: JSON.stringify(params.carpetaIds),
     token_acceso: token,
     expiracion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
   })
@@ -55,8 +41,8 @@ export async function generarEnlaceCompartido(params: {
     detalles: {
       token,
       tipo_recurso: tipoRecurso,
-      archivos: archivosCompartidos,
-      carpetas: carpetasCompartidas,
+      archivos_ids: params.archivoIds,
+      carpetas_ids: params.carpetaIds,
     },
   })
 
@@ -79,7 +65,14 @@ export async function obtenerEnlaceCompartido(token: string) {
     return { error: 'Este enlace ha expirado.' }
   }
 
-  const archivoIds: string[] = (enlace.archivos_compartidos as { id: string }[]).map(a => a.id)
+  let archivoIds: string[] = []
+  try {
+    archivoIds = typeof enlace.archivos_ids === 'string'
+      ? JSON.parse(enlace.archivos_ids)
+      : (enlace.archivos_ids as string[])
+  } catch {
+    archivoIds = []
+  }
 
   if (archivoIds.length === 0) return { error: 'No hay archivos en este enlace.', enlace }
 
@@ -92,7 +85,7 @@ export async function obtenerEnlaceCompartido(token: string) {
   const archivosConUrl = await Promise.all(
     (archivos ?? []).map(async (archivo) => {
       try {
-        const url = await getPresignedViewUrl(archivo.ruta_r2)
+        const url = await getPresignedViewUrl(archivo.ruta_r2, archivo.tipo_mime)
         return { ...archivo, url }
       } catch {
         return { ...archivo, url: null }
