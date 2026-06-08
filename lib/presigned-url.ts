@@ -3,7 +3,18 @@
  * Codifica cada segmento del pathname sin tocar el query string (firma X-Amz-*).
  */
 export function toBrowserSafePresignedUrl(signedUrl: string): string {
-  return signedUrl
+  try {
+    const url = new URL(signedUrl)
+    const segments = url.pathname.split('/')
+    const encoded = segments.map(seg => {
+      try { return encodeURIComponent(decodeURIComponent(seg)) }
+      catch { return encodeURIComponent(seg) }
+    })
+    url.pathname = encoded.join('/')
+    return url.toString()
+  } catch {
+    return signedUrl
+  }
 }
 
 /** Devuelve la URL lista para el navegador o null si no es absoluta (http/https). */

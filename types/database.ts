@@ -160,6 +160,47 @@ export type Database = {
           },
         ]
       }
+      enlaces_compartidos: {
+        Row: {
+          id: string
+          creado_por: string
+          tipo_recurso: string
+          archivos_compartidos: Json
+          carpetas_compartidas: Json
+          token_acceso: string
+          expiracion: string | null
+          fecha_creacion: string
+        }
+        Insert: {
+          id?: string
+          creado_por: string
+          tipo_recurso?: string
+          archivos_compartidos?: Json
+          carpetas_compartidas?: Json
+          token_acceso: string
+          expiracion?: string | null
+          fecha_creacion?: string
+        }
+        Update: {
+          id?: string
+          creado_por?: string
+          tipo_recurso?: string
+          archivos_compartidos?: Json
+          carpetas_compartidas?: Json
+          token_acceso?: string
+          expiracion?: string | null
+          fecha_creacion?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'enlaces_compartidos_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'perfiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -189,6 +230,7 @@ export type ActivityAction =
   | 'CAMBIAR_PRIVACIDAD'
   | 'CREAR_CARPETA'
   | 'ELIMINAR_CARPETA'
+  | 'COMPARTIR_ENLACE'
 
 // Tipos de fila convenientes
 export type Perfil = Database['public']['Tables']['perfiles']['Row']
@@ -205,3 +247,6 @@ export type HistorialConPerfil = HistorialActividad & {
 export type ArchivoConAutor = Archivo & {
   subido_por_perfil: Pick<Perfil, 'nombre_completo'> | null
 }
+
+// Tipo para enlaces de compartición
+export type EnlaceCompartido = Database['public']['Tables']['enlaces_compartidos']['Row']

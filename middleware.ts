@@ -30,7 +30,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Rutas públicas — no requieren sesión
-  const isPublicRoute = pathname.startsWith('/login') || pathname.startsWith('/_next') || pathname === '/favicon.ico'
+  const isPublicRoute = pathname.startsWith('/login') || pathname.startsWith('/compartir') || pathname.startsWith('/_next') || pathname === '/favicon.ico'
 
   // Si no hay sesión y no es ruta pública → redirigir al login
   if (!user && !isPublicRoute) {

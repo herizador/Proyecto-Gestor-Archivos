@@ -2,12 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { FolderHeart, ChevronRight, Home } from 'lucide-react'
-import FileCard from '@/components/FileCard'
-import FolderCard from '@/components/FolderCard'
-import UploadModalWrapper from './UploadModalWrapper'
-import NewFolderModalWrapper from '@/components/NewFolderModalWrapper'
-import DocumentSearchBar from '@/components/DocumentSearchBar'
-import StorageBar from '@/components/StorageBar'
+import UploadModalWrapper from './UploadModalWrapper'
+import NewFolderModalWrapper from '@/components/NewFolderModalWrapper'
+import DocumentSearchBar from '@/components/DocumentSearchBar'
+import StorageBar from '@/components/StorageBar'
+import FileListWrapper from '@/components/FileListWrapper'
 
 export default async function DashboardComun({
   searchParams,
@@ -103,38 +102,15 @@ export default async function DashboardComun({
                 : 'Sube el primer archivo o crea una carpeta para compartir con tu familia.'}
             </p>
           </div>
-        ) : (
-          <>
-            {carpetas && carpetas.length > 0 && (
-              <section style={{ marginBottom: '24px' }}>
-                <h2 className="section-title">Carpetas</h2>
-                <div className="grid-folders">
-                  {carpetas.map((carpeta) => (
-                    <FolderCard key={carpeta.id} carpeta={carpeta} />
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {archivos && archivos.length > 0 && (
-              <section>
-                {carpetas && carpetas.length > 0 && (
-                  <h2 className="section-title">Archivos</h2>
-                )}
-                <div className="grid-files">
-                  {archivos.map((file) => (
-                    <FileCard
-                      key={file.id}
-                      file={file}
-                      isAdmin={isAdmin}
-                      isOwner={file.subido_por === user.id}
-                    />
-                  ))}
-                </div>
-              </section>
-            )}
-          </>
-        )}
+        ) : (
+          <FileListWrapper
+            archivos={archivos ?? []}
+            carpetas={carpetas ?? []}
+            isAdmin={isAdmin}
+            userId={user.id}
+            carpetaActualId={carpetaActualId}
+          />
+        )}
       </DocumentSearchBar>
     </div>
   )

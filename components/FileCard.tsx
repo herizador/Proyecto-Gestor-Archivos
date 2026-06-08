@@ -3,11 +3,18 @@
 import { FileText, Image, Download, Trash2, Eye } from 'lucide-react'
 import { ArchivoConAutor } from '@/types/database'
 import { visualizarArchivo, descargarArchivo, moverAPapelera } from '@/actions/files'
-import { normalizePresignedUrlForBrowser } from '@/lib/presigned-url'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
-export default function FileCard({ file, isAdmin, isOwner }: { file: ArchivoConAutor, isAdmin: boolean, isOwner: boolean }) {
+export default function FileCard({
+  file, isAdmin, isOwner, selected, onToggleSelect,
+}: {
+  file: ArchivoConAutor
+  isAdmin: boolean
+  isOwner: boolean
+  selected?: boolean
+  onToggleSelect?: (id: string) => void
+}) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
@@ -56,21 +63,36 @@ export default function FileCard({ file, isAdmin, isOwner }: { file: ArchivoConA
   }
 
   return (
-    <div className="card card-hover file-card">
-      <div className="file-card-header">
-        <div className={`file-card-icon-wrap ${isImage ? 'image-icon' : ''}`}>
-          {isImage ? <Image size={24} /> : <FileText size={24} />}
-        </div>
-        <div className="file-card-details">
-          <h3 className="file-card-name" title={file.nombre_original}>
-            {file.nombre_original}
-          </h3>
-          <p className="file-card-meta">
-            {sizeKb} KB • {new Date(file.fecha_subida).toLocaleDateString()}
-          </p>
-          <p className="file-card-author">
-            Por: {file.subido_por_perfil?.nombre_completo || 'Desconocido'}
-          </p>
+    <div className={`card card-hover file-card${selected ? ' card-selected' : ''}`}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+        {onToggleSelect && (
+          <div style={{ paddingTop: '4px' }}>
+            <input
+              type="checkbox"
+              className="checkbox-input"
+              checked={!!selected}
+              onChange={() => onToggleSelect(file.id)}
+              aria-label={`Seleccionar ${file.nombre_original}`}
+            />
+          </div>
+        )}
+        <div style={{ flex: 1 }}>
+          <div className="file-card-header" style={{ marginBottom: 0 }}>
+            <div className={`file-card-icon-wrap ${isImage ? 'image-icon' : ''}`}>
+              {isImage ? <Image size={24} /> : <FileText size={24} />}
+            </div>
+            <div className="file-card-details">
+              <h3 className="file-card-name" title={file.nombre_original}>
+                {file.nombre_original}
+              </h3>
+              <p className="file-card-meta">
+                {sizeKb} KB • {new Date(file.fecha_subida).toLocaleDateString()}
+              </p>
+              <p className="file-card-author">
+                Por: {file.subido_por_perfil?.nombre_completo || 'Desconocido'}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 

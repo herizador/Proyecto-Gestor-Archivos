@@ -210,6 +210,36 @@ CREATE TRIGGER trg_validar_limite
 
 
 -- =============================================================================
+-- TABLA 5: enlaces_compartidos
+-- Almacena enlaces de compartición con token único y expiración.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.enlaces_compartidos (
+  id                 UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  creado_por         UUID        NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
+  tipo_recurso       TEXT        NOT NULL DEFAULT 'multiple',
+  archivos_compartidos JSONB   NOT NULL DEFAULT '[]',
+  carpetas_compartidas JSONB   NOT NULL DEFAULT '[]',
+  token_acceso       TEXT        NOT NULL UNIQUE,
+  expiracion         TIMESTAMPTZ,
+  fecha_creacion     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_enlaces_token ON public.enlaces_compartidos(token_acceso);
+
+-- RLS: enlaces_compartidos
+ALTER TABLE public.enlaces_compartidos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "enlaces_select_token" ON public.enlaces_compartidos
+  FOR SELECT USING (TRUE); -- cualquiera con el token puede consultar
+
+CREATE POLICY "enlaces_insert_propio" ON public.enlaces_compartidos
+  FOR INSERT WITH CHECK (creado_por = auth.uid());
+
+CREATE POLICY "enlaces_delete_propio" ON public.enlaces_compartidos
+  FOR DELETE USING (creado_por = auth.uid() OR public.get_user_role() = 'admin');
+
+
+-- =============================================================================
 -- FUNCIÓN UTILITARIA: Consultar uso total de almacenamiento
 -- Uso desde Next.js: supabase.rpc('get_storage_usage')
 -- =============================================================================
