@@ -1,7 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
 import { ShieldAlert, History } from 'lucide-react'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
 
 export default async function HistorialPage() {
   const supabase = await createClient()
@@ -38,7 +36,7 @@ export default async function HistorialPage() {
             {historial?.map((evento) => (
               <tr key={evento.id}>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  {format(new Date(evento.fecha_evento), "dd/MM/yyyy HH:mm:ss", { locale: es })}
+                  {new Date(evento.fecha_evento).toLocaleString('es-ES', { timeZone: 'Europe/Madrid', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </td>
                 <td>
                   <strong>{evento.perfiles?.nombre_completo || 'Sistema'}</strong>

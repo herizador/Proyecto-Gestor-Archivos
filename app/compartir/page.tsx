@@ -105,7 +105,7 @@ export default async function CompartirPage({
 
           <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
             {enlace?.expiracion && (
-              <p>Este enlace expira el {new Date(enlace.expiracion).toLocaleDateString()}</p>
+              <p>Este enlace expira el {new Date(enlace.expiracion).toLocaleDateString('es-ES')}</p>
             )}
             <p style={{ marginTop: '4px' }}>Gestor de Archivos Familiar</p>
           </div>

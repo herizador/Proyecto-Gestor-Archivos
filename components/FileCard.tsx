@@ -83,7 +83,7 @@ export default function FileCard({
             />
           </div>
         )}
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div className="file-card-header" style={{ marginBottom: 0 }}>
             <div className={`file-card-icon-wrap ${isImage ? 'image-icon' : ''}`}>
               {isImage ? <Image size={24} /> : <FileText size={24} />}
