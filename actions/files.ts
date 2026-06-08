@@ -82,7 +82,7 @@ export async function visualizarArchivo(archivoId: string) {
 
   const { data: archivo, error } = await supabase
     .from('archivos')
-    .select('ruta_r2, nombre_original')
+    .select('ruta_r2, nombre_original, tipo_mime')
     .eq('id', archivoId)
     .eq('estado', 'activo')
     .single()
@@ -90,7 +90,7 @@ export async function visualizarArchivo(archivoId: string) {
   if (error || !archivo) return { error: 'Archivo no encontrado o sin permisos.' }
 
   try {
-    const url = await getPresignedViewUrl(archivo.ruta_r2)
+    const url = await getPresignedViewUrl(archivo.ruta_r2, archivo.tipo_mime)
 
     await logActivity({
       accion: 'VISUALIZAR_ARCHIVO',

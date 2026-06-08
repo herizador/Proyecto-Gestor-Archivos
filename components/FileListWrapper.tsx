@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
-import { Share2, X, Check, Link } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Share2, X, Check, Link, List } from 'lucide-react'
 import { generarEnlaceCompartido } from '@/actions/share'
 import FileCard from '@/components/FileCard'
 import FolderCard from '@/components/FolderCard'
@@ -10,8 +10,6 @@ import type { ArchivoConAutor, Carpeta } from '@/types/database'
 type CarpetaConAutor = Carpeta & {
   creado_por_perfil?: { nombre_completo: string } | null
 }
-
-type ShareResult = { url: string } | { error: string }
 
 export default function FileListWrapper({
   archivos,
@@ -28,47 +26,48 @@ export default function FileListWrapper({
   carpetaActualId?: string | null
   showOwner?: boolean
 }) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [shareLoading, setShareLoading] = useState(false)
-  const [shareResult, setShareResult] = useState<ShareResult | null>(null)
+  const [shareResult, setShareResult] = useState<{ url: string } | { error: string } | null>(null)
 
   const allIds = useMemo(() => {
-    const fileIds = archivos.map(a => `file_${a.id}`)
-    const folderIds = carpetas.map(c => `carpeta_${c.id}`)
+    const fileIds = archivos.map(a => a.id)
+    const folderIds = carpetas.map(c => c.id)
     return [...folderIds, ...fileIds]
   }, [archivos, carpetas])
 
-  const toggleSelect = useCallback((id: string) => {
+  function toggleSelect(id: string) {
     setSelectedIds(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
+      if (prev.includes(id)) return prev.filter(i => i !== id)
+      return [...prev, id]
     })
     setShareResult(null)
-  }, [])
+  }
 
-  const handleToggleAll = useCallback(() => {
-    if (selectedIds.size === allIds.length) {
-      setSelectedIds(new Set())
+  function handleToggleAll() {
+    if (selectedIds.length === allIds.length) {
+      setSelectedIds([])
     } else {
-      setSelectedIds(new Set(allIds))
+      setSelectedIds([...allIds])
     }
     setShareResult(null)
-  }, [selectedIds, allIds])
+  }
 
-  const clearSelection = useCallback(() => {
-    setSelectedIds(new Set())
+  function exitSelectionMode() {
+    setIsSelectionMode(false)
+    setSelectedIds([])
     setShareResult(null)
-  }, [])
+  }
 
-  const handleShare = useCallback(async () => {
+  async function handleShare() {
     const archivoIds: string[] = []
     const carpetaIds: string[] = []
+    const carpetaIdSet = new Set(carpetas.map(c => c.id))
 
     selectedIds.forEach(id => {
-      if (id.startsWith('carpeta_')) carpetaIds.push(id.slice(8))
-      else if (id.startsWith('file_')) archivoIds.push(id.slice(5))
+      if (carpetaIdSet.has(id)) carpetaIds.push(id)
+      else archivoIds.push(id)
     })
 
     setShareLoading(true)
@@ -87,83 +86,100 @@ export default function FileListWrapper({
     } else {
       setShareResult({ error: ('error' in result ? result.error : 'Error al generar enlace') ?? 'Error al generar enlace' })
     }
-  }, [selectedIds])
+  }
 
-  const isAllSelected = selectedIds.size === allIds.length && allIds.length > 0
+  const isAllSelected = selectedIds.length === allIds.length && allIds.length > 0
+  const hasItems = allIds.length > 0
 
   return (
     <div>
-      {selectedIds.size > 0 && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            padding: '12px 16px',
-            marginBottom: '16px',
-            background: 'var(--color-accent-dim)',
-            border: '1px solid rgba(79,142,247,0.25)',
-            borderRadius: 'var(--radius-md)',
-            flexWrap: 'wrap',
-          }}
-        >
-          <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--color-accent)' }}>
-            {selectedIds.size} seleccionado{selectedIds.size !== 1 ? 's' : ''}
-          </span>
-
-          <button type="button" className="btn btn-ghost btn-sm" onClick={handleToggleAll} style={{ minHeight: '36px' }}>
-            <Check size={14} />
-            {isAllSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
-          </button>
-
-          <button type="button" className="btn btn-ghost btn-sm" onClick={clearSelection} style={{ minHeight: '36px' }}>
-            <X size={14} />
-            Limpiar
-          </button>
-
-          <div style={{ marginLeft: 'auto' }}>
+      {/* Barra de selección */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '10px 16px',
+          marginBottom: '16px',
+          borderRadius: 'var(--radius-md)',
+          flexWrap: 'wrap',
+          ...(isSelectionMode
+            ? { background: 'var(--color-accent-dim)', border: '1px solid rgba(79,142,247,0.25)' }
+            : {}),
+        }}
+      >
+        {!isSelectionMode ? (
+          hasItems && (
             <button
               type="button"
-              className="btn btn-primary btn-sm"
-              onClick={handleShare}
-              disabled={shareLoading}
+              className="btn btn-ghost btn-sm"
+              onClick={() => setIsSelectionMode(true)}
               style={{ minHeight: '36px' }}
             >
-              <Share2 size={14} />
-              {shareLoading ? 'Generando...' : 'Compartir'}
+              <List size={16} />
+              Seleccionar
             </button>
-          </div>
+          )
+        ) : (
+          <>
+            <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--color-accent)' }}>
+              {selectedIds.length} seleccionado{selectedIds.length !== 1 ? 's' : ''}
+            </span>
 
-          {shareResult && 'url' in shareResult && (
-            <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-              <Link size={14} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
-              <input
-                type="text"
-                className="input"
-                value={shareResult.url}
-                readOnly
-                style={{ fontSize: '0.8rem', padding: '6px 10px', flex: 1 }}
-                onClick={(e) => (e.target as HTMLInputElement).select()}
-              />
+            <button type="button" className="btn btn-ghost btn-sm" onClick={handleToggleAll} style={{ minHeight: '36px' }}>
+              <Check size={14} />
+              {isAllSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
+            </button>
+
+            <button type="button" className="btn btn-ghost btn-sm" onClick={exitSelectionMode} style={{ minHeight: '36px' }}>
+              <X size={14} />
+              Cancelar
+            </button>
+
+            <div style={{ marginLeft: 'auto' }}>
               <button
                 type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={() => navigator.clipboard.writeText(shareResult.url)}
-                style={{ minHeight: '36px', flexShrink: 0 }}
-                title="Copiar enlace"
+                className="btn btn-primary btn-sm"
+                onClick={handleShare}
+                disabled={shareLoading || selectedIds.length === 0}
+                style={{ minHeight: '36px' }}
               >
-                Copiar
+                <Share2 size={14} />
+                {shareLoading ? 'Generando...' : 'Compartir Seleccionados'}
               </button>
             </div>
-          )}
 
-          {shareResult && 'error' in shareResult && (
-            <span style={{ color: 'var(--color-danger)', fontSize: '0.85rem', width: '100%' }}>
-              {shareResult.error}
-            </span>
-          )}
-        </div>
-      )}
+            {shareResult && 'url' in shareResult && (
+              <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                <Link size={14} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
+                <input
+                  type="text"
+                  className="input"
+                  value={shareResult.url}
+                  readOnly
+                  style={{ fontSize: '0.8rem', padding: '6px 10px', flex: 1 }}
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                />
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => navigator.clipboard.writeText(shareResult.url)}
+                  style={{ minHeight: '36px', flexShrink: 0 }}
+                  title="Copiar enlace"
+                >
+                  Copiar
+                </button>
+              </div>
+            )}
+
+            {shareResult && 'error' in shareResult && (
+              <span style={{ color: 'var(--color-danger)', fontSize: '0.85rem', width: '100%' }}>
+                {shareResult.error}
+              </span>
+            )}
+          </>
+        )}
+      </div>
 
       {carpetas.length > 0 && (
         <section style={{ marginBottom: '24px' }}>
@@ -173,8 +189,8 @@ export default function FileListWrapper({
               <FolderCard
                 key={carpeta.id}
                 carpeta={carpeta}
-                selected={selectedIds.has(`carpeta_${carpeta.id}`)}
-                onToggleSelect={toggleSelect}
+                selected={isSelectionMode && selectedIds.includes(carpeta.id)}
+                onToggleSelect={isSelectionMode ? toggleSelect : undefined}
                 carpetaActualId={carpetaActualId}
               />
             ))}
@@ -192,8 +208,8 @@ export default function FileListWrapper({
                 file={archivo}
                 isAdmin={isAdmin}
                 isOwner={archivo.subido_por === userId || showOwner}
-                selected={selectedIds.has(`file_${archivo.id}`)}
-                onToggleSelect={toggleSelect}
+                selected={isSelectionMode && selectedIds.includes(archivo.id)}
+                onToggleSelect={isSelectionMode ? toggleSelect : undefined}
               />
             ))}
           </div>

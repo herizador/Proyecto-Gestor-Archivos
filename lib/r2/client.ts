@@ -36,11 +36,16 @@ function sanitizeFileNameForDisposition(fileName: string): string {
 /**
  * Genera una URL pre-firmada para VISUALIZAR en el navegador (inline).
  */
-export async function getPresignedViewUrl(key: string, expiresIn = 900): Promise<string> {
+export async function getPresignedViewUrl(
+  key: string,
+  contentType?: string,
+  expiresIn = 900
+): Promise<string> {
   const command = new GetObjectCommand({
     Bucket: BUCKET,
     Key: key,
     ResponseContentDisposition: 'inline',
+    ...(contentType ? { ResponseContentType: contentType } : {}),
   })
   return presignAndNormalize(command, expiresIn)
 }
