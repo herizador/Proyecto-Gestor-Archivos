@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gestor-familiar-v1';
+const CACHE_NAME = 'gestor-familiar-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
@@ -23,28 +23,36 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', (event) => {
-  // Only intercept same-origin GET requests
   if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).catch(() => {
-        // Safe fallback if offline and not in cache
-        return new Response('Red no disponible. Conéctate a internet para ver este recurso.', {
-          status: 503,
-          headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    fetch(event.request)
+      .then((response) => {
+        const responseClone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => {
+          if (event.request.url.includes('/manifest.json') || event.request.url === self.location.origin + '/') {
+            cache.put(event.request, responseClone);
+          }
         });
-      });
-    })
+        return response;
+      })
+      .catch(() => {
+        return caches.match(event.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          return new Response('Red no disponible. Conéctate a internet para ver este recurso.', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          });
+        });
+      })
   );
 });
