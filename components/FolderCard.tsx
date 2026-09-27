@@ -13,16 +13,14 @@ export default function FolderCard({
   carpeta,
   selected,
   onToggleSelect,
-  carpetaActualId,
+  basePath = '/',
 }: {
   carpeta: CarpetaConAutor
   selected?: boolean
   onToggleSelect?: (id: string) => void
-  carpetaActualId?: string | null
+  basePath?: string
 }) {
-  const folderHref = carpetaActualId
-    ? `/?carpeta=${carpeta.id}`
-    : `/?carpeta=${carpeta.id}`
+  const folderHref = `${basePath}?carpeta=${carpeta.id}`
 
   return (
     <div className={`card card-hover folder-card${selected ? ' card-selected' : ''}`}>

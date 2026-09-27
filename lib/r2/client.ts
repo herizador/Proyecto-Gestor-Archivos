@@ -1,4 +1,4 @@
-import { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, GetObjectCommand, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { toBrowserSafePresignedUrl } from '@/lib/presigned-url'
 
@@ -89,6 +89,51 @@ export async function getPresignedUploadUrl(
 export async function deleteFromR2(key: string): Promise<void> {
   const command = new DeleteObjectCommand({ Bucket: BUCKET, Key: key })
   await r2Client.send(command)
+}
+
+/**
+ * Sube un buffer directamente a R2 desde el servidor (staging del Share Target).
+ * No usa URL pre-firmada: el servidor ya tiene las credenciales.
+ */
+export async function putToR2(
+  key: string,
+  body: Uint8Array,
+  contentType: string
+): Promise<void> {
+  const command = new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+  })
+  await r2Client.send(command)
+}
+
+/**
+ * Mueve un objeto dentro del bucket (staging → destino definitivo).
+ * R2/S3 no tiene "rename": es Copy + Delete. Si el borrado falla tras copiar,
+ * se lanza error para que el llamador limpie; el objeto queda duplicado pero
+ * nunca se pierde el fichero.
+ */
+export async function moverEnR2(origenKey: string, destinoKey: string): Promise<void> {
+  await r2Client.send(new CopyObjectCommand({
+    Bucket: BUCKET,
+    CopySource: `${BUCKET}/${origenKey}`,
+    Key: destinoKey,
+  }))
+  await deleteFromR2(origenKey)
+}
+
+/**
+ * Key temporal del staging del Share Target. Siempre bajo el prefijo
+ * `compartidos-pendientes/<uid>/` para poder auditar y limpiar abandonos.
+ */
+export function buildStagingKey(params: {
+  userId: string
+  fileName: string
+}): string {
+  const safeName = params.fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+  return `compartidos-pendientes/${params.userId}/${Date.now()}_${safeName}`
 }
 
 /**

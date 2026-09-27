@@ -345,3 +345,106 @@ CREATE POLICY "historial_select_admin" ON public.historial_actividad
 -- Insertar: solo el sistema vía triggers (SECURITY DEFINER)
 CREATE POLICY "historial_insert_sistema" ON public.historial_actividad
   FOR INSERT WITH CHECK (TRUE);
+
+
+-- =============================================================================
+-- TABLA 6: lotes_recibidos
+-- Staging del Web Share Target: el POST de /api/recibir sube aquí los
+-- ficheros y la página /recibir los mueve a su destino definitivo.
+-- Sin UPDATE: los lotes se confirman y se borran, no se editan.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.lotes_recibidos (
+  id             UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  usuario_id     UUID        NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
+  claves_r2      JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  metadatos      JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_lotes_recibidos_usuario ON public.lotes_recibidos(usuario_id);
+
+-- ─── RLS: lotes_recibidos ─────────────────────────────────────────────────────
+ALTER TABLE public.lotes_recibidos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "lotes_select_propio" ON public.lotes_recibidos
+  FOR SELECT USING (usuario_id = auth.uid() OR public.get_user_role() = 'admin');
+
+CREATE POLICY "lotes_insert_propio" ON public.lotes_recibidos
+  FOR INSERT WITH CHECK (usuario_id = auth.uid());
+
+CREATE POLICY "lotes_delete_propio_admin" ON public.lotes_recibidos
+  FOR DELETE USING (usuario_id = auth.uid() OR public.get_user_role() = 'admin');
+
+
+-- =============================================================================
+-- TABLA 7: accesos_directos
+-- Un fichero físico visible en N ubicaciones sin duplicar bytes (no suma cupo).
+-- Ambos objetivos a NULL = enlace huérfano (el original se borró o está en
+-- papelera); por eso el CHECK solo prohíbe apuntar a archivo Y carpeta a la vez.
+-- Sin UPDATE: los enlaces no se editan, se borran y se recrean.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.accesos_directos (
+  id                     UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  creado_por             UUID NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
+  carpeta_contenedora_id UUID NOT NULL REFERENCES public.carpetas(id) ON DELETE CASCADE,
+  archivo_objetivo_id    UUID REFERENCES public.archivos(id) ON DELETE SET NULL,
+  carpeta_objetivo_id    UUID REFERENCES public.carpetas(id) ON DELETE SET NULL,
+  nombre_personalizado   TEXT,
+  fecha_creacion         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_un_solo_objetivo CHECK (
+    NOT (archivo_objetivo_id IS NOT NULL AND carpeta_objetivo_id IS NOT NULL)
+  )
+);
+
+-- Deduplicación real (una UNIQUE multidominio no funciona con NULLs)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_acceso_archivo
+  ON public.accesos_directos(carpeta_contenedora_id, archivo_objetivo_id)
+  WHERE archivo_objetivo_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_acceso_carpeta
+  ON public.accesos_directos(carpeta_contenedora_id, carpeta_objetivo_id)
+  WHERE carpeta_objetivo_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_accesos_contenedora
+  ON public.accesos_directos(carpeta_contenedora_id);
+
+-- ─── RLS: accesos_directos ────────────────────────────────────────────────────
+ALTER TABLE public.accesos_directos ENABLE ROW LEVEL SECURITY;
+
+-- Ver: creador, admin, con acceso al objetivo, o (huérfano) a la contenedora
+CREATE POLICY "accesos_select" ON public.accesos_directos
+  FOR SELECT USING (
+    creado_por = auth.uid()
+    OR public.get_user_role() = 'admin'
+    OR EXISTS (
+      SELECT 1 FROM public.archivos a
+      WHERE a.id = accesos_directos.archivo_objetivo_id
+        AND (
+          a.subido_por = auth.uid()
+          OR EXISTS (
+            SELECT 1 FROM public.carpetas c
+            WHERE c.id = a.carpeta_id AND c.es_privada = FALSE
+          )
+        )
+    )
+    OR EXISTS (
+      SELECT 1 FROM public.carpetas c
+      WHERE c.id = accesos_directos.carpeta_objetivo_id
+        AND (c.creado_por = auth.uid() OR c.es_privada = FALSE)
+    )
+    OR (
+      accesos_directos.archivo_objetivo_id IS NULL
+      AND accesos_directos.carpeta_objetivo_id IS NULL
+      AND EXISTS (
+        SELECT 1 FROM public.carpetas c
+        WHERE c.id = accesos_directos.carpeta_contenedora_id
+          AND (c.creado_por = auth.uid() OR c.es_privada = FALSE)
+      )
+    )
+  );
+
+CREATE POLICY "accesos_insert_propio" ON public.accesos_directos
+  FOR INSERT WITH CHECK (creado_por = auth.uid());
+
+CREATE POLICY "accesos_delete_propio_admin" ON public.accesos_directos
+  FOR DELETE USING (creado_por = auth.uid() OR public.get_user_role() = 'admin');

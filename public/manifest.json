@@ -3,10 +3,25 @@
   "short_name": "Gestor Familiar",
   "description": "Gestor de Archivos Familiar Privado y Seguro",
   "start_url": "/",
+  "scope": "/",
+  "id": "/",
   "display": "standalone",
   "background_color": "#0a0f1e",
   "theme_color": "#0a0f1e",
   "orientation": "portrait",
+  "share_target": {
+    "action": "/api/recibir",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "archivos",
+          "accept": ["image/*", "video/*", "audio/*", "application/pdf", "*/*"]
+        }
+      ]
+    }
+  },
   "icons": [
     {
       "src": "/icon-192.png",

@@ -108,7 +108,6 @@ export default async function DashboardComun({
             carpetas={carpetas ?? []}
             isAdmin={isAdmin}
             userId={user.id}
-            carpetaActualId={carpetaActualId}
           />
         )}
       </DocumentSearchBar>

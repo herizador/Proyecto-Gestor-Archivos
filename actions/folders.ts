@@ -13,6 +13,16 @@ export async function crearCarpeta(params: {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
 
+  // El padre debe existir y ser visible (RLS); si no, el insert quedaría huérfano
+  if (params.carpetaPadreId) {
+    const { data: padre, error: padreError } = await supabase
+      .from('carpetas')
+      .select('id')
+      .eq('id', params.carpetaPadreId)
+      .single()
+    if (padreError || !padre) return { error: 'Carpeta padre no válida.' }
+  }
+
   const { error } = await supabase.from('carpetas').insert({
     nombre: params.nombre,
     creado_por: user.id,

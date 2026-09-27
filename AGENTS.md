@@ -1,65 +1,64 @@
 # AGENTS.md — gestor-archivos-familia
 
-## Language Settings
-- Siempre debes responder y comunicarte en Español.
-- Analiza los prompts en Español y mantén las explicaciones de código en este mismo idioma.
+## Idioma
+- Responde y comunica siempre en español (prompts, explicaciones y comentarios de código).
+- UI, SQL y comentarios del repo ya están en español: manténlo.
 
-## Commands
-
+## Comandos
 ```sh
-npm run dev      # Next.js dev server
-npm run build    # production build
-npm run lint     # ESLint (no prettier/biome)
-# No test framework installed
+npm run dev      # servidor Next.js
+npm run build    # build producción (verificación principal)
+npm run lint     # ESLint (sin prettier/biome)
+# Sin framework de tests: verifica con build + lint
 ```
 
-## Stack & structure
+## Stack y estructura
+- **Next.js 16 App Router + React 19**, **TypeScript 5 strict**, **npm**. Alias `@/*` → raíz `./*`.
+- **Supabase** (PostgreSQL + Auth SSR + RLS) para auth y metadatos. Fuente de verdad del esquema: `supabase/schema.sql` (se aplica a mano en Dashboard → SQL Editor); `types/database.ts` es su espejo manual.
+- **Cloudflare R2** (S3-compatible) para los ficheros. Subida directa navegador → R2 con URL pre-firmada.
+- **PWA**: `public/sw.js` + `public/manifest.json`, registro en `app/layout.tsx`.
+- Server Actions en `actions/` (`auth.ts`, `files.ts`, `folders.ts`, `storage.ts`, `share.ts`). Clientes Supabase: `lib/supabase/client.ts` (browser) y `lib/supabase/server.ts` (server con cookies). R2 en `lib/r2/client.ts`, normalización de URLs en `lib/presigned-url.ts`.
+- Rutas: `/login` (pública), `/` (común), `/familia`, `/mi-caja-fuerte`, `/papelera`, `/admin/historial`, `/admin/usuarios`, `/compartir?token=xyz` (pública). `middleware.ts` refresca sesión, redirige sin sesión a `/login`, de `/login` con sesión a `/`, y exige rol `admin` en `/admin/*`.
 
-- **Next.js 16 App Router** (React Server Components + Server Actions), **TypeScript 5 strict**, **npm**
-- **Supabase** (PostgreSQL + Auth SSR + RLS) for auth & metadata
-- **Cloudflare R2** (S3-compatible) for file storage; clients upload directly via presigned URLs
-- **PWA** with service worker (`public/sw.js`) + manifest (`public/manifest.json`)
-- Path alias `@/*` → root `./*`
+## Flujo de subida (no inventar otro)
+1. Cliente pide URL con `getUploadUrl()` (`actions/files.ts`): valida **20 MB máx** y genera key con `buildR2Key()` → `comun/...`, `usuarios/<id>/publico/...` o `usuarios/<id>/privado/...`.
+2. `PUT` directo a R2 desde `UploadModal.tsx`: **solo** header `Content-Type` y `credentials: 'omit'`. Cualquier header extra rompe la firma.
+3. `registrarArchivo()` inserta en `archivos`. El trigger BD rechaza si supera **9 GB** (`get_storage_usage()`); propaga el mensaje `LIMITE_ALMACENAMIENTO`.
 
-## Routing
+## Quirks de R2 (causas reales de bugs pasados)
+- `S3Client` lleva `forcePathStyle: true` y `requestChecksumCalculation / responseChecksumValidation: 'WHEN_REQUIRED'` (`lib/r2/client.ts`). No quitar: R2 no soporta los checksums automáticos del SDK AWS.
+- Toda URL firmada pasa por `toBrowserSafePresignedUrl()` (codifica path sin tocar el query de firma). No normalizar ni reescribir la URL a mano.
+- Expiraciones: subida 300 s, vista/descarga 900 s. Vista = `inline` (`getPresignedViewUrl`), descarga = `attachment; filename="..."` (`getPresignedDownloadUrl`).
 
-| Route | Purpose | Auth |
-|---|---|---|
-| `/login` | Login | public |
-| `/` | Common Area (shared files) | required |
-| `/familia` | Family directory (per-user public files) | required |
-| `/mi-caja-fuerte` | Private files ("My Safe") | required |
-| `/papelera` | Trash (soft-deleted files) | required |
-| `/admin/historial` | Audit log | admin |
-| `/admin/usuarios` | User management | admin |
-| `/compartir` | Shared link view (token-based) | public |
+## Visualizar vs descargar
+- `FileCard.tsx`: visualizar abre `<a target="_blank">` con URL `inline`; descargar usa atributo `download`. No unificar: `/compartir` reutiliza el motor de vista.
+- Auditoría: `visualizarArchivo` → `VISUALIZAR_ARCHIVO`, `descargarArchivo` → `DESCARGAR_ARCHIVO`, `generarEnlaceCompartido` → `COMPARTIR_ENLACE`. Todo vía `logActivity()` (`actions/storage.ts`), nunca insert directo desde cliente.
 
-## Key conventions
+## Caché / PWA (pantallas congeladas en móvil)
+- `public/sw.js` (`CACHE_NAME = 'gestor-familiar-v2'`) es **network-first** con fallback a caché solo sin red, y el evento `activate` borra cachés viejas + `clients.claim()`. Solo cachea `/` y `/manifest.json`: **no cachear rutas del dashboard ni URLs firmadas**.
+- Al desplegar un cambio que afecte al SW, **sube la versión de `CACHE_NAME`** o los móviles seguirán con la vieja.
+- `next.config.ts` inyecta `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate` + `Pragma: no-cache` + `Expires: 0` en `/(.*)`. No añadir caché HTTP a vistas dinámicas.
 
-- **Spanish** throughout: UI labels, code comments, SQL identifiers
-- Server Actions live in `actions/` (`auth.ts`, `files.ts`, `folders.ts`, `storage.ts`, `share.ts`)
-- Supabase clients: `lib/supabase/client.ts` (browser), `lib/supabase/server.ts` (server, cookie-based)
-- R2 helpers in `lib/r2/client.ts`
-- Types generated from schema in `types/database.ts`
-- Icons: `lucide-react`; dates: `date-fns`
-- Interactive wrappers follow `<Component>Wrapper.tsx` pattern (client wrapper for server-parented modals)
-- Dark theme: CSS custom properties in `app/globals.css`
+## Fechas e hidratación (error 418 recurrente)
+- Usar siempre `<DateDisplay date={...} />` (`components/DateDisplay.tsx`: `suppressHydrationWarning` + `es-ES`). Nunca `new Date(...).toLocaleDateString()` directo en un client component.
+- `searchParams` en `app/compartir/page.tsx` es `Promise`: hay que hacer `await`.
 
-## Data flow & quirks
+## Compartir
+- `FileListWrapper.tsx` gestiona el modo selección (multi-select archivos + carpetas) y llama a `generarEnlaceCompartido({ archivoIds, carpetaIds })`. Token con `crypto.randomUUID()`, `tipo_recurso` auto (`archivo`/`carpeta`/`multiple`), expiración **7 días**, URL base `NEXT_PUBLIC_APP_URL` (fallback `http://localhost:3000`).
+- Límite conocido: `obtenerEnlaceCompartido()` solo resuelve `archivos_ids` (las `carpetas_ids` se guardan y auditan pero no se expanden en `/compartir`). No prometer carpetas navegables en el enlace.
+- RLS `enlaces_compartidos`: `SELECT` abierto por token, `INSERT` propio, `DELETE` propio/admin.
 
-1. **Direct-to-R2 upload**: browser gets presigned URL → uploads directly (bypasses server)
-2. **Audit log immutable**: `historial_actividad` has UPDATE/DELETE RLS revoked. Logging via DB triggers + server actions
-3. **Soft delete** → `papelera` state; permanent deletion admin-only
-4. **RLS is the authz layer** — do not bypass it in server code
-5. **9 GB storage cap** enforced via DB function `get_storage_usage()`
-6. **DB triggers**: auto-create profile on signup, auto-log uploads and status changes
-7. **Middleware** (`middleware.ts`): redirects unauthenticated → `/login`, guards `/admin/*` for admin role, allows `/compartir` publicly
-8. **Sharing**: multi-select via `FileListWrapper` → `generarEnlaceCompartido()` generates a token → stored in `enlaces_compartidos` table with 7-day expiry. Public `/compartir?token=xyz` generates presigned URLs at view time
-9. **DB table `enlaces_compartidos`**: stores token, typed resource, file/folder ID lists, expiration. RLS: SELECT by token (anyone), INSERT own, DELETE own/admin
+## BD y RLS
+- `supabase/schema.sql` es el ejecutable de verdad: triggers `handle_new_user`, `trg_registrar_subida`, `trg_cambio_estado_archivo`, `trg_validar_limite` (9 GB). `historial_actividad` es inmutable (UPDATE/DELETE revocados + sin policies de escritura salvo triggers/`logActivity`).
+- **RLS es la capa de autorización**: no bypasearla con service-role en código servidor. Borrado normal = `estado='papelera'`; borrado físico solo admin (`eliminarArchivoPermanente`: primero R2, luego BD).
+- `buscarArchivos()` escapa `\`, `%`, `_` y limita a 50 resultados; mantener ese escape al tocar la búsqueda.
 
-## Environment
+## Convenciones UI
+- Wrappers interactivos con patrón `<Componente>Wrapper.tsx` (`UploadModalWrapper`, `NewFolderModalWrapper`, `FileListWrapper`) para modales/selección bajo padres server.
+- Iconos `lucide-react`, fechas `date-fns`, tema oscuro por variables CSS en `app/globals.css`. Nombres largos se truncan con `ellipsis` (ver `FileCard`).
 
-Required vars (see `.env.example`):
+## Entorno
+Vars requeridas (ver `.env.example`; R2 solo servidor, sin `NEXT_PUBLIC_`):
 - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `CLOUDFLARE_R2_ENDPOINT`, `CLOUDFLARE_R2_ACCESS_KEY_ID`, `CLOUDFLARE_R2_SECRET_ACCESS_KEY`, `CLOUDFLARE_R2_BUCKET_NAME`
-- `NEXT_PUBLIC_APP_URL` (for share link generation, defaults to `http://localhost:3000`)
+- `NEXT_PUBLIC_APP_URL` (opcional; default `http://localhost:3000` para enlaces de compartir)

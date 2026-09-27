@@ -201,6 +201,32 @@ export type Database = {
           },
         ]
       }
+      lotes_recibidos: {
+        Row: {
+          id: string
+          usuario_id: string
+          claves_r2: Json
+          metadatos: Json
+          fecha_creacion: string
+        }
+        Insert: {
+          id?: string
+          usuario_id: string
+          claves_r2: Json
+          metadatos?: Json
+          fecha_creacion?: string
+        }
+        Update: Record<string, never>
+        Relationships: [
+          {
+            foreignKeyName: 'lotes_recibidos_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'perfiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -250,3 +276,13 @@ export type ArchivoConAutor = Archivo & {
 
 // Tipo para enlaces de compartición
 export type EnlaceCompartido = Database['public']['Tables']['enlaces_compartidos']['Row']
+
+// Lote pendiente del Share Target: claves en staging + metadatos por fichero
+export type LoteRecibido = Database['public']['Tables']['lotes_recibidos']['Row']
+
+export type FicheroEnLote = {
+  clave: string
+  nombre: string
+  tipo: string
+  tamano: number
+}

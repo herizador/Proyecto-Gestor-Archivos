@@ -9,13 +9,16 @@ export default function NewFolderModal({
   isOpen,
   onClose,
   carpetaPadreId = null,
+  soloPrivada = false,
 }: {
   isOpen: boolean
   onClose: () => void
   carpetaPadreId?: string | null
+  soloPrivada?: boolean
 }) {
   const [nombre, setNombre] = useState('')
-  const [esPrivada, setEsPrivada] = useState(false)
+  // En la caja fuerte las carpetas siempre son privadas (sin interruptor)
+  const [esPrivada, setEsPrivada] = useState(soloPrivada)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -46,7 +49,7 @@ export default function NewFolderModal({
     }
 
     setNombre('')
-    setEsPrivada(false)
+    setEsPrivada(soloPrivada)
     onClose()
     router.refresh()
   }
@@ -87,18 +90,22 @@ export default function NewFolderModal({
           <div>
             <p style={{ fontWeight: 600, fontSize: '0.9rem' }}>Carpeta privada</p>
             <p style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-              Solo tú y el administrador podrán verla
+              {soloPrivada
+                ? 'En tu caja fuerte todas las carpetas son privadas'
+                : 'Solo tú y el administrador podrán verla'}
             </p>
           </div>
-          <label className="switch">
-            <input
-              type="checkbox"
-              checked={esPrivada}
-              onChange={(e) => setEsPrivada(e.target.checked)}
-              disabled={loading}
-            />
-            <span className="switch-slider" />
-          </label>
+          {!soloPrivada && (
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={esPrivada}
+                onChange={(e) => setEsPrivada(e.target.checked)}
+                disabled={loading}
+              />
+              <span className="switch-slider" />
+            </label>
+          )}
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>

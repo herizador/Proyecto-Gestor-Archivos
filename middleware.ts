@@ -29,8 +29,12 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Rutas públicas — no requieren sesión
-  const isPublicRoute = pathname.startsWith('/login') || pathname.startsWith('/compartir') || pathname.startsWith('/_next') || pathname === '/favicon.ico'
+  // Rutas públicas — no requieren sesión.
+  // /recibir y /api/recibir deben ser públicas para que el POST del Web Share
+  // Target del sistema llegue intacto; la sesión se valida dentro de la ruta
+  // (un redirect a /login destruiría los ficheros del POST).
+  // /manifest.json y /sw.js también, o la PWA no es instalable sin sesión.
+  const isPublicRoute = pathname.startsWith('/login') || pathname.startsWith('/compartir') || pathname.startsWith('/recibir') || pathname.startsWith('/api/recibir') || pathname.startsWith('/_next') || pathname === '/favicon.ico' || pathname === '/manifest.json' || pathname === '/sw.js'
 
   // Si no hay sesión y no es ruta pública → redirigir al login
   if (!user && !isPublicRoute) {

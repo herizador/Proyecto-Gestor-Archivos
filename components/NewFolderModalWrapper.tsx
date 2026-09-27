@@ -6,8 +6,10 @@ import NewFolderModal from '@/components/NewFolderModal'
 
 export default function NewFolderModalWrapper({
   carpetaPadreId = null,
+  soloPrivada = false,
 }: {
   carpetaPadreId?: string | null
+  soloPrivada?: boolean
 }) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -22,6 +24,7 @@ export default function NewFolderModalWrapper({
           isOpen={isOpen}
           onClose={() => setIsOpen(false)}
           carpetaPadreId={carpetaPadreId}
+          soloPrivada={soloPrivada}
         />
       )}
     </>

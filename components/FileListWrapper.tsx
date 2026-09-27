@@ -16,15 +16,15 @@ export default function FileListWrapper({
   carpetas,
   isAdmin,
   userId,
-  carpetaActualId,
   showOwner = false,
+  basePath = '/',
 }: {
   archivos: ArchivoConAutor[]
   carpetas: CarpetaConAutor[]
   isAdmin: boolean
   userId: string
-  carpetaActualId?: string | null
   showOwner?: boolean
+  basePath?: string
 }) {
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -191,7 +191,7 @@ export default function FileListWrapper({
                 carpeta={carpeta}
                 selected={isSelectionMode && selectedIds.includes(carpeta.id)}
                 onToggleSelect={isSelectionMode ? toggleSelect : undefined}
-                carpetaActualId={carpetaActualId}
+                basePath={basePath}
               />
             ))}
           </div>

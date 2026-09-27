@@ -8,6 +8,36 @@ import { revalidatePath } from 'next/cache'
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20 MB
 
+type Scope = 'comun' | 'publico' | 'privado'
+
+// Infiere el scope desde el prefijo físico de la key R2
+function scopeDeKey(rutaR2: string): Scope | null {
+  if (rutaR2.startsWith('comun/')) return 'comun'
+  if (rutaR2.includes('/privado/')) return 'privado'
+  if (rutaR2.includes('/publico/')) return 'publico'
+  return null
+}
+
+// Valida que la carpeta exista, sea visible (RLS) y que su privacidad concuerde
+// con el scope. Devuelve el scope efectivo: el de la carpeta manda sobre el
+// que envía el cliente (nunca fiarse del cliente).
+async function validarCarpetaDestino(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  carpetaId: string | null,
+  scope: Scope
+): Promise<{ error?: string; scope: Scope }> {
+  if (!carpetaId) return { scope }
+  const { data: carpeta, error } = await supabase
+    .from('carpetas')
+    .select('id, es_privada')
+    .eq('id', carpetaId)
+    .single()
+  if (error || !carpeta) return { error: 'Carpeta de destino no válida.', scope }
+  const esperado: Scope = carpeta.es_privada ? 'privado' : 'comun'
+  if (scope !== esperado) return { error: 'El destino no concuerda con el ámbito elegido.', scope }
+  return { scope: esperado }
+}
+
 // ---------------------------------------------------------------------------
 // Obtener URL pre-firmada de subida (el cliente sube directo a R2)
 // ---------------------------------------------------------------------------
@@ -26,7 +56,10 @@ export async function getUploadUrl(params: {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
 
-  const key = buildR2Key({ userId: user.id, fileName: params.fileName, scope: params.scope })
+  const validacion = await validarCarpetaDestino(supabase, params.carpetaId, params.scope)
+  if (validacion.error) return { error: validacion.error }
+
+  const key = buildR2Key({ userId: user.id, fileName: params.fileName, scope: validacion.scope })
 
   try {
     const uploadUrl = await getPresignedUploadUrl(key, params.contentType)
@@ -49,6 +82,13 @@ export async function registrarArchivo(params: {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
+
+  // Defensa en profundidad: la key debe declarar un scope válido y concordar
+  // con la carpeta (una key 'comun/...' no puede colgarse de carpeta privada).
+  const scopeKey = scopeDeKey(params.rutaR2)
+  if (!scopeKey) return { error: 'Ruta de almacenamiento no válida.' }
+  const validacion = await validarCarpetaDestino(supabase, params.carpetaId, scopeKey)
+  if (validacion.error) return { error: validacion.error }
 
   const { error } = await supabase.from('archivos').insert({
     nombre_original: params.nombreOriginal,
