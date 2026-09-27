@@ -7,6 +7,7 @@ import { Inbox, AlertTriangle } from 'lucide-react'
 const MENSAJES_ERROR: Record<string, string> = {
   formulario: 'No se pudo leer lo compartido. Inténtalo de nuevo.',
   vacio: 'No llegó ningún archivo para guardar.',
+  texto: 'Se compartió texto o un enlace, no un archivo. Solo se pueden guardar archivos.',
   demasiados: 'Demasiados archivos a la vez (máximo 10).',
   basedatos: 'Se subieron los archivos pero no se pudo registrar el lote.',
 }

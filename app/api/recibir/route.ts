@@ -25,7 +25,7 @@ function esFichero(v: FormDataEntryValue): v is File {
 // El POST con los ficheros no sobrevive a un redirect del middleware, por eso
 // la ruta es pública y la sesión se valida aquí dentro.
 export async function POST(request: Request) {
-  console.log('[recibir] POST', request.method, request.headers.get('content-type'))
+  console.log('[recibir] POST', request.method, request.headers.get('content-type'), 'content-length:', request.headers.get('content-length'))
 
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -63,6 +63,14 @@ export async function POST(request: Request) {
   console.log('[recibir] ficheros detectados:', ficheros.map((f) => ({ nombre: f.name, tipo: f.type, tamano: f.size })))
 
   if (ficheros.length === 0) {
+    // ¿Llegó texto/enlace en vez de archivo? Se informa distinto que el vacío total.
+    const titulo = formData.get('title')
+    const texto = formData.get('text')
+    const url = formData.get('url')
+    console.log('[recibir] sin ficheros; title/text/url:', { titulo, texto, url })
+    if (typeof titulo === 'string' || typeof texto === 'string' || typeof url === 'string') {
+      return NextResponse.redirect(`${BASE_URL}/recibir?error=texto`, 303)
+    }
     return NextResponse.redirect(`${BASE_URL}/recibir?error=vacio`, 303)
   }
   if (ficheros.length > MAX_FILES) {
