@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
-import { FolderOpen, ChevronRight, ChevronLeft, Check, Loader2, Home, Lock, Users, ExternalLink } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { FolderOpen, ChevronRight, ChevronLeft, Check, Loader2, Home, Lock, Users } from 'lucide-react'
 import { listarCarpetas } from '@/actions/folders'
 import { confirmarGuardado } from '@/actions/recibir'
 import type { Carpeta, FicheroEnLote } from '@/types/database'
@@ -35,8 +35,7 @@ export default function SelectorDestino({
   const [cargando, setCargando] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
   const [resultado, setResultado] = useState<{ ok: string } | { error: string } | null>(null)
-  // Destino donde quedaron guardados (persiste tras el éxito para el enlace)
-  const [destinoFinal, setDestinoFinal] = useState<{ scope: Scope; carpetaId: string | null } | null>(null)
+  const router = useRouter()
 
   function cambiarScope(nuevo: Scope) {
     setScope(nuevo)
@@ -82,8 +81,12 @@ export default function SelectorDestino({
     if ('success' in res && res.success) {
       const total = (res as { total?: number }).total ?? ficheros.length
       const n = (res as { guardados?: number }).guardados ?? total
-      setResultado({ ok: n === total ? `${n} archivo(s) guardados.` : `${n} de ${total} guardados (algunos fallaron).` })
-      setDestinoFinal({ scope, carpetaId: destinoId })
+      // Salir de la URL con ?lote=: tras la acción Next re-ejecuta la página y,
+      // como el lote ya no existe, mostraría "Lote no válido". La pantalla ?ok=
+      // no depende del lote y sobrevive a refrescos.
+      const qs = new URLSearchParams({ ok: '1', guardados: String(n), total: String(total), scope })
+      if (destinoId) qs.set('carpeta', destinoId)
+      router.replace(`/recibir?${qs.toString()}`)
     } else {
       setResultado({ error: ('error' in res ? res.error : 'Error al guardar.') ?? 'Error al guardar.' })
     }
@@ -164,32 +167,15 @@ export default function SelectorDestino({
         ))}
       </div>
 
-      {resultado && 'ok' in resultado && (
-        <p style={{ color: 'var(--color-success, #4ade80)', fontSize: '0.9rem', marginBottom: '12px' }}>{resultado.ok}</p>
-      )}
       {resultado && 'error' in resultado && (
         <p style={{ color: 'var(--color-danger)', fontSize: '0.9rem', marginBottom: '12px' }}>{resultado.error}</p>
-      )}
-
-      {destinoFinal && (
-        <Link
-          href={
-            destinoFinal.scope === 'comun'
-              ? destinoFinal.carpetaId ? `/?carpeta=${destinoFinal.carpetaId}` : '/'
-              : destinoFinal.carpetaId ? `/mi-caja-fuerte?carpeta=${destinoFinal.carpetaId}` : '/mi-caja-fuerte'
-          }
-          className="btn btn-primary"
-          style={{ width: '100%', minHeight: '44px', textDecoration: 'none', marginBottom: '8px' }}
-        >
-          <ExternalLink size={16} /> Ver archivos guardados
-        </Link>
       )}
 
       <button
         type="button"
         className="btn btn-primary"
         onClick={handleConfirmar}
-        disabled={confirmando || (resultado !== null && 'ok' in resultado)}
+        disabled={confirmando}
         style={{ width: '100%', minHeight: '44px' }}
       >
         {confirmando ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}

@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { limpiarLotesCaducados } from '@/actions/recibir'
 import SelectorDestino from '@/components/SelectorDestino'
 import type { Carpeta, FicheroEnLote, Json } from '@/types/database'
-import { Inbox, AlertTriangle } from 'lucide-react'
+import { Inbox, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
 const MENSAJES_ERROR: Record<string, string> = {
   formulario: 'No se pudo leer lo compartido. Inténtalo de nuevo.',
@@ -25,9 +25,9 @@ function parsearFicheros(metadatos: Json): FicheroEnLote[] {
 export default async function RecibirPage({
   searchParams,
 }: {
-  searchParams: Promise<{ lote?: string; error?: string }>
+  searchParams: Promise<{ lote?: string; error?: string; ok?: string; guardados?: string; total?: string; scope?: string; carpeta?: string }>
 }) {
-  const { lote: loteId, error } = await searchParams
+  const { lote: loteId, error, ok, guardados, total, scope, carpeta: carpetaDestinoId } = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -51,6 +51,39 @@ export default async function RecibirPage({
 
   // Limpieza oportunista de lotes caducados (barata cuando no hay nada)
   await limpiarLotesCaducados()
+
+  // Pantalla de éxito: no depende del lote (ya borrado), sobrevive a refrescos
+  if (ok === '1') {
+    const n = Number(guardados ?? '0')
+    const t = Number(total ?? '0')
+    let destinoHref = scope === 'privado' ? '/mi-caja-fuerte' : '/'
+    let destinoNombre = scope === 'privado' ? 'Mi caja fuerte' : 'Área común'
+    if (carpetaDestinoId) {
+      const { data: carpeta } = await supabase
+        .from('carpetas')
+        .select('id, nombre')
+        .eq('id', carpetaDestinoId)
+        .single()
+      if (carpeta) {
+        destinoNombre = carpeta.nombre
+        destinoHref += `?carpeta=${carpeta.id}`
+      }
+    }
+    return (
+      <div className="login-bg">
+        <div className="login-card" style={{ textAlign: 'center' }}>
+          <CheckCircle2 size={48} style={{ color: 'var(--color-success, #4ade80)', margin: '0 auto 16px' }} />
+          <h1 className="login-title">Guardado en {destinoNombre}</h1>
+          <p className="login-subtitle">
+            {n === t ? `${n} archivo(s) guardados.` : `${n} de ${t} guardados (algunos fallaron).`}
+          </p>
+          <a className="btn btn-primary" href={destinoHref} style={{ marginTop: '16px', textDecoration: 'none' }}>
+            Ver archivos guardados
+          </a>
+        </div>
+      </div>
+    )
+  }
 
   if (error || !loteId) {
     return (

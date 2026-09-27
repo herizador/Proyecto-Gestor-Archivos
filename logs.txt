@@ -1,0 +1,249 @@
+Sep 27 23:40:11.84
+GET
+200
+proyecto-gestor-archivos.vercel.app
+/manifest.json
+Sep 27 23:40:11.34
+GET
+200
+proyecto-gestor-archivos.vercel.app
+/
+Sep 27 23:40:11.09
+GET
+200
+proyecto-gestor-archivos.vercel.app
+/
+Sep 27 23:40:08.14
+POST
+200
+proyecto-gestor-archivos.vercel.app
+/recibir
+Sep 27 23:40:08.00
+GET
+200
+proyecto-gestor-archivos.vercel.app
+/recibir
+Sep 27 23:40:07.98
+GET
+200
+proyecto-gestor-archivos.vercel.app
+/recibir
+Sep 27 23:40:07.93
+GET
+200
+proyecto-gestor-archivos.vercel.app
+/sw.js
+Sep 27 23:40:07.58
+GET
+200
+proyecto-gestor-archivos.vercel.app
+/recibir
+Sep 27 23:40:06.41
+GET
+200
+proyecto-gestor-archivos.vercel.app
+/manifest.json
+Sep 27 23:40:04.81
+GET
+200
+proyecto-gestor-archivos.vercel.app
+/recibir
+Sep 27 23:40:02.90
+POST
+303
+proyecto-gestor-archivos.vercel.app
+/api/recibir
+3
+[recibir] ficheros detectados: [
+ 
+  {
+ 
+    nombre: '
+
+---- otro ----
+[recibir] POST POST multipart/form-data; boundary=----WebKitFormBoundaryC2WNHVmJmcPqMBxy content-length: 17846
+[recibir] claves del formulario: [
+0: "archivos"
+]
+[recibir] ficheros detectados: [
+0: {…}
+]
+
+-----otro ------
+POST
+
+/api/recibir
+
+303
+Request started
+Sep 27 23:40:02.90GMT+2
+
+Request ID
+rv9lz-1790545202903-a60e4b6c1d85
+
+Path
+/api/recibir
+
+
+Host
+proyecto-gestor-archivos.vercel.app
+
+User Agent
+Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36
+
+Referer
+https://proyecto-gestor-archivos.vercel.app/probar-subida
+Received in Paris, France (cdg1)
+
+Firewall
+
+Allowed
+Middleware
+
+200
+
+Memory Used / Maximum
+228 MB / 2048 MB
+
+External APIs
+MethodRequestActions
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/auth/v1/user
+
+Routed to Washington, D.C., USA (iad1)
+Function Invocation
+
+
+Route
+/api/recibir
+
+Execution Duration / Maximum
+1.45s / 5m
+
+External APIs
+MethodRequestActions
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/auth/v1/user
+
+PUT
+
+f0a60cc1c91bd377276b652aaf04eb5e.r2.cloudflarestorage.com/proyecto-gestor-archivos/compartidos-pendientes/8fe5c7e9-0d74-4ac2-adb4-7c11e9764296/1790545203687_guia_rapida_examen_nivel_ingles.pdf
+
+POST
+
+khivwiabrozdqpiuadfi.supabase.co/rest/v1/lotes_recibidos
+
+
+Fluid
+
+238 MB
+Response finished in 1.8s
+Deployment Information
+
+Deployment ID
+dpl_12LYQRhmGYctti6EFSE3KJ4JSVne
+
+Environment
+production
+
+Branch
+main
+
+----- otro ----
+GET
+
+/recibir
+
+200
+Request started
+Sep 27 23:40:04.81GMT+2
+
+Request ID
+9n42l-1790545204817-4eebf0f142a6
+
+Path
+/recibir
+
+
+Host
+proyecto-gestor-archivos.vercel.app
+
+User Agent
+Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36
+
+Referer
+https://proyecto-gestor-archivos.vercel.app/probar-subida
+Search Params
+lote
+685a863a-11e8-44cf-8cbc-f22d9b7e144a
+Received in Paris, France (cdg1)
+
+Firewall
+
+Allowed
+Middleware
+
+200
+
+Memory Used / Maximum
+228 MB / 2048 MB
+
+External APIs
+MethodRequestActions
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/auth/v1/user
+
+Routed to Washington, D.C., USA (iad1)
+Function Invocation
+
+
+Route
+/recibir
+
+Execution Duration / Maximum
+775ms / 5m
+
+External APIs
+MethodRequestActions
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/auth/v1/user
+
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/rest/v1/lotes_recibidos
+
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/rest/v1/lotes_recibidos
+
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/rest/v1/carpetas
+
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/rest/v1/perfiles
+
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/rest/v1/carpetas
+
+
+Fluid
+
+238 MB
+Response finished in 1.0s
+Deployment Information
+
+Deployment ID
+dpl_12LYQRhmGYctti6EFSE3KJ4JSVne
+
+Environment
+production
+
+Branch
+main
