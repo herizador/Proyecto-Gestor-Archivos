@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { FolderOpen, ChevronRight, ChevronLeft, Check, Loader2, Home, Lock, Users } from 'lucide-react'
+import Link from 'next/link'
+import { FolderOpen, ChevronRight, ChevronLeft, Check, Loader2, Home, Lock, Users, ExternalLink } from 'lucide-react'
 import { listarCarpetas } from '@/actions/folders'
 import { confirmarGuardado } from '@/actions/recibir'
 import type { Carpeta, FicheroEnLote } from '@/types/database'
@@ -34,6 +35,8 @@ export default function SelectorDestino({
   const [cargando, setCargando] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
   const [resultado, setResultado] = useState<{ ok: string } | { error: string } | null>(null)
+  // Destino donde quedaron guardados (persiste tras el éxito para el enlace)
+  const [destinoFinal, setDestinoFinal] = useState<{ scope: Scope; carpetaId: string | null } | null>(null)
 
   function cambiarScope(nuevo: Scope) {
     setScope(nuevo)
@@ -80,6 +83,7 @@ export default function SelectorDestino({
       const total = (res as { total?: number }).total ?? ficheros.length
       const n = (res as { guardados?: number }).guardados ?? total
       setResultado({ ok: n === total ? `${n} archivo(s) guardados.` : `${n} de ${total} guardados (algunos fallaron).` })
+      setDestinoFinal({ scope, carpetaId: destinoId })
     } else {
       setResultado({ error: ('error' in res ? res.error : 'Error al guardar.') ?? 'Error al guardar.' })
     }
@@ -165,6 +169,20 @@ export default function SelectorDestino({
       )}
       {resultado && 'error' in resultado && (
         <p style={{ color: 'var(--color-danger)', fontSize: '0.9rem', marginBottom: '12px' }}>{resultado.error}</p>
+      )}
+
+      {destinoFinal && (
+        <Link
+          href={
+            destinoFinal.scope === 'comun'
+              ? destinoFinal.carpetaId ? `/?carpeta=${destinoFinal.carpetaId}` : '/'
+              : destinoFinal.carpetaId ? `/mi-caja-fuerte?carpeta=${destinoFinal.carpetaId}` : '/mi-caja-fuerte'
+          }
+          className="btn btn-primary"
+          style={{ width: '100%', minHeight: '44px', textDecoration: 'none', marginBottom: '8px' }}
+        >
+          <ExternalLink size={16} /> Ver archivos guardados
+        </Link>
       )}
 
       <button

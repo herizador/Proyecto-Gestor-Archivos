@@ -140,7 +140,8 @@ export async function confirmarGuardado(params: {
   revalidatePath('/')
   revalidatePath('/mi-caja-fuerte')
   revalidatePath('/familia')
-  revalidatePath('/recibir')
+  // Sin revalidatePath('/recibir'): el lote ya no existe tras confirmar y
+  // revalidar aquí haría que la página mostrase "Lote no válido" tapando el éxito.
 
   if (guardados === 0) {
     return { error: cupoLleno ? 'El almacenamiento familiar ha alcanzado el límite de 9 GB.' : 'No se pudo guardar ningún archivo.' }
