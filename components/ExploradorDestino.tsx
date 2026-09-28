@@ -143,7 +143,7 @@ export default function ExploradorDestino({
           <button
             key={c.id}
             type="button"
-            className="card card-hover"
+            className="card"
             onClick={() => entrar(c)}
             style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', textAlign: 'left', width: '100%' }}
           >
