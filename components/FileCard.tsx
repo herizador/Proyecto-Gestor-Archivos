@@ -1,20 +1,26 @@
 'use client'
 
-import { FileText, Image, Download, Trash2, Eye } from 'lucide-react'
+import { FileText, Image, Download, Trash2, Eye, Link2 } from 'lucide-react'
 import { ArchivoConAutor } from '@/types/database'
 import { visualizarArchivo, descargarArchivo, moverAPapelera } from '@/actions/files'
+import { eliminarAcceso } from '@/actions/accesos'
+import NuevoAccesoModal from '@/components/NuevoAccesoModal'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import DateDisplay from '@/components/DateDisplay'
 
 export default function FileCard({
   file, isAdmin, isOwner, selected, onToggleSelect,
+  esAcceso = false, origenNombre = null, huerfano = false,
 }: {
   file: ArchivoConAutor
   isAdmin: boolean
   isOwner: boolean
   selected?: boolean
   onToggleSelect?: (id: string) => void
+  esAcceso?: boolean
+  origenNombre?: string | null
+  huerfano?: boolean
 }) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -57,6 +63,19 @@ export default function FileCard({
   }
 
   async function handleTrash() {
+    if (esAcceso) {
+      if (confirm('¿Eliminar este enlace? El archivo original no se toca.')) {
+        setLoading(true)
+        const result = await eliminarAcceso(file.id)
+        setLoading(false)
+        if (result.error) {
+          alert(result.error)
+        } else {
+          router.refresh()
+        }
+      }
+      return
+    }
     if (confirm('¿Mover este archivo a la papelera?')) {
       setLoading(true)
       const result = await moverAPapelera(file.id)
@@ -92,6 +111,11 @@ export default function FileCard({
               <h3 className="file-card-name" title={file.nombre_original}>
                 {file.nombre_original}
               </h3>
+              {esAcceso && (
+                <p style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--color-accent)', fontWeight: 600 }}>
+                  <Link2 size={12} /> Enlace{huerfano ? ' · original no disponible' : ` de ${origenNombre ?? 'origen desconocido'}`}
+                </p>
+              )}
               <p className="file-card-meta">
                 {sizeKb} KB • <DateDisplay date={file.fecha_subida} />
               </p>
@@ -104,14 +128,17 @@ export default function FileCard({
       </div>
 
       <div className="file-actions-group">
-        <button className="btn btn-ghost btn-action" onClick={handleView} disabled={loading} title="Visualizar archivo">
+        <button className="btn btn-ghost btn-action" onClick={handleView} disabled={loading || huerfano} title={huerfano ? 'Original no disponible' : 'Visualizar archivo'}>
           <Eye size={16} /> <span>Visualizar</span>
         </button>
-        <button className="btn btn-primary btn-action" onClick={handleDownload} disabled={loading} title="Descargar archivo">
+        <button className="btn btn-primary btn-action" onClick={handleDownload} disabled={loading || huerfano} title={huerfano ? 'Original no disponible' : 'Descargar archivo'}>
           <Download size={16} /> <span>Descargar</span>
         </button>
+        {!esAcceso && (isAdmin || isOwner) && (
+          <NuevoAccesoModal objetivoTipo="archivo" objetivoId={file.id} objetivoNombre={file.nombre_original} />
+        )}
         {(isAdmin || isOwner) && (
-          <button className="btn btn-danger btn-action btn-action-danger" onClick={handleTrash} disabled={loading} title="Mover a papelera">
+          <button className="btn btn-danger btn-action btn-action-danger" onClick={handleTrash} disabled={loading} title={esAcceso ? 'Eliminar enlace (no toca el original)' : 'Mover a papelera'}>
             <Trash2 size={16} />
           </button>
         )}

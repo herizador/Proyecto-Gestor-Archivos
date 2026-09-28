@@ -227,6 +227,36 @@ export type Database = {
           },
         ]
       }
+      accesos_directos: {
+        Row: {
+          id: string
+          creado_por: string
+          carpeta_contenedora_id: string
+          archivo_objetivo_id: string | null
+          carpeta_objetivo_id: string | null
+          nombre_personalizado: string | null
+          fecha_creacion: string
+        }
+        Insert: {
+          id?: string
+          creado_por: string
+          carpeta_contenedora_id: string
+          archivo_objetivo_id?: string | null
+          carpeta_objetivo_id?: string | null
+          nombre_personalizado?: string | null
+          fecha_creacion?: string
+        }
+        Update: Record<string, never>
+        Relationships: [
+          {
+            foreignKeyName: 'accesos_directos_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'perfiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -257,6 +287,8 @@ export type ActivityAction =
   | 'CREAR_CARPETA'
   | 'ELIMINAR_CARPETA'
   | 'COMPARTIR_ENLACE'
+  | 'CREAR_ACCESO'
+  | 'ELIMINAR_ACCESO'
 
 // Tipos de fila convenientes
 export type Perfil = Database['public']['Tables']['perfiles']['Row']
@@ -276,6 +308,21 @@ export type ArchivoConAutor = Archivo & {
 
 // Tipo para enlaces de compartición
 export type EnlaceCompartido = Database['public']['Tables']['enlaces_compartidos']['Row']
+
+// Acceso directo (enlace): un físico visible en N ubicaciones sin duplicar bytes
+export type AccesoDirecto = Database['public']['Tables']['accesos_directos']['Row']
+
+// Acceso con su objetivo resuelto (LEFT JOIN: el objetivo puede ser NULL = huérfano)
+export type AccesoConObjetivo = AccesoDirecto & {
+  archivo_objetivo: (Pick<Archivo, 'id' | 'nombre_original' | 'tamano_bytes' | 'tipo_mime' | 'estado' | 'fecha_subida' | 'subido_por'> & {
+    subido_por_perfil: Pick<Perfil, 'nombre_completo'> | null
+    carpeta: Pick<Carpeta, 'id' | 'nombre'> | null
+  }) | null
+  carpeta_objetivo: (Pick<Carpeta, 'id' | 'nombre'> & {
+    padre: Pick<Carpeta, 'id' | 'nombre'> | null
+  }) | null
+  carpeta_contenedora: Pick<Carpeta, 'id' | 'nombre'> | null
+}
 
 // Lote pendiente del Share Target: claves en staging + metadatos por fichero
 export type LoteRecibido = Database['public']['Tables']['lotes_recibidos']['Row']

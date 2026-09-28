@@ -113,6 +113,57 @@ export async function registrarArchivo(params: {
 }
 
 // ---------------------------------------------------------------------------
+// Resuelve un id visible a su fichero físico: acepta tanto el id de `archivos`
+// como el de un acceso directo (`accesos_directos`), que apunta al original.
+// Huérfano (objetivo NULL) u original en papelera → error, nunca se firma nada.
+// ---------------------------------------------------------------------------
+async function resolverObjetivo(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  idVisible: string
+): Promise<
+  | { error: string }
+  | { ruta_r2: string; tipo_mime: string; nombre_original: string; originalId: string; accesoId: string | null }
+> {
+  const { data: acceso } = await supabase
+    .from('accesos_directos')
+    .select(`
+      id,
+      archivo_objetivo:archivos!accesos_directos_archivo_objetivo_id_fkey(
+        id, ruta_r2, nombre_original, tipo_mime, estado
+      )
+    `)
+    .eq('id', idVisible)
+    .single()
+
+  const objetivo = Array.isArray(acceso?.archivo_objetivo)
+    ? acceso.archivo_objetivo[0]
+    : acceso?.archivo_objetivo
+
+  if (acceso) {
+    if (!objetivo || objetivo.estado !== 'activo') {
+      return { error: 'El archivo original no está disponible (en papelera o eliminado).' }
+    }
+    return {
+      ruta_r2: objetivo.ruta_r2,
+      tipo_mime: objetivo.tipo_mime,
+      nombre_original: objetivo.nombre_original,
+      originalId: objetivo.id,
+      accesoId: acceso.id,
+    }
+  }
+
+  const { data: archivo, error } = await supabase
+    .from('archivos')
+    .select('id, ruta_r2, nombre_original, tipo_mime')
+    .eq('id', idVisible)
+    .eq('estado', 'activo')
+    .single()
+
+  if (error || !archivo) return { error: 'Archivo no encontrado o sin permisos.' }
+  return { ...archivo, originalId: archivo.id, accesoId: null }
+}
+
+// ---------------------------------------------------------------------------
 // Obtener URL pre-firmada para visualizar + auditar
 // ---------------------------------------------------------------------------
 export async function visualizarArchivo(archivoId: string) {
@@ -120,23 +171,18 @@ export async function visualizarArchivo(archivoId: string) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
 
-  const { data: archivo, error } = await supabase
-    .from('archivos')
-    .select('ruta_r2, nombre_original, tipo_mime')
-    .eq('id', archivoId)
-    .eq('estado', 'activo')
-    .single()
-
-  if (error || !archivo) return { error: 'Archivo no encontrado o sin permisos.' }
+  const resuelto = await resolverObjetivo(supabase, archivoId)
+  if ('error' in resuelto) return { error: resuelto.error }
 
   try {
-    const url = await getPresignedViewUrl(archivo.ruta_r2, archivo.tipo_mime)
+    const url = await getPresignedViewUrl(resuelto.ruta_r2, resuelto.tipo_mime)
 
     await logActivity({
       accion: 'VISUALIZAR_ARCHIVO',
       detalles: {
-        archivo_id: archivoId,
-        nombre_original: archivo.nombre_original,
+        archivo_id: resuelto.originalId,
+        nombre_original: resuelto.nombre_original,
+        ...(resuelto.accesoId ? { acceso_id: resuelto.accesoId } : {}),
       },
     })
 
@@ -147,34 +193,29 @@ export async function visualizarArchivo(archivoId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Obtener URL pre-firmada de descarga + auditar
+// Obtener URL pre-firmada de descarga + auditar (resuelve accesos directos)
 // ---------------------------------------------------------------------------
 export async function descargarArchivo(archivoId: string) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
 
-  const { data: archivo, error } = await supabase
-    .from('archivos')
-    .select('ruta_r2, nombre_original')
-    .eq('id', archivoId)
-    .eq('estado', 'activo')
-    .single()
-
-  if (error || !archivo) return { error: 'Archivo no encontrado o sin permisos.' }
+  const resuelto = await resolverObjetivo(supabase, archivoId)
+  if ('error' in resuelto) return { error: resuelto.error }
 
   try {
-    const url = await getPresignedDownloadUrl(archivo.ruta_r2, archivo.nombre_original)
+    const url = await getPresignedDownloadUrl(resuelto.ruta_r2, resuelto.nombre_original)
 
     await logActivity({
       accion: 'DESCARGAR_ARCHIVO',
       detalles: {
-        archivo_id: archivoId,
-        nombre_original: archivo.nombre_original,
+        archivo_id: resuelto.originalId,
+        nombre_original: resuelto.nombre_original,
+        ...(resuelto.accesoId ? { acceso_id: resuelto.accesoId } : {}),
       },
     })
 
-    return { url, nombreOriginal: archivo.nombre_original }
+    return { url, nombreOriginal: resuelto.nombre_original }
   } catch {
     return { error: 'Error al generar enlace de descarga.' }
   }
@@ -264,6 +305,12 @@ export async function eliminarArchivoPermanente(archivoId: string) {
 
   if (fetchError || !archivo) return { error: 'Archivo no encontrado.' }
 
+  // Contar enlaces que quedarán huérfanos (SET NULL) para la auditoría
+  const { count: enlacesAfectados } = await supabase
+    .from('accesos_directos')
+    .select('id', { count: 'exact', head: true })
+    .eq('archivo_objetivo_id', archivoId)
+
   // 1. Borrar de R2
   await deleteFromR2(archivo.ruta_r2)
 
@@ -276,6 +323,7 @@ export async function eliminarArchivoPermanente(archivoId: string) {
     detalles: {
       archivo_id: archivoId,
       nombre_original: archivo.nombre_original,
+      enlaces_huerfanos: enlacesAfectados ?? 0,
     },
   })
 

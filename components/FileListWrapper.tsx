@@ -1,11 +1,14 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { Share2, X, Check, Link, List } from 'lucide-react'
 import { generarEnlaceCompartido } from '@/actions/share'
+import { eliminarAcceso } from '@/actions/accesos'
 import FileCard from '@/components/FileCard'
 import FolderCard from '@/components/FolderCard'
-import type { ArchivoConAutor, Carpeta } from '@/types/database'
+import NuevoAccesoModal from '@/components/NuevoAccesoModal'
+import type { AccesoConObjetivo, ArchivoConAutor, Carpeta } from '@/types/database'
 
 type CarpetaConAutor = Carpeta & {
   creado_por_perfil?: { nombre_completo: string } | null
@@ -14,6 +17,7 @@ type CarpetaConAutor = Carpeta & {
 export default function FileListWrapper({
   archivos,
   carpetas,
+  accesos = [],
   isAdmin,
   userId,
   showOwner = false,
@@ -21,15 +25,29 @@ export default function FileListWrapper({
 }: {
   archivos: ArchivoConAutor[]
   carpetas: CarpetaConAutor[]
+  accesos?: AccesoConObjetivo[]
   isAdmin: boolean
   userId: string
   showOwner?: boolean
   basePath?: string
 }) {
+  const router = useRouter()
   const [isSelectionMode, setIsSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [shareLoading, setShareLoading] = useState(false)
   const [shareResult, setShareResult] = useState<{ url: string } | { error: string } | null>(null)
+
+  // Los accesos no entran en la selección para compartir (límite conocido:
+  // /compartir solo resuelve archivos reales); se gestionan aparte.
+  // Los huérfanos (ambos objetivos NULL) se muestran como tarjetas de archivo.
+  const accesosArchivos = useMemo(() => accesos.filter((a) => a.carpeta_objetivo_id === null), [accesos])
+  const accesosCarpetas = useMemo(() => accesos.filter((a) => a.carpeta_objetivo_id !== null), [accesos])
+
+  async function handleEliminarAcceso(accesoId: string) {
+    const res = await eliminarAcceso(accesoId)
+    if (res.error) alert(res.error)
+    else router.refresh()
+  }
 
   const allIds = useMemo(() => {
     const fileIds = archivos.map(a => a.id)
@@ -181,7 +199,7 @@ export default function FileListWrapper({
         )}
       </div>
 
-      {carpetas.length > 0 && (
+      {(carpetas.length > 0 || accesosCarpetas.length > 0) && (
         <section style={{ marginBottom: '24px' }}>
           <h2 className="section-title">Carpetas</h2>
           <div className="grid-folders">
@@ -192,15 +210,41 @@ export default function FileListWrapper({
                 selected={isSelectionMode && selectedIds.includes(carpeta.id)}
                 onToggleSelect={isSelectionMode ? toggleSelect : undefined}
                 basePath={basePath}
+                crearEnlace={(isAdmin || carpeta.creado_por === userId) ? (
+                  <NuevoAccesoModal objetivoTipo="carpeta" objetivoId={carpeta.id} objetivoNombre={carpeta.nombre} />
+                ) : null}
               />
             ))}
+            {accesosCarpetas.map((acceso) => {
+              const objetivo = acceso.carpeta_objetivo
+              const huerfano = !objetivo
+              return (
+                <FolderCard
+                  key={acceso.id}
+                  carpeta={{
+                    id: objetivo?.id ?? acceso.id,
+                    nombre: acceso.nombre_personalizado || objetivo?.nombre || 'Enlace no disponible',
+                    creado_por: acceso.creado_por,
+                    es_privada: false,
+                    carpeta_padre_id: null,
+                    fecha_creacion: acceso.fecha_creacion,
+                  }}
+                  basePath={basePath}
+                  esAcceso
+                  accesoId={acceso.id}
+                  origenNombre={objetivo?.padre?.nombre ?? 'otra ubicación'}
+                  huerfano={huerfano}
+                  onEliminarAcceso={handleEliminarAcceso}
+                />
+              )
+            })}
           </div>
         </section>
       )}
 
-      {archivos.length > 0 && (
+      {(archivos.length > 0 || accesosArchivos.length > 0) && (
         <section>
-          {carpetas.length > 0 && <h2 className="section-title">Archivos</h2>}
+          {(carpetas.length > 0 || accesosCarpetas.length > 0) && <h2 className="section-title">Archivos</h2>}
           <div className="grid-files">
             {archivos.map((archivo) => (
               <FileCard
@@ -212,6 +256,33 @@ export default function FileListWrapper({
                 onToggleSelect={isSelectionMode ? toggleSelect : undefined}
               />
             ))}
+            {accesosArchivos.map((acceso) => {
+              const objetivo = acceso.archivo_objetivo
+              const huerfano = !objetivo || objetivo.estado !== 'activo'
+              return (
+                <FileCard
+                  key={acceso.id}
+                  file={{
+                    id: acceso.id,
+                    nombre_original: acceso.nombre_personalizado || objetivo?.nombre_original || 'Enlace no disponible',
+                    ruta_r2: '',
+                    tamano_bytes: objetivo?.tamano_bytes ?? 0,
+                    tipo_mime: objetivo?.tipo_mime ?? 'application/octet-stream',
+                    carpeta_id: acceso.carpeta_contenedora_id,
+                    subido_por: objetivo?.subido_por ?? acceso.creado_por,
+                    estado: 'activo',
+                    fecha_subida: objetivo?.fecha_subida ?? acceso.fecha_creacion,
+                    fecha_papelera: null,
+                    subido_por_perfil: objetivo?.subido_por_perfil ?? null,
+                  }}
+                  isAdmin={isAdmin}
+                  isOwner={acceso.creado_por === userId || isAdmin}
+                  esAcceso
+                  origenNombre={objetivo?.carpeta?.nombre ?? 'otra ubicación'}
+                  huerfano={huerfano}
+                />
+              )
+            })}
           </div>
         </section>
       )}

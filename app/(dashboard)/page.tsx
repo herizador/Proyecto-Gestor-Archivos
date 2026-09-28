@@ -7,6 +7,7 @@ import NewFolderModalWrapper from '@/components/NewFolderModalWrapper'
 import DocumentSearchBar from '@/components/DocumentSearchBar'
 import StorageBar from '@/components/StorageBar'
 import FileListWrapper from '@/components/FileListWrapper'
+import { listarAccesos } from '@/actions/accesos'
 
 export default async function DashboardComun({
   searchParams,
@@ -55,12 +56,16 @@ export default async function DashboardComun({
     .select('*, subido_por_perfil:perfiles(nombre_completo)')
     .eq('estado', 'activo')
     .order('fecha_subida', { ascending: false })
-
-  const { data: archivos } = carpetaActualId
-    ? await archivosQuery.eq('carpeta_id', carpetaActualId)
-    : await archivosQuery.is('carpeta_id', null)
-
-  const tieneContenido = (carpetas?.length ?? 0) > 0 || (archivos?.length ?? 0) > 0
+  const { data: archivos } = carpetaActualId
+
+    ? await archivosQuery.eq('carpeta_id', carpetaActualId)
+
+    : await archivosQuery.is('carpeta_id', null)
+
+
+
+  const { data: accesos } = await listarAccesos(carpetaActualId)
+  const tieneContenido = (carpetas?.length ?? 0) > 0 || (archivos?.length ?? 0) > 0 || (accesos?.length ?? 0) > 0
 
   return (
     <div className="page-content animate-fade-in">
@@ -106,6 +111,7 @@ export default async function DashboardComun({
           <FileListWrapper
             archivos={archivos ?? []}
             carpetas={carpetas ?? []}
+            accesos={accesos ?? []}
             isAdmin={isAdmin}
             userId={user.id}
           />
