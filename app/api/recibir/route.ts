@@ -64,6 +64,11 @@ export async function POST(request: Request) {
 
   if (ficheros.length === 0) {
     // ¿Llegó texto/enlace en vez de archivo? Se informa distinto que el vacío total.
+    // Solo cuentan valores no vacíos: algunos navegadores envían los campos vacíos.
+    const hayTexto = ['title', 'text', 'url'].some((k) => {
+      const v = formData.get(k)
+      return typeof v === 'string' && v.trim() !== ''
+    })
     const titulo = formData.get('title')
     const texto = formData.get('text')
     const url = formData.get('url')
@@ -73,7 +78,7 @@ export async function POST(request: Request) {
       cabeceras[clave] = clave === 'cookie' ? `(${valor.length} chars)` : valor
     })
     console.log('[recibir] cabeceras del POST vacío:', JSON.stringify(cabeceras))
-    if (typeof titulo === 'string' || typeof texto === 'string' || typeof url === 'string') {
+    if (hayTexto) {
       return NextResponse.redirect(`${BASE_URL}/recibir?error=texto`, 303)
     }
     return NextResponse.redirect(`${BASE_URL}/recibir?error=vacio`, 303)
