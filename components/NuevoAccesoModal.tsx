@@ -28,17 +28,25 @@ export default function NuevoAccesoModal({
 
   async function abrir() {
     setCargandoRaices(true)
-    // Las raíces se cargan al abrir (sin useEffect): RLS ya filtra lo visible
-    const res = await listarRaicesAcceso()
-    setCargandoRaices(false)
-    if ('error' in res) return
-    setRaices({
-      comun: res.comun,
-      privadas: res.privadas,
-    })
-    setUserId(res.userId)
-    setIsAdmin(res.isAdmin)
-    setIsOpen(true)
+    try {
+      // Las raíces se cargan al abrir (sin useEffect): RLS ya filtra lo visible
+      const res = await listarRaicesAcceso()
+      if ('error' in res) {
+        alert(res.error)
+        return
+      }
+      setRaices({
+        comun: res.comun,
+        privadas: res.privadas,
+      })
+      setUserId(res.userId)
+      setIsAdmin(res.isAdmin)
+      setIsOpen(true)
+    } catch {
+      alert('No se pudieron cargar las carpetas. Revisa tu conexión.')
+    } finally {
+      setCargandoRaices(false)
+    }
   }
 
   async function handleConfirmar(destino: DestinoElegido) {

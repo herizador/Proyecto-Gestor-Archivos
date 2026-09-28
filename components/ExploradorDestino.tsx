@@ -129,8 +129,8 @@ export default function ExploradorDestino({
         </span>
       </div>
 
-      {/* Carpetas */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+      {/* Carpetas: altura mínima para que el modal no salte de tamaño al navegar */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', minHeight: '220px' }}>
         {cargando && <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Cargando…</p>}
         {!cargando && hijas.length === 0 && (
           <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
