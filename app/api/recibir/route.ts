@@ -68,6 +68,11 @@ export async function POST(request: Request) {
     const texto = formData.get('text')
     const url = formData.get('url')
     console.log('[recibir] sin ficheros; title/text/url:', { titulo, texto, url })
+    const cabeceras: Record<string, string> = {}
+    request.headers.forEach((valor, clave) => {
+      cabeceras[clave] = clave === 'cookie' ? `(${valor.length} chars)` : valor
+    })
+    console.log('[recibir] cabeceras del POST vacío:', JSON.stringify(cabeceras))
     if (typeof titulo === 'string' || typeof texto === 'string' || typeof url === 'string') {
       return NextResponse.redirect(`${BASE_URL}/recibir?error=texto`, 303)
     }
