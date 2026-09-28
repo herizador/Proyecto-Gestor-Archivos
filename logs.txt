@@ -1,0 +1,203 @@
+POST
+
+/api/recibir
+
+303
+Request started
+Sep 28 15:33:53.98GMT+2
+
+Request ID
+ms8t2-1790602433988-28eff653df68
+
+Path
+/api/recibir
+
+
+Host
+proyecto-gestor-archivos.vercel.app
+
+User Agent
+Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36
+Received in Paris, France (cdg1)
+
+Firewall
+
+Allowed
+Middleware
+
+200
+
+Memory Used / Maximum
+237 MB / 2048 MB
+
+External APIs
+MethodRequestActions
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/auth/v1/user
+
+Routed to Washington, D.C., USA (iad1)
+Function Invocation
+
+
+Route
+/api/recibir
+
+Execution Duration / Maximum
+233ms / 5m
+
+External APIs
+MethodRequestActions
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/auth/v1/user
+
+
+Fluid
+
+232 MB
+Response finished in 686ms
+Deployment Information
+
+Deployment ID
+dpl_EJRTrcdMfqHJdrUAerTMBUsTAF4G
+
+Environment
+production
+
+Branch
+main
+
+--- otro ----
+
+[recibir] cabeceras del POST vacío: {
+accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+accept-encoding: "gzip, deflate, br, zstd",
+accept-language: "es-ES,es;q=0.9",
+cache-control: "no-store, no-cache, must-revalidate, proxy-revalidate",
+connection: "close",
+content-length: "75",
+content-type: "multipart/form-data; boundary=----MultipartBoundary--yB4DqJy63oIbRLVsg0nDwRVdbC5VOHgTPV9sb7uiMy----",
+cookie: "(2549 chars)",
+date: "Mon, 28 Sep 2026 13:33:54 GMT",
+expires: "0",
+forwarded: "for=79.116.217.136;host=proyecto-gestor-archivos.vercel.app;proto=https;sig=0QmVhcmVyIDRiMDFkNzUwZjdjNjE0NzVjNTc0NjUxN2Y5ZDZlOTdkNjIxMGNjNTg1ZTM3NmFkNjJkMGRjOGU0OTFlMTYwZDk=;exp=1790602733",
+host: "proyecto-gestor-archivos.vercel.app",
+origin: "null",
+pragma: "no-cache",
+priority: "u=0, i",
+sec-ch-ua: "\"Google Chrome\";v=\"153\", \"Not_A Brand\";v=\"8\", \"Chromium\";v=\"153\"",
+sec-ch-ua-mobile: "?1",
+sec-ch-ua-platform: "\"Android\"",
+sec-fetch-dest: "document",
+sec-fetch-mode: "navigate",
+sec-fetch-site: "none",
+sec-fetch-user: "?1",
+upgrade-insecure-requests: "1",
+user-agent: "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36",
+x-forwarded-for: "79.116.217.136",
+x-forwarded-host: "proyecto-gestor-archivos.vercel.app",
+x-forwarded-proto: "https",
+x-invocation-id: "cdg1::ms8t2-1790602433988-28eff653df68",
+x-matched-path: "/api/recibir",
+x-real-ip: "79.116.217.136",
+x-vercel-deployment-url: "proyecto-gestor-archivos-g0xhxyptq-heri-dev-s-projects.vercel.app",
+x-vercel-enable-rewrite-caching: "1",
+x-vercel-forwarded-for: "79.116.217.136",
+x-vercel-id: "cdg1::ms8t2-1790602433988-28eff653df68",
+x-vercel-ip-as-number: "57269",
+x-vercel-ip-city: "Madrid",
+x-vercel-ip-continent: "EU",
+x-vercel-ip-country: "ES",
+x-vercel-ip-country-region: "MD",
+x-vercel-ip-latitude: "40.4165",
+x-vercel-ip-longitude: "-3.7026",
+x-vercel-ip-postal-code: "28087",
+x-vercel-ip-timezone: "Europe/Madrid",
+x-vercel-ja4-digest: "t13d1516h2_8daaf6152771_806a8c22fdea",
+x-vercel-oidc-token: "eyJ0eXAiOiJKV1QiLCJraWQiOiJtcmstNDMwMmVjMWI2NzBmNDhhOThhZDYxZGFkZTRhMjNiZTciLCJhbGciOiJSUzI1NiJ9.eyJzY29wZSI6Im93bmVyOmhlcmktZGV2LXMtcHJvamVjdHM6cHJvamVjdDpwcm95ZWN0by1nZXN0b3ItYXJjaGl2b3M6ZW52aXJvbm1lbnQ6cHJvZHVjdGlvbiIsIm93bmVyX2lkIjoidGVhbV9Xd3ZvYUZSa0xic3dOY002QlV2ZUNiaFciLCJvd25lciI6ImhlcmktZGV2LXMtcHJvamVjdHMiLCJpc3MiOiJodHRwczpcL1wvb2lkYy52ZXJjZWwuY29tXC9oZXJpLWRldi1zLXByb2plY3RzIiwiZGVwbG95bWVudF9pZCI6ImRwbF9FSlJUcmNkTWZxSEpkclVBZXJUTUJVc1RBRjRHIiwicGxhbiI6ImhvYmJ5IiwicHJvamVjdF9pZCI6InByal9iNkNUY1pmZThGdDdVN0RGOGw1ZWZEaTQyRWZQIiwicHJvamVjdCI6InByb3llY3RvLWdlc3Rvci1hcmNoaXZvcyIsImF1ZCI6Imh0dHBzOlwvXC92ZXJjZWwuY29tXC9oZXJpLWRldi1zLXByb2plY3RzIiwiZW52aXJvbm1lbnQiOiJwcm9kdWN0aW9uIiwic3ViIjoib3duZXI6aGVyaS1kZXYtcy1wcm9qZWN0czpwcm9qZWN0OnByb3llY3RvLWdlc3Rvci1hcmNoaXZvczplbnZpcm9ubWVudDpwcm9kdWN0aW9uIiwiZXhwIjoxNzkwNjA3Mzk3LCJuYmYiOjE3OTA2MDAxOTcsImlhdCI6MTc5MDYwMDE5N30.T1NevcaMjObCzioJNpWJtrkuZgevMYwQwc7A0MUYH08S3qfZNK5L3w0H5iQ02LTpAh9NRuEgwCOZAJa5aNiaK3kUvIY3XK-458efCxBk3J7I7QqEjRQiuOFmCNu-VB96mrez2XsPCh8bbLeSZGVUjtAKPc-AgOaInWmhDDvbj532hoJifmCsKAbxa5e6x3BQ_NQGHBhe2k52RNzUPSsQk7z4Z0pS1jqlRYL4mr0M86FmV3TN8CIOYGjDo8rEOit_CzOxRhMoKzeXSthWU1jexUShxK0L1Ny6GrI3HRQ7Jyxz7em3Yl27-X8SMJ2_p_9AnsZxnHvNdU8KYNyflXsqoQ",
+x-vercel-proxied-for: "79.116.217.136",
+x-vercel-proxy-signature: "Bearer 4b01d750f7c61475c5746517f9d6e97d6210cc585e376ad62d0dc8e491e160d9",
+x-vercel-proxy-signature-ts: "1790602733",
+x-vercel-sc-basepath: "",
+x-vercel-sc-headers: "{\"x-vercel-function-platform\":\"vercel\\/proxy+serverless\",\"Authorization\":\"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJuZXh0VmVyc2lvbiI6IjE2LjIuNiIsImlzcyI6InNlcnZlcmxlc3MiLCJ1bmxpbWl0ZWQiOmZhbHNlLCJyZXF1ZXN0SWQiOiJtczh0Mi0xNzkwNjAyNDMzOTg4LTI4ZWZmNjUzZGY2OCIsImVudiI6InByb2R1Y3Rpb24iLCJleHAiOjE3OTA2MDYwNTQsImlhdCI6MTc5MDYwMjQzNCwiYmxvY2siOmZhbHNlLCJkZXBsb3ltZW50SWQiOiJkcGxfRUpSVHJjZE1mcUhKZHJVQWVyVE1CVXNUQUY0RyIsIm93bmVySWQiOiJ0ZWFtX1d3dm9hRlJrTGJzd05jTTZCVXZlQ2JoVyIsImRvbWFpbiI6InByb3llY3RvLWdlc3Rvci1hcmNoaXZvcy52ZXJjZWwuYXBwIiwicHJvamVjdElkIjoicHJqX2I2Q1RjWmZlOEZ0N1U3REY4bDVlZkRpNDJFZlAiLCJwbGFuIjoiaG9iYnkifQ.s1Iz6xXsgfrA0gzKAbF5DtjFaCS1c9484xQDZ58ETdk\",\"x-vercel-ept\":\"0\"}",
+x-vercel-sc-host: "iad1.suspense-cache.vercel-infra.com"
+}
+
+------ otro -----------
+GET
+
+/recibir
+
+200
+Request started
+Sep 28 15:33:54.73GMT+2
+
+Request ID
+gzw9z-1790602434733-8aa2c3bc50ea
+
+Path
+/recibir
+
+
+Host
+proyecto-gestor-archivos.vercel.app
+
+User Agent
+Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36
+Search Params
+error
+vacio
+Received in Paris, France (cdg1)
+
+Firewall
+
+Allowed
+Middleware
+
+200
+
+Memory Used / Maximum
+238 MB / 2048 MB
+
+External APIs
+MethodRequestActions
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/auth/v1/user
+
+Routed to Washington, D.C., USA (iad1)
+Function Invocation
+
+
+Route
+/recibir
+
+Execution Duration / Maximum
+541ms / 5m
+
+External APIs
+MethodRequestActions
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/auth/v1/user
+
+GET
+
+khivwiabrozdqpiuadfi.supabase.co/rest/v1/lotes_recibidos
+
+
+Fluid
+
+251 MB
+Response finished in 753ms
+Deployment Information
+
+Deployment ID
+dpl_EJRTrcdMfqHJdrUAerTMBUsTAF4G
+
+Environment
+production
+
+Branch
+main

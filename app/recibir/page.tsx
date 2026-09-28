@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { limpiarLotesCaducados } from '@/actions/recibir'
 import SelectorDestino from '@/components/SelectorDestino'
+import Link from 'next/link'
 import type { Carpeta, FicheroEnLote, Json } from '@/types/database'
 import { Inbox, AlertTriangle, CheckCircle2 } from 'lucide-react'
 
@@ -86,6 +87,7 @@ export default async function RecibirPage({
   }
 
   if (error || !loteId) {
+    const esVacio = error === 'vacio'
     return (
       <div className="login-bg">
         <div className="login-card" style={{ textAlign: 'center' }}>
@@ -94,6 +96,17 @@ export default async function RecibirPage({
           <p className="login-subtitle">
             {error ? (MENSAJES_ERROR[error] ?? decodeURIComponent(error)) : 'Comparte un archivo desde otra app para verlo aquí.'}
           </p>
+          {esVacio && (
+            <>
+              <p className="login-subtitle" style={{ marginTop: '8px' }}>
+                El sistema no entregó ningún archivo (algunos móviles lo bloquean).
+                Puedes subirlo manualmente:
+              </p>
+              <Link className="btn btn-primary" href="/" style={{ marginTop: '16px', textDecoration: 'none' }}>
+                Ir a subir manualmente
+              </Link>
+            </>
+          )}
         </div>
       </div>
     )
