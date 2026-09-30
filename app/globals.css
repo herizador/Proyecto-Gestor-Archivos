@@ -388,6 +388,7 @@ input, textarea, select { font-family: inherit; }
   display: flex; align-items: center; justify-content: center;
   padding: 24px;
   animation: fadeIn 0.2s ease;
+  overscroll-behavior: contain;
 }
 .modal {
   background: var(--color-surface);
@@ -397,12 +398,36 @@ input, textarea, select { font-family: inherit; }
   width: 100%;
   max-width: 480px;
   max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
   animation: slideUp 0.25s ease;
+  flex-shrink: 0;
+  min-width: 0;
+}
+/* Modal de "Crear enlace": ancho garantizado en escritorio y móvil.
+   Se renderiza por portal en document.body para que ningún `transform`
+   de las tarjetas lo convierta en containing block del fixed. */
+.modal-enlace {
+  width: min(480px, calc(100vw - 32px));
+}
+.modal-enlace .destino-tabs .btn {
+  padding: 10px 12px;
+  font-size: 0.82rem;
+}
+.modal-enlace .destino-confirmar {
+  white-space: normal;
 }
 @media (max-width: 560px) {
   .modal { padding: 20px; }
+  .modal-overlay { padding: 16px; align-items: flex-end; }
+  .modal-enlace {
+    width: 100%;
+    max-height: calc(100dvh - 32px);
+  }
+}
+@media (min-width: 561px) {
+  .modal-overlay { align-items: center; }
 }
 .modal-header {
   display: flex; align-items: center; justify-content: space-between;

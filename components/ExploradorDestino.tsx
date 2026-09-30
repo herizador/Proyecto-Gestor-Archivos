@@ -95,42 +95,44 @@ export default function ExploradorDestino({
   const sinDestino = requiereCarpeta && pila.length === 0
 
   return (
-    <div>
+    <div className="destino-explorador" style={{ minWidth: 0 }}>
       {/* Tabs de ámbito */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+      <div className="destino-tabs" style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
         <button
           type="button"
           className={`btn ${scope === 'comun' ? 'btn-primary' : 'btn-ghost'}`}
           onClick={() => cambiarScope('comun')}
-          style={{ flex: 1 }}
+          style={{ flex: '1 1 0', minWidth: 0, justifyContent: 'center', whiteSpace: 'normal', textAlign: 'center', lineHeight: 1.3 }}
         >
-          <Users size={16} /> Área común
+          <Users size={16} style={{ flexShrink: 0 }} /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Área común</span>
         </button>
         <button
           type="button"
           className={`btn ${scope === 'privado' ? 'btn-primary' : 'btn-ghost'}`}
           onClick={() => cambiarScope('privado')}
-          style={{ flex: 1 }}
+          style={{ flex: '1 1 0', minWidth: 0, justifyContent: 'center', whiteSpace: 'normal', textAlign: 'center', lineHeight: 1.3 }}
         >
-          <Lock size={16} /> Mi caja fuerte
+          <Lock size={16} style={{ flexShrink: 0 }} /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>Mi caja fuerte</span>
         </button>
       </div>
 
       {/* Migas */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '0.85rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', fontSize: '0.85rem', minWidth: 0 }}>
         {pila.length > 0 && (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={volver} disabled={cargando}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={volver} disabled={cargando} style={{ flexShrink: 0 }}>
             <ChevronLeft size={16} /> Atrás
           </button>
         )}
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-text-muted)' }}>
-          <Home size={14} />
-          {pila.map((c) => c.nombre).join(' / ')}
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-text-muted)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <Home size={14} style={{ flexShrink: 0 }} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {pila.map((c) => c.nombre).join(' / ')}
+          </span>
         </span>
       </div>
 
       {/* Carpetas: altura mínima para que el modal no salte de tamaño al navegar */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', minHeight: '220px' }}>
+      <div className="destino-lista" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', minHeight: '180px', maxHeight: '40vh', overflowY: 'auto', minWidth: 0 }}>
         {cargando && <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Cargando…</p>}
         {!cargando && hijas.length === 0 && (
           <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
@@ -160,13 +162,13 @@ export default function ExploradorDestino({
 
       <button
         type="button"
-        className="btn btn-primary"
+        className="btn btn-primary destino-confirmar"
         onClick={handleConfirmar}
         disabled={confirmando || sinDestino}
-        style={{ width: '100%', minHeight: '44px' }}
+        style={{ width: '100%', minHeight: '44px', whiteSpace: 'normal', textAlign: 'center', justifyContent: 'center', lineHeight: 1.4, wordBreak: 'break-word' }}
       >
-        {confirmando ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-        {confirmando ? ' Guardando…' : ` ${textoBoton(scope, destinoActual)}`}
+        {confirmando ? <Loader2 size={16} className="animate-spin" style={{ flexShrink: 0 }} /> : <Check size={16} style={{ flexShrink: 0 }} />}
+        <span style={{ minWidth: 0 }}>{confirmando ? ' Guardando…' : ` ${textoBoton(scope, destinoActual)}`}</span>
       </button>
     </div>
   )
