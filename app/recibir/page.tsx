@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { limpiarLotesCaducados } from '@/actions/recibir'
 import SelectorDestino from '@/components/SelectorDestino'
+import GuardadoManual from '@/components/GuardadoManual'
 import Link from 'next/link'
 import type { Carpeta, FicheroEnLote, Json } from '@/types/database'
 import { Inbox, AlertTriangle, CheckCircle2 } from 'lucide-react'
@@ -88,6 +89,14 @@ export default async function RecibirPage({
 
   if (error || !loteId) {
     const esVacio = error === 'vacio'
+    // Raíces para el plan B manual: en iOS no existe Web Share Target y en
+    // algunos Android el sistema no entrega el fichero. El usuario puede
+    // elegirlo con el selector nativo sin salir de esta pantalla.
+    const [{ data: raicesComun }, { data: raicesPrivadas }, { data: perfil }] = await Promise.all([
+      supabase.from('carpetas').select('*').eq('es_privada', false).is('carpeta_padre_id', null).order('fecha_creacion'),
+      supabase.from('carpetas').select('*').eq('es_privada', true).eq('creado_por', user.id).is('carpeta_padre_id', null).order('fecha_creacion'),
+      supabase.from('perfiles').select('rol').eq('id', user.id).single(),
+    ])
     return (
       <div className="login-bg">
         <div className="login-card" style={{ textAlign: 'center' }}>
@@ -97,16 +106,22 @@ export default async function RecibirPage({
             {error ? (MENSAJES_ERROR[error] ?? decodeURIComponent(error)) : 'Comparte un archivo desde otra app para verlo aquí.'}
           </p>
           {esVacio && (
-            <>
-              <p className="login-subtitle" style={{ marginTop: '8px' }}>
-                El sistema no entregó ningún archivo (algunos móviles lo bloquean).
-                Puedes subirlo manualmente:
-              </p>
-              <Link className="btn btn-primary" href="/" style={{ marginTop: '16px', textDecoration: 'none' }}>
-                Ir a subir manualmente
-              </Link>
-            </>
+            <p className="login-subtitle" style={{ marginTop: '8px' }}>
+              El sistema no entregó ningún archivo (en iPhone nunca lo hace y en
+              algunos Android lo bloquea). Elígelo abajo manualmente:
+            </p>
           )}
+          <div style={{ textAlign: 'left' }}>
+            <GuardadoManual
+              raicesComun={(raicesComun ?? []) as Carpeta[]}
+              raicesPrivadas={(raicesPrivadas ?? []) as Carpeta[]}
+              userId={user.id}
+              isAdmin={perfil?.rol === 'admin'}
+            />
+          </div>
+          <Link className="btn btn-ghost" href="/" style={{ marginTop: '16px', textDecoration: 'none' }}>
+            Volver al inicio
+          </Link>
         </div>
       </div>
     )
