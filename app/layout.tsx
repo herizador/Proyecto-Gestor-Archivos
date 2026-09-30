@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   title: 'Gestor de Archivos Familiar',
   description: 'Plataforma segura y privada para centralizar los documentos importantes de tu familia.',
   manifest: '/manifest.json',
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/icons/apple-touch-icon.png',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
