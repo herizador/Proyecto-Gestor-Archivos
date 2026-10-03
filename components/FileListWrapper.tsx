@@ -4,10 +4,11 @@ import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Share2, X, Check, Link, List } from 'lucide-react'
 import { generarEnlaceCompartido } from '@/actions/share'
-import { eliminarAcceso } from '@/actions/accesos'
+import { eliminarAcceso, type ObjetivoEnlace } from '@/actions/accesos'
 import FileCard from '@/components/FileCard'
 import FolderCard from '@/components/FolderCard'
 import NuevoAccesoModal from '@/components/NuevoAccesoModal'
+import EnlazarSeleccionModal from '@/components/EnlazarSeleccionModal'
 import type { AccesoConObjetivo, ArchivoConAutor, Carpeta } from '@/types/database'
 
 type CarpetaConAutor = Carpeta & {
@@ -109,6 +110,27 @@ export default function FileListWrapper({
   const isAllSelected = selectedIds.length === allIds.length && allIds.length > 0
   const hasItems = allIds.length > 0
 
+  // Objetivos para el enlace en lote: los accesos nunca entran en allIds,
+  // así que aquí solo hay archivos y carpetas reales.
+  const objetivosEnlace = useMemo<ObjetivoEnlace[]>(() => {
+    const carpetaIdSet = new Set(carpetas.map((c) => c.id))
+    const nombresArchivos = new Map(archivos.map((a) => [a.id, a.nombre_original]))
+    const nombresCarpetas = new Map(carpetas.map((c) => [c.id, c.nombre]))
+    return selectedIds.flatMap((id): ObjetivoEnlace[] => {
+      if (carpetaIdSet.has(id)) {
+        const nombre = nombresCarpetas.get(id)
+        return nombre ? [{ tipo: 'carpeta', id, nombre }] : []
+      }
+      const nombre = nombresArchivos.get(id)
+      return nombre ? [{ tipo: 'archivo', id, nombre }] : []
+    })
+  }, [selectedIds, archivos, carpetas])
+
+  function handleEnlazados() {
+    exitSelectionMode()
+    router.refresh()
+  }
+
   return (
     <div>
       {/* Barra de selección */}
@@ -154,7 +176,12 @@ export default function FileListWrapper({
               Cancelar
             </button>
 
-            <div style={{ marginLeft: 'auto' }}>
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <EnlazarSeleccionModal
+                objetivos={objetivosEnlace}
+                basePath={basePath}
+                onEnlazados={handleEnlazados}
+              />
               <button
                 type="button"
                 className="btn btn-primary btn-sm"

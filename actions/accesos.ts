@@ -171,49 +171,49 @@ export async function listarAccesos(carpetaContenedoraId: string | null) {
 }
 
 // ---------------------------------------------------------------------------
-// Crear acceso directo a un archivo o carpeta visible en una contenedora visible
+// Núcleo compartido (uno y lote): valida contenedora visible, objetivo visible
+// y anti-ciclo de carpetas, e inserta el acceso. El duplicado (23505) se marca
+// aparte para que el lote lo cuente como "omitido" en vez de error fatal.
 // ---------------------------------------------------------------------------
-export async function crearAcceso(params: {
-  objetivoTipo: 'archivo' | 'carpeta'
-  objetivoId: string
-  carpetaContenedoraId: string
+async function validarYCrearAcceso(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  objetivoTipo: 'archivo' | 'carpeta',
+  objetivoId: string,
+  carpetaContenedoraId: string,
   nombrePersonalizado?: string | null
-}) {
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) return { error: 'No autenticado.' }
-
+): Promise<{ ok: true } | { ok: false; error: string; duplicado: boolean }> {
   // La contenedora debe existir y ser visible (RLS); si no, error
   const { data: contenedora, error: contError } = await supabase
     .from('carpetas')
     .select('id')
-    .eq('id', params.carpetaContenedoraId)
+    .eq('id', carpetaContenedoraId)
     .single()
-  if (contError || !contenedora) return { error: 'Carpeta de destino no válida.' }
+  if (contError || !contenedora) return { ok: false, error: 'Carpeta de destino no válida.', duplicado: false }
 
-  if (params.objetivoTipo === 'archivo') {
+  if (objetivoTipo === 'archivo') {
     const { data: objetivo, error: objError } = await supabase
       .from('archivos')
       .select('id, estado')
-      .eq('id', params.objetivoId)
+      .eq('id', objetivoId)
       .single()
-    if (objError || !objetivo) return { error: 'Archivo no encontrado o sin permisos.' }
-    if (objetivo.estado !== 'activo') return { error: 'Solo se puede enlazar archivos activos.' }
+    if (objError || !objetivo) return { ok: false, error: 'Archivo no encontrado o sin permisos.', duplicado: false }
+    if (objetivo.estado !== 'activo') return { ok: false, error: 'Solo se puede enlazar archivos activos.', duplicado: false }
   } else {
-    if (params.objetivoId === params.carpetaContenedoraId) {
-      return { error: 'Una carpeta no puede enlazarse a sí misma.' }
+    if (objetivoId === carpetaContenedoraId) {
+      return { ok: false, error: 'Una carpeta no puede enlazarse a sí misma.', duplicado: false }
     }
     const { data: objetivo, error: objError } = await supabase
       .from('carpetas')
       .select('id')
-      .eq('id', params.objetivoId)
+      .eq('id', objetivoId)
       .single()
-    if (objError || !objetivo) return { error: 'Carpeta no encontrada o sin permisos.' }
+    if (objError || !objetivo) return { ok: false, error: 'Carpeta no encontrada o sin permisos.', duplicado: false }
     // Anti-ciclo: la contenedora no puede ser descendiente del objetivo
-    let cursor: string | null = params.carpetaContenedoraId
+    let cursor: string | null = carpetaContenedoraId
     for (let i = 0; i < 50 && cursor; i++) {
-      if (cursor === params.objetivoId) {
-        return { error: 'No se puede enlazar una carpeta dentro de sí misma o sus hijas.' }
+      if (cursor === objetivoId) {
+        return { ok: false, error: 'No se puede enlazar una carpeta dentro de sí misma o sus hijas.', duplicado: false }
       }
       const idActual: string = cursor
       const { data: padre }: { data: { carpeta_padre_id: string | null } | null } = await supabase
@@ -226,33 +226,101 @@ export async function crearAcceso(params: {
   }
 
   const { error: insertError } = await supabase.from('accesos_directos').insert({
-    creado_por: user.id,
-    carpeta_contenedora_id: params.carpetaContenedoraId,
-    archivo_objetivo_id: params.objetivoTipo === 'archivo' ? params.objetivoId : null,
-    carpeta_objetivo_id: params.objetivoTipo === 'carpeta' ? params.objetivoId : null,
-    nombre_personalizado: params.nombrePersonalizado?.trim() || null,
+    creado_por: userId,
+    carpeta_contenedora_id: carpetaContenedoraId,
+    archivo_objetivo_id: objetivoTipo === 'archivo' ? objetivoId : null,
+    carpeta_objetivo_id: objetivoTipo === 'carpeta' ? objetivoId : null,
+    nombre_personalizado: nombrePersonalizado?.trim() || null,
   })
 
   if (insertError) {
     if (insertError.code === '23505') {
-      return { error: 'Ya existe un enlace a ese elemento en esta carpeta.' }
+      return { ok: false, error: 'Ya existe un enlace a ese elemento en esta carpeta.', duplicado: true }
     }
-    return { error: insertError.message }
+    return { ok: false, error: insertError.message, duplicado: false }
   }
 
   await logActivity({
     accion: 'CREAR_ACCESO',
     detalles: {
-      objetivo_tipo: params.objetivoTipo,
-      objetivo_id: params.objetivoId,
-      carpeta_contenedora_id: params.carpetaContenedoraId,
+      objetivo_tipo: objetivoTipo,
+      objetivo_id: objetivoId,
+      carpeta_contenedora_id: carpetaContenedoraId,
     },
   })
+
+  return { ok: true }
+}
+
+// ---------------------------------------------------------------------------
+// Crear acceso directo a un archivo o carpeta visible en una contenedora visible
+// ---------------------------------------------------------------------------
+export async function crearAcceso(params: {
+  objetivoTipo: 'archivo' | 'carpeta'
+  objetivoId: string
+  carpetaContenedoraId: string
+  nombrePersonalizado?: string | null
+}) {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'No autenticado.' }
+
+  const res = await validarYCrearAcceso(
+    supabase,
+    user.id,
+    params.objetivoTipo,
+    params.objetivoId,
+    params.carpetaContenedoraId,
+    params.nombrePersonalizado
+  )
+  if (!res.ok) return { error: res.error }
 
   revalidatePath('/')
   revalidatePath('/mi-caja-fuerte')
   revalidatePath('/familia')
   return { success: true }
+}
+
+// ---------------------------------------------------------------------------
+// Crear accesos en lote (modo selección): enlaza N archivos/carpetas al mismo
+// destino. Los duplicados se omiten sin abortar; al final devuelve resumen.
+// ---------------------------------------------------------------------------
+export type ObjetivoEnlace = {
+  tipo: 'archivo' | 'carpeta'
+  id: string
+  nombre: string
+}
+
+export async function crearAccesosBatch(params: {
+  objetivos: ObjetivoEnlace[]
+  carpetaContenedoraId: string
+}) {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'No autenticado.' }
+
+  if (params.objetivos.length === 0) return { error: 'Selecciona al menos un elemento para enlazar.' }
+  if (params.objetivos.length > 50) return { error: 'Demasiados elementos a la vez (máximo 50).' }
+
+  let creados = 0
+  let omitidos = 0
+  const fallidos: Array<{ id: string; nombre: string; error: string }> = []
+
+  for (const obj of params.objetivos) {
+    const res = await validarYCrearAcceso(supabase, user.id, obj.tipo, obj.id, params.carpetaContenedoraId, null)
+    if (res.ok) {
+      creados += 1
+    } else if (res.duplicado) {
+      omitidos += 1
+    } else {
+      fallidos.push({ id: obj.id, nombre: obj.nombre, error: res.error })
+    }
+  }
+
+  revalidatePath('/')
+  revalidatePath('/mi-caja-fuerte')
+  revalidatePath('/familia')
+  return { success: true, creados, omitidos, fallidos, total: params.objetivos.length }
 }
 
 // ---------------------------------------------------------------------------
