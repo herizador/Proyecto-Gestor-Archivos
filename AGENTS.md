@@ -44,7 +44,7 @@ npm run lint     # ESLint (sin prettier/biome)
 - `searchParams` en `app/compartir/page.tsx` es `Promise`: hay que hacer `await`.
 
 ## Enviar fuera y Abrir con (PWA bidireccional)
-- **Enviar** (`FileCard.tsx` → `enviarArchivo()` en `actions/files.ts`): Web Share con ficheros (blob vía URL firmada, sin guardar en disco) + fallback a descarga clásica si `canShare` falla o se cancela. **Copiar** usa `ClipboardItem` para pegar en Gmail/Drive web. Auditoría propia: `COMPARTIR_EXTERNO` (distinto de `DESCARGAR_ARCHIVO`).
+- **Enviar** (barra de selección → `EnviarSeleccionButton.tsx` → `enviarArchivo()` en `actions/files.ts`): Web Share con ficheros (blob vía URL firmada, sin guardar en disco, máx 10 por envío); si el navegador no lo soporta o se cancela, avisa. Auditoría propia: `COMPARTIR_EXTERNO` (distinto de `DESCARGAR_ARCHIVO`). El botón **Copiar** se eliminó: el portapapeles web solo acepta texto/HTML/PNG y fallaba con el resto.
 - **Abrir con** (File Handling, solo Chromium escritorio): `file_handlers` en `public/manifest.json` → `/abrir` (pública en `middleware.ts`, la sesión se valida dentro como `/recibir`). `AperturaSistema.tsx` consume `launchQueue` y reutiliza `GuardadoManual` (prop `externos`, remonte por `key`).
 - Límite conocido: ninguna web puede inyectarse en el diálogo "Abrir archivo" del SO; el puente WebDAV quedó descartado (los route handlers no soportan `PROPFIND`, devuelven 405).
 
