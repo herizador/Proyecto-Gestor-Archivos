@@ -18,13 +18,17 @@ export default function GuardadoManual({
   raicesPrivadas,
   userId,
   isAdmin,
+  externos,
 }: {
   raicesComun: Carpeta[]
   raicesPrivadas: Carpeta[]
   userId: string
   isAdmin: boolean
+  // Archivos que llegan de fuera (File Handling "Abrir con"): pre-rellenan la
+  // selección. El padre remonta con key nueva por cada apertura del sistema.
+  externos?: File[]
 }) {
-  const [ficheros, setFicheros] = useState<File[]>([])
+  const [ficheros, setFicheros] = useState<File[]>(() => (externos ?? []).slice(0, MAX_MANUAL))
   const [errorLocal, setErrorLocal] = useState<string | null>(null)
   const router = useRouter()
 

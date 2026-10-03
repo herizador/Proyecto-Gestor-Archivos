@@ -43,6 +43,11 @@ npm run lint     # ESLint (sin prettier/biome)
 - Usar siempre `<DateDisplay date={...} />` (`components/DateDisplay.tsx`: `suppressHydrationWarning` + `es-ES`). Nunca `new Date(...).toLocaleDateString()` directo en un client component.
 - `searchParams` en `app/compartir/page.tsx` es `Promise`: hay que hacer `await`.
 
+## Enviar fuera y Abrir con (PWA bidireccional)
+- **Enviar** (`FileCard.tsx` → `enviarArchivo()` en `actions/files.ts`): Web Share con ficheros (blob vía URL firmada, sin guardar en disco) + fallback a descarga clásica si `canShare` falla o se cancela. **Copiar** usa `ClipboardItem` para pegar en Gmail/Drive web. Auditoría propia: `COMPARTIR_EXTERNO` (distinto de `DESCARGAR_ARCHIVO`).
+- **Abrir con** (File Handling, solo Chromium escritorio): `file_handlers` en `public/manifest.json` → `/abrir` (pública en `middleware.ts`, la sesión se valida dentro como `/recibir`). `AperturaSistema.tsx` consume `launchQueue` y reutiliza `GuardadoManual` (prop `externos`, remonte por `key`).
+- Límite conocido: ninguna web puede inyectarse en el diálogo "Abrir archivo" del SO; el puente WebDAV quedó descartado (los route handlers no soportan `PROPFIND`, devuelven 405).
+
 ## Compartir
 - `FileListWrapper.tsx` gestiona el modo selección (multi-select archivos + carpetas) y llama a `generarEnlaceCompartido({ archivoIds, carpetaIds })`. Token con `crypto.randomUUID()`, `tipo_recurso` auto (`archivo`/`carpeta`/`multiple`), expiración **7 días**, URL base `NEXT_PUBLIC_APP_URL` (fallback `http://localhost:3000`).
 - Límite conocido: `obtenerEnlaceCompartido()` solo resuelve `archivos_ids` (las `carpetas_ids` se guardan y auditan pero no se expanden en `/compartir`). No prometer carpetas navegables en el enlace.

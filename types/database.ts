@@ -289,6 +289,7 @@ export type ActivityAction =
   | 'COMPARTIR_ENLACE'
   | 'CREAR_ACCESO'
   | 'ELIMINAR_ACCESO'
+  | 'COMPARTIR_EXTERNO'
 
 // Tipos de fila convenientes
 export type Perfil = Database['public']['Tables']['perfiles']['Row']

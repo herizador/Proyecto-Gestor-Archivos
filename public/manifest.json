@@ -25,6 +25,29 @@
       ]
     }
   },
+  "file_handlers": [
+    {
+      "action": "/abrir",
+      "accept": {
+        "application/pdf": [".pdf"],
+        "image/jpeg": [".jpg", ".jpeg"],
+        "image/png": [".png"],
+        "image/webp": [".webp"],
+        "image/gif": [".gif"],
+        "text/plain": [".txt"],
+        "text/csv": [".csv"],
+        "application/msword": [".doc"],
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [".docx"],
+        "application/vnd.ms-excel": [".xls"],
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+        "application/vnd.ms-powerpoint": [".ppt"],
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": [".pptx"],
+        "application/zip": [".zip"],
+        "audio/mpeg": [".mp3"],
+        "video/mp4": [".mp4"]
+      }
+    }
+  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",

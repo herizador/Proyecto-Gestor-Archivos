@@ -222,6 +222,37 @@ export async function descargarArchivo(archivoId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Obtener URL para ENVIAR a otra app (Web Share / copiar) + auditar.
+// A diferencia de descargar, registra COMPARTIR_EXTERNO para distinguir en el
+// historial "lo mandé fuera" de "lo bajé a este dispositivo". Resuelve accesos.
+// ---------------------------------------------------------------------------
+export async function enviarArchivo(archivoId: string) {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'No autenticado.' }
+
+  const resuelto = await resolverObjetivo(supabase, archivoId)
+  if ('error' in resuelto) return { error: resuelto.error }
+
+  try {
+    const url = await getPresignedDownloadUrl(resuelto.ruta_r2, resuelto.nombre_original)
+
+    await logActivity({
+      accion: 'COMPARTIR_EXTERNO',
+      detalles: {
+        archivo_id: resuelto.originalId,
+        nombre_original: resuelto.nombre_original,
+        ...(resuelto.accesoId ? { acceso_id: resuelto.accesoId } : {}),
+      },
+    })
+
+    return { url, nombreOriginal: resuelto.nombre_original, tipoMime: resuelto.tipo_mime }
+  } catch {
+    return { error: 'Error al preparar el archivo para enviar.' }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Búsqueda global de archivos activos por nombre
 // ---------------------------------------------------------------------------
 export async function buscarArchivos(termino: string) {
