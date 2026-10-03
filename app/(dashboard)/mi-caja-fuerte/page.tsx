@@ -62,7 +62,8 @@ export default async function CajaFuertePage({
     ? await archivosQuery.eq('carpeta_id', carpetaActualId)
     : await archivosQuery.is('carpeta_id', null)
 
-  const { data: accesos } = await listarAccesos(carpetaActualId)
+  const { data: accesos, error: errorAccesos } = await listarAccesos(carpetaActualId)
+  if (errorAccesos) console.error('[Caja Fuerte] listarAccesos:', errorAccesos)
 
   const tieneContenido = (carpetas?.length ?? 0) > 0 || (archivos?.length ?? 0) > 0 || (accesos?.length ?? 0) > 0
 
@@ -104,7 +105,13 @@ export default async function CajaFuertePage({
           </p>
         </div>
       ) : (
-        <FileListWrapper
+        <>
+          {errorAccesos && (
+            <p className="error-msg" style={{ marginBottom: '12px' }}>
+              <span>No se pudieron cargar los enlaces de esta carpeta ({errorAccesos}). Archivos y carpetas se muestran igual.</span>
+            </p>
+          )}
+          <FileListWrapper
           archivos={archivos ?? []}
           carpetas={carpetas ?? []}
           accesos={accesos ?? []}
@@ -112,7 +119,8 @@ export default async function CajaFuertePage({
           userId={user.id}
           showOwner
           basePath="/mi-caja-fuerte"
-        />
+          />
+        </>
       )}
     </div>
   )

@@ -2,25 +2,122 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { logActivity } from '@/actions/storage'
-import type { AccesoConObjetivo, Carpeta } from '@/types/database'
+import type { AccesoConObjetivo, AccesoDirecto, Carpeta } from '@/types/database'
 import { revalidatePath } from 'next/cache'
-
-const SELECT_ACCESO = `
-  *,
-  archivo_objetivo:archivos!accesos_directos_archivo_objetivo_id_fkey(
-    id, nombre_original, tamano_bytes, tipo_mime, estado, fecha_subida, subido_por,
-    subido_por_perfil:perfiles(nombre_completo),
-    carpeta:carpetas!archivos_carpeta_id_fkey(id, nombre)
-  ),
-  carpeta_objetivo:carpetas!accesos_directos_carpeta_objetivo_id_fkey(
-    id, nombre,
-    padre:carpetas!carpetas_carpeta_padre_id_fkey(id, nombre)
-  ),
-  carpeta_contenedora:carpetas!accesos_directos_carpeta_contenedora_id_fkey(id, nombre)
-`
 
 function escaparLike(termino: string) {
   return termino.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+}
+
+// ---------------------------------------------------------------------------
+// Enriquecer filas de accesos con sus objetivos mediante consultas simples por
+// separado (nunca un SELECT con joins por nombre de FK: si un join fallaba, la
+// consulta entera devolvía error y la carpeta destino se veía vacía sin aviso).
+// Un objetivo no visible por RLS queda en NULL (= huérfano) sin romper el resto.
+// ---------------------------------------------------------------------------
+async function enriquecerAccesos(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  filas: AccesoDirecto[]
+): Promise<AccesoConObjetivo[]> {
+  if (filas.length === 0) return []
+
+  const archivoIds = [...new Set(
+    filas.map((a) => a.archivo_objetivo_id).filter((x): x is string => typeof x === 'string' && x.length > 0)
+  )]
+  const carpetaIds = [...new Set(
+    filas.map((a) => a.carpeta_objetivo_id).filter((x): x is string => typeof x === 'string' && x.length > 0)
+  )]
+  const contenedoraIds = [...new Set(filas.map((a) => a.carpeta_contenedora_id).filter((x) => typeof x === 'string' && x.length > 0))]
+
+  type FilaArchivo = { id: string; nombre_original: string; tamano_bytes: number; tipo_mime: string; estado: string; fecha_subida: string; subido_por: string; carpeta_id: string | null }
+  type FilaCarpeta = { id: string; nombre: string; carpeta_padre_id?: string | null }
+
+  let archivos: FilaArchivo[] = []
+  if (archivoIds.length > 0) {
+    const res = await supabase
+      .from('archivos')
+      .select('id, nombre_original, tamano_bytes, tipo_mime, estado, fecha_subida, subido_por, carpeta_id')
+      .in('id', archivoIds)
+    if (res.error) console.error('[accesos] no se pudieron resolver archivos objetivo:', res.error.message)
+    else archivos = (res.data ?? []) as FilaArchivo[]
+  }
+
+  let carpetas: FilaCarpeta[] = []
+  if (carpetaIds.length > 0) {
+    const res = await supabase
+      .from('carpetas')
+      .select('id, nombre, carpeta_padre_id')
+      .in('id', carpetaIds)
+    if (res.error) console.error('[accesos] no se pudieron resolver carpetas objetivo:', res.error.message)
+    else carpetas = (res.data ?? []) as FilaCarpeta[]
+  }
+
+  const autorIds = [...new Set(archivos.map((a) => a.subido_por).filter((x) => typeof x === 'string' && x.length > 0))]
+  const carpetaDeArchivoIds = [...new Set(archivos.map((a) => a.carpeta_id).filter((x): x is string => typeof x === 'string' && x.length > 0))]
+  const padreIds = [...new Set(carpetas.map((c) => c.carpeta_padre_id).filter((x): x is string => typeof x === 'string' && x.length > 0))]
+
+  let perfiles: Array<{ id: string; nombre_completo: string }> = []
+  if (autorIds.length > 0) {
+    const res = await supabase.from('perfiles').select('id, nombre_completo').in('id', autorIds)
+    if (!res.error) perfiles = (res.data ?? []) as Array<{ id: string; nombre_completo: string }>
+  }
+
+  let carpetasDeArchivo: Array<{ id: string; nombre: string }> = []
+  if (carpetaDeArchivoIds.length > 0) {
+    const res = await supabase.from('carpetas').select('id, nombre').in('id', carpetaDeArchivoIds)
+    if (!res.error) carpetasDeArchivo = (res.data ?? []) as Array<{ id: string; nombre: string }>
+  }
+
+  let padres: Array<{ id: string; nombre: string }> = []
+  if (padreIds.length > 0) {
+    const res = await supabase.from('carpetas').select('id, nombre').in('id', padreIds)
+    if (!res.error) padres = (res.data ?? []) as Array<{ id: string; nombre: string }>
+  }
+
+  let contenedoras: Array<{ id: string; nombre: string }> = []
+  if (contenedoraIds.length > 0) {
+    const res = await supabase.from('carpetas').select('id, nombre').in('id', contenedoraIds)
+    if (!res.error) contenedoras = (res.data ?? []) as Array<{ id: string; nombre: string }>
+  }
+
+  const porArchivo = new Map(archivos.map((a) => [a.id, a]))
+  const porCarpeta = new Map(carpetas.map((c) => [c.id, c]))
+  const porPerfil = new Map(perfiles.map((p) => [p.id, p]))
+  const porCarpetaArchivo = new Map(carpetasDeArchivo.map((c) => [c.id, c]))
+  const porPadre = new Map(padres.map((c) => [c.id, c]))
+  const porContenedora = new Map(contenedoras.map((c) => [c.id, c]))
+
+  return filas.map((a) => {
+    const arch = a.archivo_objetivo_id ? (porArchivo.get(a.archivo_objetivo_id) ?? null) : null
+    const carp = a.carpeta_objetivo_id ? (porCarpeta.get(a.carpeta_objetivo_id) ?? null) : null
+    const perfil = arch ? (porPerfil.get(arch.subido_por) ?? null) : null
+    const carpArch = arch?.carpeta_id ? (porCarpetaArchivo.get(arch.carpeta_id) ?? null) : null
+    const padre = carp?.carpeta_padre_id ? (porPadre.get(carp.carpeta_padre_id) ?? null) : null
+    return {
+      ...a,
+      archivo_objetivo: arch
+        ? {
+            id: arch.id,
+            nombre_original: arch.nombre_original,
+            tamano_bytes: arch.tamano_bytes,
+            tipo_mime: arch.tipo_mime,
+            estado: arch.estado as 'activo' | 'papelera',
+            fecha_subida: arch.fecha_subida,
+            subido_por: arch.subido_por,
+            subido_por_perfil: perfil ? { nombre_completo: perfil.nombre_completo } : null,
+            carpeta: carpArch ? { id: carpArch.id, nombre: carpArch.nombre } : null,
+          }
+        : null,
+      carpeta_objetivo: carp
+        ? {
+            id: carp.id,
+            nombre: carp.nombre,
+            padre: padre ? { id: padre.id, nombre: padre.nombre } : null,
+          }
+        : null,
+      carpeta_contenedora: porContenedora.get(a.carpeta_contenedora_id) ?? null,
+    }
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -61,12 +158,16 @@ export async function listarAccesos(carpetaContenedoraId: string | null) {
   const supabase = await createClient()
   const { data, error } = await supabase
     .from('accesos_directos')
-    .select(SELECT_ACCESO)
+    .select('*')
     .eq('carpeta_contenedora_id', carpetaContenedoraId)
     .order('fecha_creacion', { ascending: true })
 
-  if (error) return { error: error.message, data: [] as AccesoConObjetivo[] }
-  return { data: (data ?? []) as unknown as AccesoConObjetivo[] }
+  if (error) {
+    console.error('[listarAccesos] error base:', error.message)
+    return { error: error.message, data: [] as AccesoConObjetivo[] }
+  }
+  const filas = (data ?? []) as AccesoDirecto[]
+  return { data: await enriquecerAccesos(supabase, filas) }
 }
 
 // ---------------------------------------------------------------------------
@@ -200,12 +301,16 @@ export async function buscarAccesos(termino: string) {
 
   async function conDetalle(ids: string[]) {
     if (ids.length === 0) return
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('accesos_directos')
-      .select(SELECT_ACCESO)
+      .select('*')
       .in('id', ids)
       .limit(25)
-    for (const a of ((data ?? []) as unknown as AccesoConObjetivo[])) {
+    if (error) {
+      console.error('[buscarAccesos] error base:', error.message)
+      return
+    }
+    for (const a of await enriquecerAccesos(supabase, (data ?? []) as AccesoDirecto[])) {
       if (!vistos.has(a.id)) {
         vistos.add(a.id)
         resultados.push(a)

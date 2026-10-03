@@ -64,8 +64,9 @@ export default async function DashboardComun({
 
 
 
-  const { data: accesos } = await listarAccesos(carpetaActualId)
-  const tieneContenido = (carpetas?.length ?? 0) > 0 || (archivos?.length ?? 0) > 0 || (accesos?.length ?? 0) > 0
+  const { data: accesos, error: errorAccesos } = await listarAccesos(carpetaActualId)
+  if (errorAccesos) console.error('[Área Común] listarAccesos:', errorAccesos)
+  const tieneContenido = (carpetas?.length ?? 0) > 0 || (archivos?.length ?? 0) > 0 || (accesos?.length ?? 0) > 0
 
   return (
     <div className="page-content animate-fade-in">
@@ -92,7 +93,13 @@ export default async function DashboardComun({
         </div>
       </div>
 
-      {isAdmin && <StorageBar isAdmin={isAdmin} />}
+      {isAdmin && <StorageBar isAdmin={isAdmin} />}
+
+      {errorAccesos && (
+        <p className="error-msg" style={{ marginBottom: '12px' }}>
+          <span>No se pudieron cargar los enlaces de esta carpeta ({errorAccesos}). Archivos y carpetas se muestran igual.</span>
+        </p>
+      )}
 
       <DocumentSearchBar userId={user.id} isAdmin={isAdmin}>
         {!tieneContenido ? (
