@@ -150,12 +150,14 @@ La policy `historial_insert_sistema` ya permite INSERT.
 
 ## 10. Estimación y fases
 
-- **F1 (este diseño)**: 0 código. ✅ hecho.
-- **F2 prototipo**: Worker (auth + PROPFIND + GET + Range) + migración
-  `tokens_dav` + `/ajustes` con crear/revocar. Estimación: 4–8 días con
-  pruebas en Windows/macOS.
-- **F3 endurecer**: rate-limit, `ultimo_uso`, pruebas con tildes y nombres
-  largos, docs de alta para la familia.
+- **F1 (diseño)**: hecho. ✅
+- **F2 (prototipo)**: hecho ✅ — Worker (auth + PROPFIND + GET + Range + cuota),
+  migración `tokens_dav`, `/ajustes` con crear/revocar.
+- **F3 (endurecer)**: hecho ✅ — rate-limit aproximado en memoria del isolate
+  (30/min por IP sin auth, 300/min por token; `429` + `Retry-After`), `Cache-Control:
+  no-store` en todo, tope de 25 segmentos, `Allow` en el `501`, `ultimo_uso` +
+  auditoría `ACCESO_WEBDAV` en cada GET, script `worker/test/smoke.mjs` y guía
+  `docs/alta-explorador.md`.
 - **Futuro (no diseñado)**: escritura PUT (locks, subidas parciales, cupo 9 GB).
 
 ## 11. Decisiones (cerradas 2026-10-04)

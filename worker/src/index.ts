@@ -37,6 +37,36 @@ const RAIZ_PRIVADA = 'Mi caja fuerte'
 // Mismo límite que el trigger validar_limite_almacenamiento de la BD
 const LIMITE_BYTES = 9663676416 // 9 GB
 
+// Rate-limit best-effort en memoria del isolate (sin infra extra): frena
+// raspados y fuerza bruta contra tokens. Cada isolate lleva su contador, así
+// que es aproximado; con dominio propio se puede sumar una regla en el panel.
+const VENTANA_MS = 60_000
+const MAX_POR_IP = 30 // sin autenticar (por IP vista por Cloudflare)
+const MAX_POR_TOKEN = 300 // autenticado (por token)
+const marcasRitmo = new Map<string, number[]>()
+
+function excesoRitmo(clave: string, maximo: number): boolean {
+  const ahora = Date.now()
+  const marcas = (marcasRitmo.get(clave) ?? []).filter((t) => ahora - t < VENTANA_MS)
+  marcas.push(ahora)
+  marcasRitmo.set(clave, marcas)
+  if (marcasRitmo.size > 2000) {
+    for (const [k, m] of marcasRitmo) {
+      if (m.length === 0 || ahora - m[m.length - 1] > VENTANA_MS) marcasRitmo.delete(k)
+      if (marcasRitmo.size <= 1000) break
+    }
+  }
+  return marcas.length > maximo
+}
+
+// Profundidad máxima de ruta (anti-abuso: cada nivel es una consulta)
+const MAX_SEGMENTOS = 25
+
+// Nada del puente se cachea: son listados privados por token
+function cabecerasPrivadas(extra?: Record<string, string>): Record<string, string> {
+  return { 'Cache-Control': 'no-store, no-cache, must-revalidate', ...(extra ?? {}) }
+}
+
 const SELECT_CARPETA = 'id,nombre,carpeta_padre_id,es_privada,creado_por,fecha_creacion'
 const SELECT_ARCHIVO = 'id,nombre_original,ruta_r2,tamano_bytes,tipo_mime,fecha_subida,carpeta_id,subido_por'
 
@@ -267,7 +297,7 @@ async function responderPropfind(env: Env, user: UsuarioDav, req: Request, segs:
     }
     return new Response(xmlPropfind([item]), {
       status: 207,
-      headers: { 'Content-Type': 'application/xml; charset=utf-8', 'DAV': '1' },
+      headers: { 'Content-Type': 'application/xml; charset=utf-8', 'DAV': '1', ...cabecerasPrivadas() },
     })
   }
 
@@ -290,7 +320,7 @@ async function responderPropfind(env: Env, user: UsuarioDav, req: Request, segs:
   }
   return new Response(xmlPropfind(items), {
     status: 207,
-    headers: { 'Content-Type': 'application/xml; charset=utf-8', 'DAV': '1' },
+    headers: { 'Content-Type': 'application/xml; charset=utf-8', 'DAV': '1', ...cabecerasPrivadas() },
   })
 }
 
@@ -348,6 +378,7 @@ async function responderArchivo(env: Env, user: UsuarioDav, req: Request, archiv
     'Content-Type': archivo.tipo_mime || 'application/octet-stream',
     'Accept-Ranges': 'bytes',
     'Content-Disposition': `inline; filename="${archivo.nombre_original.replace(/["\\]/g, '_')}"`,
+    ...cabecerasPrivadas(),
   }
   let estado = 200
   if (rango) {
@@ -378,7 +409,17 @@ const worker = {
           'Allow': 'OPTIONS, PROPFIND, GET, HEAD',
           'MS-Author-Via': 'DAV',
           'Content-Length': '0',
+          ...cabecerasPrivadas(),
         },
+      })
+    }
+
+    // Pre-chequeo por IP antes de tocar la BD (frena fuerza bruta anónima)
+    const ip = req.headers.get('cf-connecting-ip') ?? 'desconocida'
+    if (excesoRitmo(`ip:${ip}`, MAX_POR_IP)) {
+      return new Response('Demasiadas peticiones.', {
+        status: 429,
+        headers: { 'Retry-After': '60', ...cabecerasPrivadas() },
       })
     }
 
@@ -386,23 +427,40 @@ const worker = {
     try {
       user = await autenticar(env, req)
     } catch {
-      return new Response('Error interno de autenticación.', { status: 500 })
+      return new Response('Error interno de autenticación.', { status: 500, headers: cabecerasPrivadas() })
     }
     if (!user) return noAuth()
+    if (excesoRitmo(`tok:${user.tokenId}`, MAX_POR_TOKEN)) {
+      return new Response('Demasiadas peticiones.', {
+        status: 429,
+        headers: { 'Retry-After': '60', ...cabecerasPrivadas() },
+      })
+    }
 
     const segs = segmentos(new URL(req.url).pathname)
-    if (!segs) return new Response('Ruta no válida.', { status: 400 })
+    if (!segs) return new Response('Ruta no válida.', { status: 400, headers: cabecerasPrivadas() })
+    if (segs.length > MAX_SEGMENTOS) {
+      return new Response('Ruta demasiado profunda.', { status: 400, headers: cabecerasPrivadas() })
+    }
 
     try {
       if (req.method === 'PROPFIND') return await responderPropfind(env, user, req, segs)
       if (req.method === 'GET' || req.method === 'HEAD') {
         const nodo = await resolver(env, user, segs)
-        if (!nodo || nodo.kind !== 'archivo') return new Response('No encontrado.', { status: 404 })
+        if (!nodo || nodo.kind !== 'archivo') {
+          return new Response('No encontrado.', { status: 404, headers: cabecerasPrivadas() })
+        }
         return await responderArchivo(env, user, req, nodo.archivo, req.method === 'HEAD')
       }
-      return new Response('Método no soportado (solo lectura).', { status: 501 })
+      return new Response('Método no soportado (solo lectura).', {
+        status: 501,
+        headers: { 'Allow': 'OPTIONS, PROPFIND, GET, HEAD', ...cabecerasPrivadas() },
+      })
     } catch (e) {
-      return new Response(`Error interno: ${e instanceof Error ? e.message : 'desconocido'}`, { status: 500 })
+      return new Response(`Error interno: ${e instanceof Error ? e.message : 'desconocido'}`, {
+        status: 500,
+        headers: cabecerasPrivadas(),
+      })
     }
   },
 }
