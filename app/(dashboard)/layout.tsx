@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ShieldCheck, FolderHeart, Users, Lock, LogOut, ShieldAlert, Trash2 } from 'lucide-react'
+import { ShieldCheck, FolderHeart, Users, Lock, LogOut, ShieldAlert, Trash2, Settings } from 'lucide-react'
 import { logout } from '@/actions/auth'
 import MobileNavigation from '@/components/MobileNavigation'
 
@@ -59,6 +59,10 @@ export default async function DashboardLayout({
           <Link href="/papelera" className="nav-item">
             <Trash2 size={18} />
             Papelera de Reciclaje
+          </Link>
+          <Link href="/ajustes" className="nav-item">
+            <Settings size={18} />
+            Ajustes
           </Link>
 
           {isAdmin && (

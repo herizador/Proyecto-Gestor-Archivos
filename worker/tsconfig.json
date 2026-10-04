@@ -1,0 +1,13 @@
+{
+  // Solo para verificar tipos del Worker (`npx tsc -p worker/tsconfig.json`).
+  // El build de Next lo ignora (tsconfig.json raíz excluye `worker/`).
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["ESNext", "DOM"],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": []
+  },
+  "include": ["src/**/*.ts"]
+}

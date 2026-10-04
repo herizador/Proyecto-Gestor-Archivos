@@ -46,7 +46,8 @@ npm run lint     # ESLint (sin prettier/biome)
 ## Enviar fuera y Abrir con (PWA bidireccional)
 - **Enviar** (barra de selección → `EnviarSeleccionButton.tsx` → `enviarArchivo()` en `actions/files.ts`): Web Share con ficheros (blob vía URL firmada, sin guardar en disco, máx 10 por envío); si el navegador no lo soporta o se cancela, avisa. Auditoría propia: `COMPARTIR_EXTERNO` (distinto de `DESCARGAR_ARCHIVO`). El botón **Copiar** se eliminó: el portapapeles web solo acepta texto/HTML/PNG y fallaba con el resto.
 - **Abrir con** (File Handling, solo Chromium escritorio): `file_handlers` en `public/manifest.json` → `/abrir` (pública en `middleware.ts`, la sesión se valida dentro como `/recibir`). `AperturaSistema.tsx` consume `launchQueue` y reutiliza `GuardadoManual` (prop `externos`, remonte por `key`).
-- Límite conocido: ninguna web puede inyectarse en el diálogo "Abrir archivo" del SO; el puente WebDAV quedó descartado (los route handlers no soportan `PROPFIND`, devuelven 405).
+- Límite conocido: ninguna web puede inyectarse en el diálogo "Abrir archivo" del SO. Puente WebDAV: implementado en `worker/` (Worker Cloudflare + R2 solo-lectura; en Vercel es imposible: `PROPFIND` devuelve 405). Detalle en `docs/diseno-webdav.md`.
+- **Worker WebDAV**: deploy separado con `npx wrangler deploy` desde `worker/` (no pasa por Vercel ni `npm run build`; `tsconfig.json` lo excluye). Secretos solo vía `wrangler secret put` (`SUPABASE_SERVICE_ROLE_KEY`); `SUPABASE_URL` en `worker/wrangler.toml`. Tokens de Explorador: `actions/dav.ts` + `/ajustes` + tabla `tokens_dav`.
 
 ## Compartir
 - `FileListWrapper.tsx` gestiona el modo selección (multi-select archivos + carpetas) y llama a `generarEnlaceCompartido({ archivoIds, carpetaIds })`. Token con `crypto.randomUUID()`, `tipo_recurso` auto (`archivo`/`carpeta`/`multiple`), expiración **7 días**, URL base `NEXT_PUBLIC_APP_URL` (fallback `http://localhost:3000`).

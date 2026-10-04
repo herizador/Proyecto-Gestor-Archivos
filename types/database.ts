@@ -257,6 +257,44 @@ export type Database = {
           },
         ]
       }
+      tokens_dav: {
+        Row: {
+          id: string
+          usuario_id: string
+          nombre: string
+          token_hash: string
+          revocado: boolean
+          ultimo_uso: string | null
+          fecha_creacion: string
+        }
+        Insert: {
+          id?: string
+          usuario_id: string
+          nombre: string
+          token_hash: string
+          revocado?: boolean
+          ultimo_uso?: string | null
+          fecha_creacion?: string
+        }
+        Update: {
+          id?: string
+          usuario_id?: string
+          nombre?: string
+          token_hash?: string
+          revocado?: boolean
+          ultimo_uso?: string | null
+          fecha_creacion?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'tokens_dav_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'perfiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -290,6 +328,7 @@ export type ActivityAction =
   | 'CREAR_ACCESO'
   | 'ELIMINAR_ACCESO'
   | 'COMPARTIR_EXTERNO'
+  | 'ACCESO_WEBDAV'
 
 // Tipos de fila convenientes
 export type Perfil = Database['public']['Tables']['perfiles']['Row']
@@ -312,6 +351,9 @@ export type EnlaceCompartido = Database['public']['Tables']['enlaces_compartidos
 
 // Acceso directo (enlace): un físico visible en N ubicaciones sin duplicar bytes
 export type AccesoDirecto = Database['public']['Tables']['accesos_directos']['Row']
+
+// Token de Explorador para el puente WebDAV (el claro solo existe al crearlo)
+export type TokenDav = Database['public']['Tables']['tokens_dav']['Row']
 
 // Acceso con su objetivo resuelto (LEFT JOIN: el objetivo puede ser NULL = huérfano)
 export type AccesoConObjetivo = AccesoDirecto & {

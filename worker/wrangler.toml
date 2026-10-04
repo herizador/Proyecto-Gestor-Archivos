@@ -1,0 +1,16 @@
+# Puente WebDAV solo-lectura del Gestor Familiar (ver docs/diseno-webdav.md).
+# Deploy: `npx wrangler deploy` desde esta carpeta (sustituye el worker actual).
+# Secretos (nunca en este fichero): `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY`
+
+name = "gestor-familiar"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "proyecto-gestor-archivos"
+
+[vars]
+# URL del proyecto Supabase (misma que NEXT_PUBLIC_SUPABASE_URL en Vercel)
+SUPABASE_URL = "https://khivwiabrozdqpiuadfi.supabase.co"

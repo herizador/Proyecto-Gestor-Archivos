@@ -448,3 +448,43 @@ CREATE POLICY "accesos_insert_propio" ON public.accesos_directos
 
 CREATE POLICY "accesos_delete_propio_admin" ON public.accesos_directos
   FOR DELETE USING (creado_por = auth.uid() OR public.get_user_role() = 'admin');
+
+
+-- =============================================================================
+-- TABLA 8: tokens_dav
+-- Contraseñas de Explorador para el puente WebDAV (un token = un dispositivo).
+-- El token en claro solo existe al crearlo; en BD solo vive su hash SHA-256.
+-- La PWA gestiona tokens propios vía RLS; el Worker usa service-role.
+-- Sin UPDATE salvo revocar: los tokens no se editan.
+-- Ver docs/diseno-webdav.md
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.tokens_dav (
+  id             UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  usuario_id     UUID        NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
+  nombre         TEXT        NOT NULL,
+  token_hash     TEXT        NOT NULL UNIQUE,
+  revocado       BOOLEAN     NOT NULL DEFAULT FALSE,
+  ultimo_uso     TIMESTAMPTZ,
+  fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tokens_dav_usuario ON public.tokens_dav(usuario_id);
+
+-- ─── RLS: tokens_dav ────────────────────────────────────────────────────────
+ALTER TABLE public.tokens_dav ENABLE ROW LEVEL SECURITY;
+
+-- Ver: propios o admin (el admin audita los de todos)
+CREATE POLICY "tokens_dav_select" ON public.tokens_dav
+  FOR SELECT USING (usuario_id = auth.uid() OR public.get_user_role() = 'admin');
+
+-- Crear: solo propios (el usuario_id lo fija la server action, nunca el cliente)
+CREATE POLICY "tokens_dav_insert" ON public.tokens_dav
+  FOR INSERT WITH CHECK (usuario_id = auth.uid());
+
+-- Revocar: propios o admin
+CREATE POLICY "tokens_dav_update" ON public.tokens_dav
+  FOR UPDATE USING (usuario_id = auth.uid() OR public.get_user_role() = 'admin');
+
+-- Borrar: propios o admin
+CREATE POLICY "tokens_dav_delete" ON public.tokens_dav
+  FOR DELETE USING (usuario_id = auth.uid() OR public.get_user_role() = 'admin');

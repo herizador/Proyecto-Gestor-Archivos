@@ -2,14 +2,14 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ShieldCheck, FolderHeart, Users, Lock, Trash2, ShieldAlert, LogOut, Menu, X } from 'lucide-react'
+import { ShieldCheck, FolderHeart, Users, Lock, Trash2, ShieldAlert, LogOut, Menu, X, Settings } from 'lucide-react'
 import { logout } from '@/actions/auth'
 
 export default function MobileNavigation({
   perfil,
   isAdmin,
 }: {
-  perfil: any
+  perfil: { nombre_completo?: string | null } | null
   isAdmin: boolean
 }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -83,6 +83,10 @@ export default function MobileNavigation({
           <Link href="/papelera" className="nav-item" onClick={closeMenu}>
             <Trash2 size={18} />
             Papelera de Reciclaje
+          </Link>
+          <Link href="/ajustes" className="nav-item" onClick={closeMenu}>
+            <Settings size={18} />
+            Ajustes
           </Link>
 
           {isAdmin && (
