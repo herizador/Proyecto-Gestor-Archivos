@@ -34,6 +34,9 @@ type Scope = 'comun' | 'privado'
 const RAIZ_COMUN = 'Área común'
 const RAIZ_PRIVADA = 'Mi caja fuerte'
 
+// Mismo límite que el trigger validar_limite_almacenamiento de la BD
+const LIMITE_BYTES = 9663676416 // 9 GB
+
 const SELECT_CARPETA = 'id,nombre,carpeta_padre_id,es_privada,creado_por,fecha_creacion'
 const SELECT_ARCHIVO = 'id,nombre_original,ruta_r2,tamano_bytes,tipo_mime,fecha_subida,carpeta_id,subido_por'
 
@@ -190,6 +193,19 @@ type ItemProp = {
   tamano?: number
   tipo?: string
   fecha?: string
+  cuota?: { usada: number; libre: number } | null
+}
+
+// Uso total (misma función que usa la PWA en StorageBar). Si falla, se omite la
+// cuota y Windows vuelve a mostrar su estimación local: nunca rompe el listado.
+async function usoAlmacenamiento(env: Env): Promise<{ usada: number; libre: number } | null> {
+  try {
+    const total = await sb<number>(env, 'rpc/get_storage_usage', { method: 'POST' })
+    if (typeof total !== 'number' || !Number.isFinite(total)) return null
+    return { usada: total, libre: Math.max(0, LIMITE_BYTES - total) }
+  } catch {
+    return null
+  }
 }
 
 function xmlPropfind(items: ItemProp[]): string {
@@ -206,6 +222,10 @@ function xmlPropfind(items: ItemProp[]): string {
           `<D:getcontenttype>${escXml(it.tipo ?? 'application/octet-stream')}</D:getcontenttype>`) +
       `<D:getlastmodified>${ultimaMod}</D:getlastmodified>` +
       `<D:creationdate>${creada}</D:creationdate>` +
+      (it.esCarpeta && it.cuota
+        ? `<D:quota-available-bytes>${it.cuota.libre}</D:quota-available-bytes>` +
+          `<D:quota-used-bytes>${it.cuota.usada}</D:quota-used-bytes>`
+        : '') +
       '<D:supportedlock/><D:lockdiscovery/>' +
       '</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>'
     )
@@ -214,7 +234,8 @@ function xmlPropfind(items: ItemProp[]): string {
 }
 
 async function miembrosDe(
-  env: Env, user: UsuarioDav, nodo: { kind: 'ambito'; scope: Scope } | { kind: 'carpeta'; scope: Scope; carpeta: FilaCarpeta }, baseSegs: string[]
+  env: Env, user: UsuarioDav, nodo: { kind: 'ambito'; scope: Scope } | { kind: 'carpeta'; scope: Scope; carpeta: FilaCarpeta }, baseSegs: string[],
+  cuota: { usada: number; libre: number } | null
 ): Promise<ItemProp[]> {
   const padre = nodo.kind === 'ambito' ? null : nodo.carpeta.id
   const [carpetas, archivos] = await Promise.all([
@@ -223,7 +244,7 @@ async function miembrosDe(
   ])
   return [
     ...carpetas.map((c): ItemProp => ({
-      href: hrefDe([...baseSegs, c.nombre], true), nombre: c.nombre, esCarpeta: true, fecha: c.fecha_creacion,
+      href: hrefDe([...baseSegs, c.nombre], true), nombre: c.nombre, esCarpeta: true, fecha: c.fecha_creacion, cuota,
     })),
     ...archivos.map((a): ItemProp => ({
       href: hrefDe([...baseSegs, a.nombre_original], false), nombre: a.nombre_original, esCarpeta: false,
@@ -251,19 +272,20 @@ async function responderPropfind(env: Env, user: UsuarioDav, req: Request, segs:
   }
 
   const esRaiz = nodo.kind === 'raiz'
+  const cuota = await usoAlmacenamiento(env)
   const propio: ItemProp = esRaiz
-    ? { href: '/', nombre: '', esCarpeta: true }
-    : { href: hrefDe(segs, true), nombre: segs[segs.length - 1], esCarpeta: true }
+    ? { href: '/', nombre: '', esCarpeta: true, cuota }
+    : { href: hrefDe(segs, true), nombre: segs[segs.length - 1], esCarpeta: true, cuota }
   let items = [propio]
   if (prof === 1) {
     if (esRaiz) {
       items = [
         propio,
-        { href: hrefDe([RAIZ_COMUN], true), nombre: RAIZ_COMUN, esCarpeta: true },
-        { href: hrefDe([RAIZ_PRIVADA], true), nombre: RAIZ_PRIVADA, esCarpeta: true },
+        { href: hrefDe([RAIZ_COMUN], true), nombre: RAIZ_COMUN, esCarpeta: true, cuota },
+        { href: hrefDe([RAIZ_PRIVADA], true), nombre: RAIZ_PRIVADA, esCarpeta: true, cuota },
       ]
     } else {
-      items = [propio, ...(await miembrosDe(env, user, nodo, segs))]
+      items = [propio, ...(await miembrosDe(env, user, nodo, segs, cuota))]
     }
   }
   return new Response(xmlPropfind(items), {
