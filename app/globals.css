@@ -444,7 +444,7 @@ input, textarea, select { font-family: inherit; }
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
-  animation: slideUp 0.25s ease;
+  animation: slideUp 0.32s var(--ease-spring);
   flex-shrink: 0;
   min-width: 0;
 }
@@ -680,9 +680,57 @@ tbody tr:hover td { background: var(--color-surface-2); }
    ANIMACIONES
    ============================================================ */
 @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px) scale(0.98); } to { opacity: 1; transform: none; } }
 @keyframes pulse   { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 @keyframes spin    { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+/* Entrada de tarjetas: solo transform+opacity. Fill `backwards` (no `both`)
+   para no pisar el translateY del hover al terminar la animación. */
+@keyframes riseIn  { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+/* Rejillas con entrada escalonada (F2): cubre dashboard, papelera, familia y
+   resultados de búsqueda sin tocar JS. Tope en 12 para listas largas. */
+.grid-files > *, .grid-folders > *, .grid-members > * {
+  animation: riseIn 0.5s var(--ease-spring) backwards;
+}
+.grid-files > *:nth-child(1), .grid-folders > *:nth-child(1), .grid-members > *:nth-child(1) { animation-delay: 0ms; }
+.grid-files > *:nth-child(2), .grid-folders > *:nth-child(2), .grid-members > *:nth-child(2) { animation-delay: 35ms; }
+.grid-files > *:nth-child(3), .grid-folders > *:nth-child(3), .grid-members > *:nth-child(3) { animation-delay: 70ms; }
+.grid-files > *:nth-child(4), .grid-folders > *:nth-child(4), .grid-members > *:nth-child(4) { animation-delay: 105ms; }
+.grid-files > *:nth-child(5), .grid-folders > *:nth-child(5), .grid-members > *:nth-child(5) { animation-delay: 140ms; }
+.grid-files > *:nth-child(6), .grid-folders > *:nth-child(6), .grid-members > *:nth-child(6) { animation-delay: 175ms; }
+.grid-files > *:nth-child(7), .grid-folders > *:nth-child(7), .grid-members > *:nth-child(7) { animation-delay: 210ms; }
+.grid-files > *:nth-child(8), .grid-folders > *:nth-child(8), .grid-members > *:nth-child(8) { animation-delay: 245ms; }
+.grid-files > *:nth-child(9), .grid-folders > *:nth-child(9), .grid-members > *:nth-child(9) { animation-delay: 280ms; }
+.grid-files > *:nth-child(10), .grid-folders > *:nth-child(10), .grid-members > *:nth-child(10) { animation-delay: 315ms; }
+.grid-files > *:nth-child(11), .grid-folders > *:nth-child(11), .grid-members > *:nth-child(11) { animation-delay: 350ms; }
+.grid-files > *:nth-child(n+12), .grid-folders > *:nth-child(n+12), .grid-members > *:nth-child(n+12) { animation-delay: 385ms; }
+
+/* Filas fantasma de carga (shimmer) */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  min-height: 46px;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.08) 50%, transparent 70%);
+  animation: shimmer 1.4s infinite;
+}
+
+/* Accesibilidad: con "reducir movimiento" todo queda estático */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 
 .animate-spin    { animation: spin 1s linear infinite; }
 .animate-pulse   { animation: pulse 2s ease infinite; }

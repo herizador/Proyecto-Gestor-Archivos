@@ -133,7 +133,13 @@ export default function ExploradorDestino({
 
       {/* Carpetas: altura mínima para que el modal no salte de tamaño al navegar */}
       <div className="destino-lista" style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', minHeight: '180px', maxHeight: '40vh', overflowY: 'auto', minWidth: 0 }}>
-        {cargando && <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>Cargando…</p>}
+        {cargando && (
+          <>
+            <div className="skeleton" aria-hidden="true" />
+            <div className="skeleton" aria-hidden="true" />
+            <div className="skeleton" aria-hidden="true" />
+          </>
+        )}
         {!cargando && hijas.length === 0 && (
           <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
             {requiereCarpeta
