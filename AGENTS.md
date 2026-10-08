@@ -64,6 +64,7 @@ npm run lint     # ESLint (sin prettier/biome)
 ## Convenciones UI
 - Wrappers interactivos con patrón `<Componente>Wrapper.tsx` (`UploadModalWrapper`, `NewFolderModalWrapper`, `FileListWrapper`) para modales/selección bajo padres server.
 - Iconos `lucide-react`, fechas `date-fns`, tema oscuro por variables CSS en `app/globals.css`. Nombres largos se truncan con `ellipsis` (ver `FileCard`).
+- Rediseño premium oscuro (F1): fondo con resplandores + ruido fijo en `body`, mosaicos por tipo (`ft-image/pdf/video/audio/archive/doc` en `FileCard`), carpeta con degradado índigo, halo en `card-hover` (atenuado en móvil), indicador activo en sidebar, topbar con blur, press `scale(.97)`, `focus-visible` y `::selection`. Solo `transform`/`opacity` en animaciones.
 
 ## Entorno
 Vars requeridas (ver `.env.example`; R2 solo servidor, sin `NEXT_PUBLIC_`):

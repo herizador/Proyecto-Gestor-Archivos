@@ -1,6 +1,6 @@
 'use client'
 
-import { FileText, Image, Download, Trash2, Eye, Link2, Pencil, Check, X } from 'lucide-react'
+import { FileText, Image, Download, Trash2, Eye, Link2, Pencil, Check, X, Film, Music, Archive } from 'lucide-react'
 import { ArchivoConAutor } from '@/types/database'
 import { visualizarArchivo, descargarArchivo, moverAPapelera, renombrarArchivo } from '@/actions/files'
 import { eliminarAcceso } from '@/actions/accesos'
@@ -53,7 +53,15 @@ export default function FileCard({
     router.refresh()
   }
 
-  const isImage = file.tipo_mime.startsWith('image/')
+  const kindArchivo = (() => {
+    const mime = file.tipo_mime || ''
+    if (mime.startsWith('image/')) return 'image'
+    if (mime === 'application/pdf') return 'pdf'
+    if (mime.startsWith('video/')) return 'video'
+    if (mime.startsWith('audio/')) return 'audio'
+    if (mime.includes('zip') || mime.includes('compressed') || mime.includes('rar') || mime.includes('7z')) return 'archive'
+    return 'doc'
+  })()
   const sizeKb = (file.tamano_bytes / 1024).toFixed(1)
 
   async function handleView() {
@@ -132,8 +140,12 @@ export default function FileCard({
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="file-card-header" style={{ marginBottom: 0 }}>
-            <div className={`file-card-icon-wrap ${isImage ? 'image-icon' : ''}`}>
-              {isImage ? <Image size={24} /> : <FileText size={24} />}
+            <div className={`file-card-icon-wrap ft-${kindArchivo}`}>
+              {kindArchivo === 'image' ? <Image size={24} />
+                : kindArchivo === 'video' ? <Film size={24} />
+                : kindArchivo === 'audio' ? <Music size={24} />
+                : kindArchivo === 'archive' ? <Archive size={24} />
+                : <FileText size={24} />}
             </div>
             <div className="file-card-details">
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
