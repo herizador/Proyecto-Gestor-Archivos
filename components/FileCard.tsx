@@ -5,9 +5,10 @@ import { ArchivoConAutor } from '@/types/database'
 import { visualizarArchivo, descargarArchivo, moverAPapelera, renombrarArchivo } from '@/actions/files'
 import { eliminarAcceso } from '@/actions/accesos'
 import NuevoAccesoModal from '@/components/NuevoAccesoModal'
+import MenuAcciones, { type ItemMenu } from '@/components/MenuAcciones'
 import { avisar, confirmar } from '@/components/Avisos'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import DateDisplay from '@/components/DateDisplay'
 
 export default function FileCard({
@@ -27,6 +28,7 @@ export default function FileCard({
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(file.nombre_original)
   const [guardando, setGuardando] = useState(false)
+  const enlaceRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
   // Renombrar solo en originales: el enlace sigue al original automáticamente
@@ -137,9 +139,53 @@ export default function FileCard({
     }
   }
 
+  // Dispara el botón oculto de NuevoAccesoModal (su modal ya vive en un portal)
+  function dispararEnlace() {
+    enlaceRef.current?.querySelector('button')?.click()
+  }
+
+  const puedeEnlazar = !esAcceso && (isAdmin || isOwner)
+  const puedeBorrar = isAdmin || isOwner
+
+  const itemsMenu: ItemMenu[] = [
+    { icono: <Eye size={16} />, texto: 'Visualizar', onClick: handleView, deshabilitado: loading || huerfano },
+    { icono: <Download size={16} />, texto: 'Descargar', onClick: handleDownload, deshabilitado: loading || huerfano },
+    ...(editable
+      ? [{
+          icono: <Pencil size={16} />,
+          texto: 'Renombrar',
+          onClick: () => {
+            setNuevoNombre(file.nombre_original)
+            setEditando(true)
+          },
+          deshabilitado: loading,
+        }]
+      : []),
+    ...(puedeEnlazar
+      ? [{ icono: <Link2 size={16} />, texto: 'Crear enlace', onClick: dispararEnlace, deshabilitado: loading }]
+      : []),
+    ...(puedeBorrar
+      ? [{
+          icono: <Trash2 size={16} />,
+          texto: esAcceso ? 'Eliminar enlace' : 'Mover a papelera',
+          peligroso: true,
+          onClick: handleTrash,
+          deshabilitado: loading,
+        }]
+      : []),
+  ]
+
   return (
-    <div className={`card card-hover file-card${selected ? ' card-selected' : ''}`}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+    <div className={`card card-hover file-card${selected ? ' card-selected' : ''}`} style={{ position: 'relative' }}>
+      <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 5 }}>
+        <MenuAcciones items={itemsMenu} etiqueta={`Acciones de ${file.nombre_original}`} />
+      </div>
+      {puedeEnlazar && (
+        <div ref={enlaceRef} style={{ display: 'none' }} aria-hidden="true">
+          <NuevoAccesoModal objetivoTipo="archivo" objetivoId={file.id} objetivoNombre={file.nombre_original} />
+        </div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', paddingRight: '40px' }}>
         {onToggleSelect && (
           <div style={{ paddingTop: '4px' }}>
             <input
@@ -209,26 +255,9 @@ export default function FileCard({
                     </button>
                   </>
                 ) : (
-                  <>
-                    <h3 className="file-card-name" title={file.nombre_original} style={{ flex: 1, minWidth: 0 }}>
-                      {file.nombre_original}
-                    </h3>
-                    {editable && (
-                      <button
-                        type="button"
-                        className="btn-ghost btn-icon"
-                        onClick={() => {
-                          setNuevoNombre(file.nombre_original)
-                          setEditando(true)
-                        }}
-                        title="Renombrar"
-                        aria-label={`Renombrar ${file.nombre_original}`}
-                        style={{ padding: '4px', flexShrink: 0 }}
-                      >
-                        <Pencil size={14} />
-                      </button>
-                    )}
-                  </>
+                  <h3 className="file-card-name" title={file.nombre_original} style={{ flex: 1, minWidth: 0 }}>
+                    {file.nombre_original}
+                  </h3>
                 )}
               </div>
               {esAcceso && (
@@ -245,23 +274,6 @@ export default function FileCard({
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="file-actions-group">
-        <button className="btn btn-ghost btn-action" onClick={handleView} disabled={loading || huerfano} title={huerfano ? 'Original no disponible' : 'Visualizar archivo'}>
-          <Eye size={16} /> <span>Visualizar</span>
-        </button>
-        <button className="btn btn-primary btn-action" onClick={handleDownload} disabled={loading || huerfano} title={huerfano ? 'Original no disponible' : 'Descargar archivo'}>
-          <Download size={16} /> <span>Descargar</span>
-        </button>
-        {!esAcceso && (isAdmin || isOwner) && (
-          <NuevoAccesoModal objetivoTipo="archivo" objetivoId={file.id} objetivoNombre={file.nombre_original} />
-        )}
-        {(isAdmin || isOwner) && (
-          <button className="btn btn-danger btn-action btn-action-danger" onClick={handleTrash} disabled={loading} title={esAcceso ? 'Eliminar enlace (no toca el original)' : 'Mover a papelera'}>
-            <Trash2 size={16} />
-          </button>
-        )}
       </div>
     </div>
   )
