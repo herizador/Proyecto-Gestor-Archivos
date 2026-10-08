@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Share2, Loader2 } from 'lucide-react'
 import { enviarArchivo } from '@/actions/files'
+import { avisar } from '@/components/Avisos'
 
 const MAX_ENVIO = 10 // tope por envío: los blobs viven en memoria del móvil
 
@@ -24,12 +25,12 @@ export default function EnviarSeleccionButton({
   async function handleEnviar() {
     if (archivos.length === 0) return
     if (archivos.length > MAX_ENVIO) {
-      alert(`Demasiados archivos a la vez (máximo ${MAX_ENVIO}).`)
+      avisar('error', `Demasiados archivos a la vez (máximo ${MAX_ENVIO}).`)
       return
     }
     const nav = navigator as NavigatorConShare
     if (!nav.share) {
-      alert('Este navegador no permite enviar. Descarga los archivos uno por uno.')
+      avisar('error', 'Este navegador no permite enviar. Descarga los archivos uno por uno.')
       return
     }
     setEnviando(true)
@@ -54,7 +55,8 @@ export default function EnviarSeleccionButton({
       })
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return // menú cerrado: silencio
-      alert(
+      avisar(
+        'error',
         e instanceof Error && e.message !== 'no-soportado'
           ? e.message
           : 'Este navegador no permite enviar estos archivos. Descárgalos uno por uno.'

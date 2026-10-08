@@ -5,6 +5,7 @@ import { ArchivoConAutor } from '@/types/database'
 import { visualizarArchivo, descargarArchivo, moverAPapelera, renombrarArchivo } from '@/actions/files'
 import { eliminarAcceso } from '@/actions/accesos'
 import NuevoAccesoModal from '@/components/NuevoAccesoModal'
+import { avisar, confirmar } from '@/components/Avisos'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import DateDisplay from '@/components/DateDisplay'
@@ -39,14 +40,14 @@ export default function FileCard({
       return
     }
     if (limpio.length > 200) {
-      alert('Máximo 200 caracteres.')
+      avisar('error', 'Máximo 200 caracteres.')
       return
     }
     setGuardando(true)
     const res = await renombrarArchivo(file.id, limpio)
     setGuardando(false)
     if ('error' in res && res.error) {
-      alert(res.error)
+      avisar('error', res.error)
       return
     }
     setEditando(false)
@@ -77,7 +78,7 @@ export default function FileCard({
       link.click()
       document.body.removeChild(link)
     } else {
-      alert(error || 'Enlace de visualización no válido.')
+      avisar('error', error || 'Enlace de visualización no válido.')
     }
   }
 
@@ -94,33 +95,45 @@ export default function FileCard({
       link.click()
       document.body.removeChild(link)
     } else {
-      alert(error || 'Enlace de descarga no válido.')
+      avisar('error', error || 'Enlace de descarga no válido.')
     }
   }
 
   async function handleTrash() {
     if (esAcceso) {
-      if (confirm('¿Eliminar este enlace? El archivo original no se toca.')) {
-        setLoading(true)
-        const result = await eliminarAcceso(file.id)
-        setLoading(false)
-        if (result.error) {
-          alert(result.error)
-        } else {
-          router.refresh()
-        }
+      const ok = await confirmar({
+        titulo: 'Eliminar enlace',
+        mensaje: '¿Eliminar este enlace? El archivo original no se toca.',
+        textoOk: 'Eliminar',
+        peligroso: true,
+      })
+      if (!ok) return
+      setLoading(true)
+      const result = await eliminarAcceso(file.id)
+      setLoading(false)
+      if (result.error) {
+        avisar('error', result.error)
+      } else {
+        avisar('exito', 'Enlace eliminado.')
+        router.refresh()
       }
       return
     }
-    if (confirm('¿Mover este archivo a la papelera?')) {
-      setLoading(true)
-      const result = await moverAPapelera(file.id)
-      setLoading(false)
-      if (result.error) {
-        alert(result.error)
-      } else {
-        router.refresh()
-      }
+    const ok = await confirmar({
+      titulo: 'Mover a papelera',
+      mensaje: '¿Mover este archivo a la papelera?',
+      textoOk: 'Mover',
+      peligroso: true,
+    })
+    if (!ok) return
+    setLoading(true)
+    const result = await moverAPapelera(file.id)
+    setLoading(false)
+    if (result.error) {
+      avisar('error', result.error)
+    } else {
+      avisar('exito', 'Movido a la papelera.')
+      router.refresh()
     }
   }
 

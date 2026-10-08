@@ -6,6 +6,7 @@ import { restaurarArchivo, eliminarArchivoPermanente } from '@/actions/files'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import DateDisplay from '@/components/DateDisplay'
+import { avisar, confirmar } from '@/components/Avisos'
 
 export default function TrashFileCard({
   file,
@@ -27,21 +28,29 @@ export default function TrashFileCard({
     const result = await restaurarArchivo(file.id)
     setLoading(false)
     if (result.error) {
-      alert(result.error)
+      avisar('error', result.error)
     } else {
+      avisar('exito', 'Archivo restaurado.')
       router.refresh()
     }
   }
 
   async function handlePermanentDelete() {
-    if (!confirm('¿Eliminar permanentemente este archivo? Esta acción no se puede deshacer.')) return
+    const ok = await confirmar({
+      titulo: 'Eliminar para siempre',
+      mensaje: '¿Eliminar permanentemente este archivo? Esta acción no se puede deshacer.',
+      textoOk: 'Eliminar',
+      peligroso: true,
+    })
+    if (!ok) return
 
     setLoading(true)
     const result = await eliminarArchivoPermanente(file.id)
     setLoading(false)
     if (result.error) {
-      alert(result.error)
+      avisar('error', result.error)
     } else {
+      avisar('exito', 'Archivo eliminado permanentemente.')
       router.refresh()
     }
   }

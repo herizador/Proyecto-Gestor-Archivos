@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { AvisosHost } from '@/components/Avisos'
 
 export const metadata: Metadata = {
   title: 'Gestor de Archivos Familiar',
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es">
       <body>
         {children}
+        <AvisosHost />
         <script
           dangerouslySetInnerHTML={{
             __html: `

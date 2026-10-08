@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Link2, X, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { crearAccesosBatch, listarRaicesAcceso, type ObjetivoEnlace } from '@/actions/accesos'
 import ExploradorDestino, { type DestinoElegido } from '@/components/ExploradorDestino'
+import { avisar } from '@/components/Avisos'
 import type { Carpeta } from '@/types/database'
 
 type Resultado = {
@@ -58,7 +59,7 @@ export default function EnlazarSeleccionModal({
     try {
       const res = await listarRaicesAcceso()
       if ('error' in res) {
-        alert(res.error)
+        avisar('error', res.error ?? 'No se pudieron cargar las carpetas.')
         return
       }
       setRaices({ comun: res.comun, privadas: res.privadas })
@@ -68,7 +69,7 @@ export default function EnlazarSeleccionModal({
       setDestinoId(null)
       setIsOpen(true)
     } catch {
-      alert('No se pudieron cargar las carpetas. Revisa tu conexión.')
+      avisar('error', 'No se pudieron cargar las carpetas. Revisa tu conexión.')
     } finally {
       setCargandoRaices(false)
     }

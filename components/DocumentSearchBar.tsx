@@ -7,6 +7,7 @@ import { buscarArchivos } from '@/actions/files'
 import { buscarAccesos, eliminarAcceso } from '@/actions/accesos'
 import FileCard from '@/components/FileCard'
 import FolderCard from '@/components/FolderCard'
+import { avisar } from '@/components/Avisos'
 import type { AccesoConObjetivo, ArchivoConAutor } from '@/types/database'
 
 export default function DocumentSearchBar({
@@ -58,8 +59,9 @@ export default function DocumentSearchBar({
 
   async function handleEliminarAcceso(accesoId: string) {
     const res = await eliminarAcceso(accesoId)
-    if (res.error) alert(res.error)
+    if (res.error) avisar('error', res.error)
     else {
+      avisar('exito', 'Enlace eliminado.')
       setAccesos((prev) => prev.filter((a) => a.id !== accesoId))
       router.refresh()
     }

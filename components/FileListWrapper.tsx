@@ -11,6 +11,7 @@ import NuevoAccesoModal from '@/components/NuevoAccesoModal'
 import EnlazarSeleccionModal from '@/components/EnlazarSeleccionModal'
 import EnviarSeleccionButton from '@/components/EnviarSeleccionButton'
 import MoverSeleccionModal from '@/components/MoverSeleccionModal'
+import { avisar } from '@/components/Avisos'
 import type { AccesoConObjetivo, ArchivoConAutor, Carpeta } from '@/types/database'
 
 type CarpetaConAutor = Carpeta & {
@@ -48,8 +49,11 @@ export default function FileListWrapper({
 
   async function handleEliminarAcceso(accesoId: string) {
     const res = await eliminarAcceso(accesoId)
-    if (res.error) alert(res.error)
-    else router.refresh()
+    if (res.error) avisar('error', res.error)
+    else {
+      avisar('exito', 'Enlace eliminado.')
+      router.refresh()
+    }
   }
 
   const allIds = useMemo(() => {

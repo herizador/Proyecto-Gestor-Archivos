@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { KeyRound, Copy, Check, Ban, Trash2, Loader2 } from 'lucide-react'
 import { crearTokenDav, revocarTokenDav, eliminarTokenDav, type TokenDavVisible } from '@/actions/dav'
 import DateDisplay from '@/components/DateDisplay'
+import { avisar, confirmar } from '@/components/Avisos'
 
 // Gestión de tokens de Explorador (puente WebDAV): crear, mostrar una sola vez,
 // revocar y eliminar. El admin ve además a quién pertenece cada token.
@@ -57,26 +58,40 @@ export default function TokensDav({
   }
 
   async function handleRevocar(id: string) {
-    if (!confirm('¿Revocar este token? Ese dispositivo dejará de ver tus archivos.')) return
+    const ok = await confirmar({
+      titulo: 'Revocar token',
+      mensaje: '¿Revocar este token? Ese dispositivo dejará de ver tus archivos.',
+      textoOk: 'Revocar',
+      peligroso: true,
+    })
+    if (!ok) return
     setProcesando(id)
     const res = await revocarTokenDav(id)
     setProcesando(null)
     if ('error' in res && res.error) {
-      setError(res.error)
+      avisar('error', res.error)
       return
     }
+    avisar('exito', 'Token revocado.')
     setTokens((prev) => prev.map((t) => (t.id === id ? { ...t, revocado: true } : t)))
   }
 
   async function handleEliminar(id: string) {
-    if (!confirm('¿Eliminar este token definitivamente?')) return
+    const ok = await confirmar({
+      titulo: 'Eliminar token',
+      mensaje: '¿Eliminar este token definitivamente?',
+      textoOk: 'Eliminar',
+      peligroso: true,
+    })
+    if (!ok) return
     setProcesando(id)
     const res = await eliminarTokenDav(id)
     setProcesando(null)
     if ('error' in res && res.error) {
-      setError(res.error)
+      avisar('error', res.error)
       return
     }
+    avisar('exito', 'Token eliminado.')
     setTokens((prev) => prev.filter((t) => t.id !== id))
   }
 

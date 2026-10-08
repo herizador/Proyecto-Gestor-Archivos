@@ -6,6 +6,7 @@ import { Link2, X, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { crearAcceso, listarRaicesAcceso } from '@/actions/accesos'
 import ExploradorDestino, { type DestinoElegido } from '@/components/ExploradorDestino'
+import { avisar } from '@/components/Avisos'
 import type { Carpeta } from '@/types/database'
 
 // Botón "Enlace" + modal: crea un acceso directo al archivo/carpeta indicado
@@ -53,7 +54,7 @@ export default function NuevoAccesoModal({
       // Las raíces se cargan al abrir (sin useEffect): RLS ya filtra lo visible
       const res = await listarRaicesAcceso()
       if ('error' in res) {
-        alert(res.error)
+        avisar('error', res.error ?? 'No se pudieron cargar las carpetas.')
         return
       }
       setRaices({
@@ -64,7 +65,7 @@ export default function NuevoAccesoModal({
       setIsAdmin(res.isAdmin)
       setIsOpen(true)
     } catch {
-      alert('No se pudieron cargar las carpetas. Revisa tu conexión.')
+      avisar('error', 'No se pudieron cargar las carpetas. Revisa tu conexión.')
     } finally {
       setCargandoRaices(false)
     }

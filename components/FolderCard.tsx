@@ -8,6 +8,7 @@ import { renombrarCarpeta } from '@/actions/folders'
 import type { Carpeta } from '@/types/database'
 import DateDisplay from '@/components/DateDisplay'
 import type { ReactNode } from 'react'
+import { avisar, confirmar } from '@/components/Avisos'
 
 type CarpetaConAutor = Carpeta & {
   creado_por_perfil?: { nombre_completo: string } | null
@@ -57,14 +58,14 @@ export default function FolderCard({
       return
     }
     if (limpio.length > 100) {
-      alert('Máximo 100 caracteres.')
+      avisar('error', 'Máximo 100 caracteres.')
       return
     }
     setGuardando(true)
     const res = await renombrarCarpeta(carpeta.id, limpio)
     setGuardando(false)
     if ('error' in res && res.error) {
-      alert(res.error)
+      avisar('error', res.error)
       return
     }
     setEditando(false)
@@ -75,9 +76,14 @@ export default function FolderCard({
     e.preventDefault()
     e.stopPropagation()
     if (!accesoId) return
-    if (confirm('¿Eliminar este enlace? La carpeta original no se toca.')) {
-      onEliminarAcceso?.(accesoId)
-    }
+    const ok = await confirmar({
+      titulo: 'Eliminar enlace',
+      mensaje: '¿Eliminar este enlace? La carpeta original no se toca.',
+      textoOk: 'Eliminar',
+      peligroso: true,
+    })
+    if (!ok) return
+    onEliminarAcceso?.(accesoId)
   }
 
   const contenido = (
