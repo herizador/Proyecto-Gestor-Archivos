@@ -10,6 +10,7 @@ import FolderCard from '@/components/FolderCard'
 import NuevoAccesoModal from '@/components/NuevoAccesoModal'
 import EnlazarSeleccionModal from '@/components/EnlazarSeleccionModal'
 import EnviarSeleccionButton from '@/components/EnviarSeleccionButton'
+import MoverSeleccionModal from '@/components/MoverSeleccionModal'
 import type { AccesoConObjetivo, ArchivoConAutor, Carpeta } from '@/types/database'
 
 type CarpetaConAutor = Carpeta & {
@@ -132,6 +133,11 @@ export default function FileListWrapper({
     router.refresh()
   }
 
+  function handleMovidos() {
+    exitSelectionMode()
+    router.refresh()
+  }
+
   // Archivos seleccionados para Enviar (las carpetas no viajan como ficheros)
   const archivosParaEnviar = useMemo(
     () => {
@@ -191,6 +197,11 @@ export default function FileListWrapper({
 
             <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <EnviarSeleccionButton archivos={archivosParaEnviar} />
+              <MoverSeleccionModal
+                objetivos={objetivosEnlace}
+                basePath={basePath}
+                onMovidos={handleMovidos}
+              />
               <EnlazarSeleccionModal
                 objetivos={objetivosEnlace}
                 basePath={basePath}
