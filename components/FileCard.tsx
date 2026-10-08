@@ -1,8 +1,8 @@
 'use client'
 
-import { FileText, Image, Download, Trash2, Eye, Link2 } from 'lucide-react'
+import { FileText, Image, Download, Trash2, Eye, Link2, Pencil, Check, X } from 'lucide-react'
 import { ArchivoConAutor } from '@/types/database'
-import { visualizarArchivo, descargarArchivo, moverAPapelera } from '@/actions/files'
+import { visualizarArchivo, descargarArchivo, moverAPapelera, renombrarArchivo } from '@/actions/files'
 import { eliminarAcceso } from '@/actions/accesos'
 import NuevoAccesoModal from '@/components/NuevoAccesoModal'
 import { useRouter } from 'next/navigation'
@@ -23,7 +23,35 @@ export default function FileCard({
   huerfano?: boolean
 }) {
   const [loading, setLoading] = useState(false)
+  const [editando, setEditando] = useState(false)
+  const [nuevoNombre, setNuevoNombre] = useState(file.nombre_original)
+  const [guardando, setGuardando] = useState(false)
   const router = useRouter()
+
+  // Renombrar solo en originales: el enlace sigue al original automáticamente
+  const editable = (isAdmin || isOwner) && !esAcceso
+
+  async function handleGuardarNombre() {
+    const limpio = nuevoNombre.trim()
+    if (!limpio || limpio === file.nombre_original) {
+      setNuevoNombre(file.nombre_original)
+      setEditando(false)
+      return
+    }
+    if (limpio.length > 200) {
+      alert('Máximo 200 caracteres.')
+      return
+    }
+    setGuardando(true)
+    const res = await renombrarArchivo(file.id, limpio)
+    setGuardando(false)
+    if ('error' in res && res.error) {
+      alert(res.error)
+      return
+    }
+    setEditando(false)
+    router.refresh()
+  }
 
   const isImage = file.tipo_mime.startsWith('image/')
   const sizeKb = (file.tamano_bytes / 1024).toFixed(1)
@@ -108,9 +136,76 @@ export default function FileCard({
               {isImage ? <Image size={24} /> : <FileText size={24} />}
             </div>
             <div className="file-card-details">
-              <h3 className="file-card-name" title={file.nombre_original}>
-                {file.nombre_original}
-              </h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                {editando ? (
+                  <>
+                    <input
+                      type="text"
+                      className="input"
+                      value={nuevoNombre}
+                      onChange={(e) => setNuevoNombre(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleGuardarNombre()
+                        if (e.key === 'Escape') {
+                          setNuevoNombre(file.nombre_original)
+                          setEditando(false)
+                        }
+                      }}
+                      maxLength={200}
+                      autoFocus
+                      disabled={guardando}
+                      aria-label="Nuevo nombre del archivo"
+                      style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', padding: '6px 10px' }}
+                    />
+                    <button
+                      type="button"
+                      className="btn-ghost btn-icon"
+                      onClick={handleGuardarNombre}
+                      disabled={guardando}
+                      title="Guardar nombre"
+                      aria-label="Guardar nombre"
+                      style={{ padding: '6px', flexShrink: 0 }}
+                    >
+                      <Check size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost btn-icon"
+                      onClick={() => {
+                        setNuevoNombre(file.nombre_original)
+                        setEditando(false)
+                      }}
+                      disabled={guardando}
+                      title="Cancelar"
+                      aria-label="Cancelar"
+                      style={{ padding: '6px', flexShrink: 0 }}
+                    >
+                      <X size={14} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="file-card-name" title={file.nombre_original} style={{ flex: 1, minWidth: 0 }}>
+                      {file.nombre_original}
+                    </h3>
+                    {editable && (
+                      <button
+                        type="button"
+                        className="btn-ghost btn-icon"
+                        onClick={() => {
+                          setNuevoNombre(file.nombre_original)
+                          setEditando(true)
+                        }}
+                        title="Renombrar"
+                        aria-label={`Renombrar ${file.nombre_original}`}
+                        style={{ padding: '4px', flexShrink: 0 }}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
               {esAcceso && (
                 <p style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--color-accent)', fontWeight: 600 }}>
                   <Link2 size={12} /> Enlace{huerfano ? ' · original no disponible' : ` de ${origenNombre ?? 'origen desconocido'}`}

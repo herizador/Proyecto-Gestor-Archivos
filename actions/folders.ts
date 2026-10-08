@@ -47,6 +47,45 @@ export async function crearCarpeta(params: {
   return { success: true }
 }
 
+// ---------------------------------------------------------------------------
+// Renombrar carpeta (solo cambia el nombre visible)
+// ---------------------------------------------------------------------------
+export async function renombrarCarpeta(carpetaId: string, nombre: string) {
+  const limpio = nombre.trim()
+  if (!limpio) return { error: 'El nombre no puede estar vacío.' }
+  if (limpio.length > 100) return { error: 'Máximo 100 caracteres.' }
+
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'No autenticado.' }
+
+  const { data: carpeta } = await supabase
+    .from('carpetas')
+    .select('id, nombre, creado_por')
+    .eq('id', carpetaId)
+    .single()
+  if (!carpeta) return { error: 'Carpeta no encontrada o sin permisos.' }
+
+  const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single()
+  if (carpeta.creado_por !== user.id && perfil?.rol !== 'admin') {
+    return { error: 'Sin permiso para renombrar esta carpeta.' }
+  }
+  if (carpeta.nombre === limpio) return { success: true }
+
+  const { error } = await supabase.from('carpetas').update({ nombre: limpio }).eq('id', carpetaId)
+  if (error) return { error: error.message }
+
+  await logActivity({
+    accion: 'RENOMBRAR_CARPETA',
+    detalles: { carpeta_id: carpetaId, anterior: carpeta.nombre, nuevo: limpio },
+  })
+
+  revalidatePath('/')
+  revalidatePath('/familia')
+  revalidatePath('/mi-caja-fuerte')
+  return { success: true }
+}
+
 export async function eliminarCarpeta(carpetaId: string) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()

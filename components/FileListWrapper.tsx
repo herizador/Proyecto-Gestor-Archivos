@@ -265,6 +265,7 @@ export default function FileListWrapper({
                 crearEnlace={(isAdmin || carpeta.creado_por === userId) ? (
                   <NuevoAccesoModal objetivoTipo="carpeta" objetivoId={carpeta.id} objetivoNombre={carpeta.nombre} />
                 ) : null}
+                puedeRenombrar={isAdmin || carpeta.creado_por === userId}
               />
             ))}
             {accesosCarpetas.map((acceso) => {

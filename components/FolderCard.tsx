@@ -1,7 +1,10 @@
 'use client'
 
-import { Folder, Link2, Trash2, FolderX } from 'lucide-react'
+import { useState } from 'react'
+import { Folder, Link2, Trash2, FolderX, Pencil, Check, X } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { renombrarCarpeta } from '@/actions/folders'
 import type { Carpeta } from '@/types/database'
 import DateDisplay from '@/components/DateDisplay'
 import type { ReactNode } from 'react'
@@ -21,6 +24,7 @@ export default function FolderCard({
   huerfano = false,
   onEliminarAcceso,
   crearEnlace = null,
+  puedeRenombrar = false,
 }: {
   carpeta: CarpetaConAutor
   selected?: boolean
@@ -32,8 +36,40 @@ export default function FolderCard({
   huerfano?: boolean
   onEliminarAcceso?: (accesoId: string) => void
   crearEnlace?: ReactNode
+  puedeRenombrar?: boolean
 }) {
   const folderHref = `${basePath}?carpeta=${carpeta.id}`
+  const router = useRouter()
+  const [editando, setEditando] = useState(false)
+  const [nuevoNombre, setNuevoNombre] = useState(carpeta.nombre)
+  const [guardando, setGuardando] = useState(false)
+
+  // Renombrar solo en originales: el enlace sigue al original automáticamente
+  const editable = puedeRenombrar && !esAcceso
+
+  async function guardarNombre(e?: React.SyntheticEvent) {
+    e?.preventDefault()
+    e?.stopPropagation()
+    const limpio = nuevoNombre.trim()
+    if (!limpio || limpio === carpeta.nombre) {
+      setNuevoNombre(carpeta.nombre)
+      setEditando(false)
+      return
+    }
+    if (limpio.length > 100) {
+      alert('Máximo 100 caracteres.')
+      return
+    }
+    setGuardando(true)
+    const res = await renombrarCarpeta(carpeta.id, limpio)
+    setGuardando(false)
+    if ('error' in res && res.error) {
+      alert(res.error)
+      return
+    }
+    setEditando(false)
+    router.refresh()
+  }
 
   async function handleEliminar(e: React.MouseEvent) {
     e.preventDefault()
@@ -49,7 +85,89 @@ export default function FolderCard({
       <div className="folder-card-icon">
         {huerfano ? <FolderX size={28} /> : <Folder size={28} />}
       </div>
-      <h3 className="folder-card-name">{carpeta.nombre}</h3>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%', minWidth: 0 }}
+        onClick={(e) => {
+          if (editando) {
+            e.preventDefault()
+            e.stopPropagation()
+          }
+        }}
+      >
+        {editando ? (
+          <>
+            <input
+              type="text"
+              className="input"
+              value={nuevoNombre}
+              onChange={(e) => setNuevoNombre(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') guardarNombre()
+                if (e.key === 'Escape') {
+                  setNuevoNombre(carpeta.nombre)
+                  setEditando(false)
+                }
+              }}
+              maxLength={100}
+              autoFocus
+              disabled={guardando}
+              aria-label="Nuevo nombre de la carpeta"
+              style={{ flex: 1, minWidth: 0, fontSize: '0.85rem', padding: '6px 10px', textAlign: 'center' }}
+            />
+            <button
+              type="button"
+              className="btn-ghost btn-icon"
+              onClick={guardarNombre}
+              disabled={guardando}
+              title="Guardar nombre"
+              aria-label="Guardar nombre"
+              style={{ padding: '6px', flexShrink: 0 }}
+            >
+              <Check size={14} />
+            </button>
+            <button
+              type="button"
+              className="btn-ghost btn-icon"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setNuevoNombre(carpeta.nombre)
+                setEditando(false)
+              }}
+              disabled={guardando}
+              title="Cancelar"
+              aria-label="Cancelar"
+              style={{ padding: '6px', flexShrink: 0 }}
+            >
+              <X size={14} />
+            </button>
+          </>
+        ) : (
+          <>
+            <h3 className="folder-card-name" title={carpeta.nombre} style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {carpeta.nombre}
+            </h3>
+            {editable && (
+              <button
+                type="button"
+                className="btn-ghost btn-icon"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setNuevoNombre(carpeta.nombre)
+                  setEditando(true)
+                }}
+                title="Renombrar"
+                aria-label={`Renombrar ${carpeta.nombre}`}
+                style={{ padding: '4px', flexShrink: 0 }}
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+          </>
+        )}
+      </div>
       {esAcceso && (
         <p style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--color-accent)', fontWeight: 600 }}>
           <Link2 size={12} /> Enlace{huerfano ? ' · no disponible' : ` de ${origenNombre ?? 'origen desconocido'}`}

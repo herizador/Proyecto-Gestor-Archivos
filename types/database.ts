@@ -329,6 +329,8 @@ export type ActivityAction =
   | 'ELIMINAR_ACCESO'
   | 'COMPARTIR_EXTERNO'
   | 'ACCESO_WEBDAV'
+  | 'RENOMBRAR_ARCHIVO'
+  | 'RENOMBRAR_CARPETA'
 
 // Tipos de fila convenientes
 export type Perfil = Database['public']['Tables']['perfiles']['Row']

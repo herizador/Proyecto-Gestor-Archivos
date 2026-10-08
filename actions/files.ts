@@ -253,6 +253,46 @@ export async function enviarArchivo(archivoId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Renombrar archivo (solo cambia el nombre visible; la key R2 no se toca)
+// ---------------------------------------------------------------------------
+export async function renombrarArchivo(archivoId: string, nombre: string) {
+  const limpio = nombre.trim()
+  if (!limpio) return { error: 'El nombre no puede estar vacío.' }
+  if (limpio.length > 200) return { error: 'Máximo 200 caracteres.' }
+
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'No autenticado.' }
+
+  const { data: archivo } = await supabase
+    .from('archivos')
+    .select('id, nombre_original, subido_por, estado')
+    .eq('id', archivoId)
+    .single()
+  if (!archivo) return { error: 'Archivo no encontrado o sin permisos.' }
+  if (archivo.estado !== 'activo') return { error: 'Solo se puede renombrar archivos activos.' }
+
+  const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single()
+  if (archivo.subido_por !== user.id && perfil?.rol !== 'admin') {
+    return { error: 'Sin permiso para renombrar este archivo.' }
+  }
+  if (archivo.nombre_original === limpio) return { success: true }
+
+  const { error } = await supabase.from('archivos').update({ nombre_original: limpio }).eq('id', archivoId)
+  if (error) return { error: error.message }
+
+  await logActivity({
+    accion: 'RENOMBRAR_ARCHIVO',
+    detalles: { archivo_id: archivoId, anterior: archivo.nombre_original, nuevo: limpio },
+  })
+
+  revalidatePath('/')
+  revalidatePath('/mi-caja-fuerte')
+  revalidatePath('/familia')
+  return { success: true }
+}
+
+// ---------------------------------------------------------------------------
 // Búsqueda global de archivos activos por nombre
 // ---------------------------------------------------------------------------
 export async function buscarArchivos(termino: string) {
