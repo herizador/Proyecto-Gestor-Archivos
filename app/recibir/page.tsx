@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
+import { headers } from 'next/headers'
 import { limpiarLotesCaducados } from '@/actions/recibir'
 import SelectorDestino from '@/components/SelectorDestino'
 import GuardadoManual from '@/components/GuardadoManual'
 import Link from 'next/link'
 import type { Carpeta, FicheroEnLote, Json } from '@/types/database'
-import { Inbox, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Inbox, AlertTriangle, CheckCircle2, Smartphone } from 'lucide-react'
 
 const MENSAJES_ERROR: Record<string, string> = {
   formulario: 'No se pudo leer lo compartido. Inténtalo de nuevo.',
@@ -89,6 +90,10 @@ export default async function RecibirPage({
 
   if (error || !loteId) {
     const esVacio = error === 'vacio'
+    // En iPhone el sistema nunca entrega archivos a una web (Apple no soporta
+    // Web Share Target): se detecta por UA en servidor y se explican los pasos.
+    const ua = (await headers()).get('user-agent') ?? ''
+    const esIOS = /iPhone|iPad|iPod/.test(ua)
     // Raíces para el plan B manual: en iOS no existe Web Share Target y en
     // algunos Android el sistema no entrega el fichero. El usuario puede
     // elegirlo con el selector nativo sin salir de esta pantalla.
@@ -105,11 +110,23 @@ export default async function RecibirPage({
           <p className="login-subtitle">
             {error ? (MENSAJES_ERROR[error] ?? decodeURIComponent(error)) : 'Comparte un archivo desde otra app para verlo aquí.'}
           </p>
-          {esVacio && (
+          {esVacio && !esIOS && (
             <p className="login-subtitle" style={{ marginTop: '8px' }}>
-              El sistema no entregó ningún archivo (en iPhone nunca lo hace y en
-              algunos Android lo bloquea). Elígelo abajo manualmente:
+              El sistema no entregó ningún archivo (algunos Android lo bloquean).
+              Elígelo abajo manualmente:
             </p>
+          )}
+          {esIOS && (
+            <div style={{ textAlign: 'left', marginTop: '12px', padding: '12px 16px', background: 'var(--color-accent-dim)', border: '1px solid rgba(79,142,247,0.3)', borderRadius: 'var(--radius-md)' }}>
+              <p style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', fontWeight: 600, marginBottom: '8px' }}>
+                <Smartphone size={18} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
+                En iPhone se hace en 2 pasos
+              </p>
+              <ol style={{ fontSize: '0.85rem', color: 'var(--color-text-subtle)', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <li>En la otra app pulsa Compartir → <strong>Guardar en Archivos</strong> (las fotos también valen desde Fototeca).</li>
+                <li>Elígelo abajo con el botón: puedes cogerlo de Fototeca, Archivos o hacer una foto.</li>
+              </ol>
+            </div>
           )}
           <div style={{ textAlign: 'left' }}>
             <GuardadoManual
