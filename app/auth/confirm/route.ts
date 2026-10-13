@@ -37,6 +37,7 @@ async function gestionarInvitacion(request: NextRequest, token_hash: string) {
   const supabase = await createClient()
   const { data, error } = await supabase.auth.verifyOtp({ token_hash, type: 'invite' })
   if (error || !data.user) {
+    console.error('[invite] verifyOtp falló:', error?.message ?? 'sin usuario')
     return NextResponse.redirect(new URL('/login?error=enlace', request.url))
   }
   // La sesión de la invitación no debe servir para navegar: se cierra aquí.
@@ -44,6 +45,7 @@ async function gestionarInvitacion(request: NextRequest, token_hash: string) {
 
   const servicio = crearServiceClient()
   if (!servicio) {
+    console.error('[invite] falta SUPABASE_SERVICE_ROLE_KEY en el servidor')
     return NextResponse.redirect(new URL('/login?error=config', request.url))
   }
   const token = randomBytes(32).toString('hex')
@@ -54,6 +56,7 @@ async function gestionarInvitacion(request: NextRequest, token_hash: string) {
     expira: new Date(Date.now() + RECLAMO_MINUTOS * 60 * 1000).toISOString(),
   })
   if (insertError) {
+    console.error('[invite] insert reclamo falló:', insertError.message)
     return NextResponse.redirect(new URL('/login?error=enlace', request.url))
   }
 

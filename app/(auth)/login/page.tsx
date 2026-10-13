@@ -1,8 +1,25 @@
 'use client'
 
-import { useState } from 'react'
-import { ShieldCheck, Loader2 } from 'lucide-react'
+import { Suspense, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { ShieldCheck, Loader2, AlertTriangle } from 'lucide-react'
 import { login } from '@/actions/auth'
+
+function AvisoEnlace() {
+  const params = useSearchParams()
+  const motivo = params.get('error')
+  if (motivo !== 'enlace' && motivo !== 'config') return null
+  return (
+    <div className="error-msg">
+      <AlertTriangle size={16} style={{ flexShrink: 0 }} />
+      <span>
+        {motivo === 'config'
+          ? 'Falta configuración del servidor. Avisa al administrador.'
+          : 'Ese enlace caducó, ya se usó o no es válido. Pide otra invitación.'}
+      </span>
+    </div>
+  )
+}
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
@@ -36,6 +53,9 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="form-group">
+          <Suspense>
+            <AvisoEnlace />
+          </Suspense>
           {error && (
             <div className="error-msg">
               <span>{error}</span>

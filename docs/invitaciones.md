@@ -20,8 +20,8 @@ Sin esto los botones del email apuntan a localhost o los bloquea Supabase.
 
 ## 2. Plantilla de invitación (una vez)
 
-Authentication → **Email Templates** → plantilla **Invite user** → pega este
-asunto y cuerpo (compatible con Gmail/Outlook/iPhone):
+Authentication → **Emails** (apartado *NOTIFICATIONS* del menú) → plantilla
+**Invite user** → pega este asunto y cuerpo (compatible con Gmail/Outlook/iPhone):
 
 - Asunto: `Te han invitado a Archivo Familiar`
 - Cuerpo (sustituye `https://tu-app.vercel.app` por tu dominio):
