@@ -488,3 +488,25 @@ CREATE POLICY "tokens_dav_update" ON public.tokens_dav
 -- Borrar: propios o admin
 CREATE POLICY "tokens_dav_delete" ON public.tokens_dav
   FOR DELETE USING (usuario_id = auth.uid() OR public.get_user_role() = 'admin');
+
+
+-- =============================================================================
+-- TABLA 9: invitaciones_pendientes
+-- Reclamos de invitación de un solo uso (30 min): el enlace del email autoriza
+-- ÚNICAMENTE a definir la contraseña, nunca a navegar con sesión. Solo la usa
+-- el servidor con service-role (RLS activado sin policies = denegado a resto).
+-- Ver docs/invitaciones.md
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.invitaciones_pendientes (
+  id             UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  usuario_id     UUID        NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
+  token_hash     TEXT        NOT NULL UNIQUE,
+  usada          BOOLEAN     NOT NULL DEFAULT FALSE,
+  expira         TIMESTAMPTZ NOT NULL,
+  fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_invitaciones_pendientes_usuario ON public.invitaciones_pendientes(usuario_id);
+
+ALTER TABLE public.invitaciones_pendientes ENABLE ROW LEVEL SECURITY;
+-- Sin policies: solo service-role (el navegador nunca la toca directo).

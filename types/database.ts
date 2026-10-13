@@ -295,6 +295,41 @@ export type Database = {
           },
         ]
       }
+      invitaciones_pendientes: {
+        Row: {
+          id: string
+          usuario_id: string
+          token_hash: string
+          usada: boolean
+          expira: string
+          fecha_creacion: string
+        }
+        Insert: {
+          id?: string
+          usuario_id: string
+          token_hash: string
+          usada?: boolean
+          expira: string
+          fecha_creacion?: string
+        }
+        Update: {
+          id?: string
+          usuario_id?: string
+          token_hash?: string
+          usada?: boolean
+          expira?: string
+          fecha_creacion?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'invitaciones_pendientes_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'perfiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: Record<string, never>
     Functions: {
