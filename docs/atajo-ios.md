@@ -34,7 +34,11 @@ vez, el Atajo trae *Repetir con cada elemento* envolviendo el paso 3.
 
 ## Límites y notas
 
-- Máximo **20 MB** por archivo; cupo familiar de **9 GB** (si se llena, responde error).
+- Máximo **20 MB** por archivo en teoría, pero ojo: el endpoint pasa por Vercel,
+  que corta las peticiones de más de **4,5 MB** (límite de la plataforma en todos
+  los planes). En la práctica: **fotos sueltas o archivos pequeños** por el Atajo;
+  para lotes grandes usa "Guardar en Archivos" + subida manual desde la PWA
+  (esa va directa a R2 y sí admite 20 MB).
 - Sin `carpetaId` va a la **raíz** del ámbito (`comun` por defecto). Avanzado:
   puedes añadir el campo `carpetaId` con el UUID de una carpeta (visible en la
   URL de la PWA como `?carpeta=...`).

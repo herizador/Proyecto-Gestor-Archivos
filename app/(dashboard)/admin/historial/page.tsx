@@ -22,7 +22,7 @@ export default async function HistorialPage() {
         </div>
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap table-stack">
         <table>
           <thead>
             <tr>
@@ -35,13 +35,13 @@ export default async function HistorialPage() {
           <tbody>
             {historial?.map((evento) => (
               <tr key={evento.id}>
-                <td style={{ whiteSpace: 'nowrap' }}>
+                <td data-label="Fecha y Hora" style={{ whiteSpace: 'nowrap' }}>
                   {new Date(evento.fecha_evento).toLocaleString('es-ES', { timeZone: 'Europe/Madrid', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </td>
-                <td>
+                <td data-label="Usuario">
                   <strong>{evento.perfiles?.nombre_completo || 'Sistema'}</strong>
                 </td>
-                <td>
+                <td data-label="Acción">
                   <span className={`badge ${
                     evento.accion.includes('ELIMINAR') || evento.accion.includes('PAPELERA') ? 'badge-papelera' :
                     evento.accion === 'LOGIN' ? 'badge-admin' : 'badge-activo'
@@ -49,7 +49,7 @@ export default async function HistorialPage() {
                     {evento.accion}
                   </span>
                 </td>
-                <td style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+                <td data-label="Detalles" style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
                   {evento.detalles ? (
                     <pre style={{ margin: 0, fontFamily: 'inherit' }}>
                       {JSON.stringify(evento.detalles, null, 2)}

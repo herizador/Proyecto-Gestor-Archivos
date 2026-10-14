@@ -21,7 +21,7 @@ export default async function UsuariosPage() {
         </div>
       </div>
 
-      <div className="table-wrap">
+      <div className="table-wrap table-stack">
         <table>
           <thead>
             <tr>
@@ -33,7 +33,7 @@ export default async function UsuariosPage() {
           <tbody>
             {perfiles?.map((perfil) => (
               <tr key={perfil.id}>
-                <td>
+                <td data-label="Usuario">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div className="avatar avatar-sm">
                       {perfil.nombre_completo?.charAt(0).toUpperCase() || <UserCircle size={16} />}
@@ -41,12 +41,12 @@ export default async function UsuariosPage() {
                     <strong>{perfil.nombre_completo || 'Usuario sin nombre'}</strong>
                   </div>
                 </td>
-                <td>
+                <td data-label="Rol">
                   <span className={`badge ${perfil.rol === 'admin' ? 'badge-admin' : 'badge-miembro'}`}>
                     {perfil.rol}
                   </span>
                 </td>
-                <td>
+                <td data-label="Fecha de Registro">
                   {new Date(perfil.fecha_registro).toLocaleDateString()}
                 </td>
               </tr>

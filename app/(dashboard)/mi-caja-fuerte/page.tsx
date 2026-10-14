@@ -84,7 +84,7 @@ export default async function CajaFuertePage({
             </nav>
           )}
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+        <div className="safe-actions" style={{ marginLeft: 'auto', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <NewFolderModalWrapper carpetaPadreId={carpetaActualId} soloPrivada />
           <UploadModalWrapper scope="privado" carpetaId={carpetaActualId ?? undefined} />
         </div>

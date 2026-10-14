@@ -1154,7 +1154,9 @@ tbody tr:hover td { background: var(--color-surface-2); }
   }
   
   .grid-files {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    /* En móvil las tarjetas de archivo son filas a ancho completo: en 2
+       columnas los datos (nombre, fecha, autor) no cabían y se cortaban */
+    grid-template-columns: 1fr;
     gap: 12px;
   }
   
@@ -1177,4 +1179,34 @@ tbody tr:hover td { background: var(--color-surface-2); }
   .card-hover:hover {
     box-shadow: var(--shadow-md);
   }
+
+  /* Tablas apiladas (historial, usuarios): cada fila pasa a tarjeta con etiquetas */
+  .table-stack thead {
+    position: absolute; width: 1px; height: 1px;
+    overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap;
+  }
+  .table-stack table, .table-stack tbody, .table-stack tr, .table-stack td {
+    display: block;
+    width: 100%;
+  }
+  .table-stack tbody tr { border-bottom: 1px solid var(--color-border); }
+  .table-stack tbody tr:hover td { background: transparent; }
+  .table-stack td { border-bottom: none; padding: 8px 16px; }
+  .table-stack td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-muted);
+    margin-bottom: 2px;
+  }
+  .table-stack td pre { white-space: pre-wrap; word-break: break-word; }
+
+  /* Cabecera de Caja Fuerte: en columna para que nada se aprete */
+  .safe-header { flex-direction: column; align-items: stretch; }
+  .safe-actions { margin-left: 0 !important; width: 100%; display: flex; gap: 10px; }
+  .safe-actions > * { flex: 1; min-width: 0; }
+  .safe-actions .btn { justify-content: center; width: 100%; }
 }
