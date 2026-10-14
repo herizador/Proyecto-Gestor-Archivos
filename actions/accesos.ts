@@ -31,54 +31,49 @@ async function enriquecerAccesos(
 
   type FilaArchivo = { id: string; nombre_original: string; tamano_bytes: number; tipo_mime: string; estado: string; fecha_subida: string; subido_por: string; carpeta_id: string | null }
   type FilaCarpeta = { id: string; nombre: string; carpeta_padre_id?: string | null }
+  type IdNombre = { id: string; nombre: string }
+  type IdAutor = { id: string; nombre_completo: string }
 
-  let archivos: FilaArchivo[] = []
-  if (archivoIds.length > 0) {
-    const res = await supabase
-      .from('archivos')
-      .select('id, nombre_original, tamano_bytes, tipo_mime, estado, fecha_subida, subido_por, carpeta_id')
-      .in('id', archivoIds)
-    if (res.error) console.error('[accesos] no se pudieron resolver archivos objetivo:', res.error.message)
-    else archivos = (res.data ?? []) as FilaArchivo[]
-  }
-
-  let carpetas: FilaCarpeta[] = []
-  if (carpetaIds.length > 0) {
-    const res = await supabase
-      .from('carpetas')
-      .select('id, nombre, carpeta_padre_id')
-      .in('id', carpetaIds)
-    if (res.error) console.error('[accesos] no se pudieron resolver carpetas objetivo:', res.error.message)
-    else carpetas = (res.data ?? []) as FilaCarpeta[]
-  }
+  // Lote 1: todo lo derivable de las filas (en paralelo, antes en serie)
+  const [archivosRes, carpetasRes, contenedorasRes] = await Promise.all([
+    archivoIds.length > 0
+      ? supabase
+        .from('archivos')
+        .select('id, nombre_original, tamano_bytes, tipo_mime, estado, fecha_subida, subido_por, carpeta_id')
+        .in('id', archivoIds)
+      : Promise.resolve({ data: [] as FilaArchivo[], error: null }),
+    carpetaIds.length > 0
+      ? supabase.from('carpetas').select('id, nombre, carpeta_padre_id').in('id', carpetaIds)
+      : Promise.resolve({ data: [] as FilaCarpeta[], error: null }),
+    contenedoraIds.length > 0
+      ? supabase.from('carpetas').select('id, nombre').in('id', contenedoraIds)
+      : Promise.resolve({ data: [] as IdNombre[], error: null }),
+  ])
+  if (archivosRes.error) console.error('[accesos] no se pudieron resolver archivos objetivo:', archivosRes.error.message)
+  if (carpetasRes.error) console.error('[accesos] no se pudieron resolver carpetas objetivo:', carpetasRes.error.message)
+  const archivos = (archivosRes.data ?? []) as FilaArchivo[]
+  const carpetas = (carpetasRes.data ?? []) as FilaCarpeta[]
+  const contenedoras = (contenedorasRes.data ?? []) as IdNombre[]
 
   const autorIds = [...new Set(archivos.map((a) => a.subido_por).filter((x) => typeof x === 'string' && x.length > 0))]
   const carpetaDeArchivoIds = [...new Set(archivos.map((a) => a.carpeta_id).filter((x): x is string => typeof x === 'string' && x.length > 0))]
   const padreIds = [...new Set(carpetas.map((c) => c.carpeta_padre_id).filter((x): x is string => typeof x === 'string' && x.length > 0))]
 
-  let perfiles: Array<{ id: string; nombre_completo: string }> = []
-  if (autorIds.length > 0) {
-    const res = await supabase.from('perfiles').select('id, nombre_completo').in('id', autorIds)
-    if (!res.error) perfiles = (res.data ?? []) as Array<{ id: string; nombre_completo: string }>
-  }
-
-  let carpetasDeArchivo: Array<{ id: string; nombre: string }> = []
-  if (carpetaDeArchivoIds.length > 0) {
-    const res = await supabase.from('carpetas').select('id, nombre').in('id', carpetaDeArchivoIds)
-    if (!res.error) carpetasDeArchivo = (res.data ?? []) as Array<{ id: string; nombre: string }>
-  }
-
-  let padres: Array<{ id: string; nombre: string }> = []
-  if (padreIds.length > 0) {
-    const res = await supabase.from('carpetas').select('id, nombre').in('id', padreIds)
-    if (!res.error) padres = (res.data ?? []) as Array<{ id: string; nombre: string }>
-  }
-
-  let contenedoras: Array<{ id: string; nombre: string }> = []
-  if (contenedoraIds.length > 0) {
-    const res = await supabase.from('carpetas').select('id, nombre').in('id', contenedoraIds)
-    if (!res.error) contenedoras = (res.data ?? []) as Array<{ id: string; nombre: string }>
-  }
+  // Lote 2: nombres dependientes del lote 1 (también en paralelo)
+  const [perfilesRes, carpetasArchivoRes, padresRes] = await Promise.all([
+    autorIds.length > 0
+      ? supabase.from('perfiles').select('id, nombre_completo').in('id', autorIds)
+      : Promise.resolve({ data: [] as IdAutor[], error: null }),
+    carpetaDeArchivoIds.length > 0
+      ? supabase.from('carpetas').select('id, nombre').in('id', carpetaDeArchivoIds)
+      : Promise.resolve({ data: [] as IdNombre[], error: null }),
+    padreIds.length > 0
+      ? supabase.from('carpetas').select('id, nombre').in('id', padreIds)
+      : Promise.resolve({ data: [] as IdNombre[], error: null }),
+  ])
+  const perfiles = (perfilesRes.data ?? []) as IdAutor[]
+  const carpetasDeArchivo = (carpetasArchivoRes.data ?? []) as IdNombre[]
+  const padres = (padresRes.data ?? []) as IdNombre[]
 
   const porArchivo = new Map(archivos.map((a) => [a.id, a]))
   const porCarpeta = new Map(carpetas.map((c) => [c.id, c]))

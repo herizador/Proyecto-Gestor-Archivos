@@ -20,37 +20,14 @@ export default async function CajaFuertePage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single()
-
-  const isAdmin = perfil?.rol === 'admin'
-
-  // La caja fuerte es personal: solo carpetas privadas propias
-  let carpetaActual: { id: string; nombre: string; carpeta_padre_id: string | null } | null = null
-  if (carpetaActualId) {
-    const { data } = await supabase
-      .from('carpetas')
-      .select('id, nombre, carpeta_padre_id, es_privada')
-      .eq('id', carpetaActualId)
-      .eq('es_privada', true)
-      .eq('creado_por', user.id)
-      .single()
-    carpetaActual = data
-  }
-
-  const carpetasQuery = supabase
+  // Una sola tanda en paralelo (antes: 5 idas en serie por navegación)
+  const carpetasBase = supabase
     .from('carpetas')
     .select('*, creado_por_perfil:perfiles(nombre_completo)')
     .eq('es_privada', true)
     .eq('creado_por', user.id)
     .order('fecha_creacion', { ascending: true })
-
-  const { data: carpetas } = carpetaActualId
-    ? await carpetasQuery.eq('carpeta_padre_id', carpetaActualId)
-    : await carpetasQuery.is('carpeta_padre_id', null)
-
-  // Solo ficheros privados propios (prefijo /privado/ + carpeta actual).
-  // El filtro por carpeta_id manda; el LIKE preserva la semántica privada.
-  const archivosQuery = supabase
+  const archivosBase = supabase
     .from('archivos')
     .select('*, subido_por_perfil:perfiles(nombre_completo)')
     .eq('subido_por', user.id)
@@ -58,14 +35,35 @@ export default async function CajaFuertePage({
     .like('ruta_r2', '%/privado/%')
     .order('fecha_subida', { ascending: false })
 
-  const { data: archivos } = carpetaActualId
-    ? await archivosQuery.eq('carpeta_id', carpetaActualId)
-    : await archivosQuery.is('carpeta_id', null)
+  const [perfilRes, carpetaRes, carpetasRes, archivosRes, accesosRes] = await Promise.all([
+    supabase.from('perfiles').select('rol').eq('id', user.id).single(),
+    carpetaActualId
+      ? supabase
+        .from('carpetas')
+        .select('id, nombre, carpeta_padre_id, es_privada')
+        .eq('id', carpetaActualId)
+        .eq('es_privada', true)
+        .eq('creado_por', user.id)
+        .single()
+      : Promise.resolve({ data: null }),
+    carpetaActualId
+      ? carpetasBase.eq('carpeta_padre_id', carpetaActualId)
+      : carpetasBase.is('carpeta_padre_id', null),
+    carpetaActualId
+      ? archivosBase.eq('carpeta_id', carpetaActualId)
+      : archivosBase.is('carpeta_id', null),
+    listarAccesos(carpetaActualId),
+  ])
 
-  const { data: accesos, error: errorAccesos } = await listarAccesos(carpetaActualId)
+  const isAdmin = perfilRes.data?.rol === 'admin'
+  const carpetaActual = carpetaRes.data as { id: string; nombre: string; carpeta_padre_id: string | null } | null
+  const carpetas = carpetasRes.data ?? []
+  const archivos = archivosRes.data ?? []
+  const accesos = accesosRes.data ?? []
+  const errorAccesos = ('error' in accesosRes && accesosRes.error) || null
   if (errorAccesos) console.error('[Caja Fuerte] listarAccesos:', errorAccesos)
 
-  const tieneContenido = (carpetas?.length ?? 0) > 0 || (archivos?.length ?? 0) > 0 || (accesos?.length ?? 0) > 0
+  const tieneContenido = carpetas.length > 0 || archivos.length > 0 || accesos.length > 0
 
   return (
     <div className="page-content animate-fade-in">

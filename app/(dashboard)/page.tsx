@@ -19,54 +19,49 @@ export default async function DashboardComun({
 
   const supabase = await createClient()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data: perfil } = await supabase
-    .from('perfiles')
-    .select('rol')
-    .eq('id', user.id)
-    .single()
-
-  const isAdmin = perfil?.rol === 'admin'
-
-  let carpetaActual: { id: string; nombre: string; carpeta_padre_id: string | null } | null = null
-  if (carpetaActualId) {
-    const { data } = await supabase
-      .from('carpetas')
-      .select('id, nombre, carpeta_padre_id, es_privada')
-      .eq('id', carpetaActualId)
-      .eq('es_privada', false)
-      .single()
-    carpetaActual = data
-  }
-
-  const carpetasQuery = supabase
-    .from('carpetas')
-    .select('*, creado_por_perfil:perfiles(nombre_completo)')
-    .eq('es_privada', false)
-    .order('fecha_creacion', { ascending: true })
-
-  const { data: carpetas } = carpetaActualId
-    ? await carpetasQuery.eq('carpeta_padre_id', carpetaActualId)
-    : await carpetasQuery.is('carpeta_padre_id', null)
-
-  const archivosQuery = supabase
-    .from('archivos')
-    .select('*, subido_por_perfil:perfiles(nombre_completo)')
-    .eq('estado', 'activo')
-    .order('fecha_subida', { ascending: false })
-  const { data: archivos } = carpetaActualId
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
 
-    ? await archivosQuery.eq('carpeta_id', carpetaActualId)
+  // Todo lo independiente viaja en una sola tanda (las consultas se lanzan
+  // juntas; antes iban en serie y cada navegación pagaba 5-6 idas a la BD)
+  const carpetasBase = supabase
+    .from('carpetas')
+    .select('*, creado_por_perfil:perfiles(nombre_completo)')
+    .eq('es_privada', false)
+    .order('fecha_creacion', { ascending: true })
+  const archivosBase = supabase
+    .from('archivos')
+    .select('*, subido_por_perfil:perfiles(nombre_completo)')
+    .eq('estado', 'activo')
+    .order('fecha_subida', { ascending: false })
 
-    : await archivosQuery.is('carpeta_id', null)
+  const [perfilRes, carpetaRes, carpetasRes, archivosRes, accesosRes] = await Promise.all([
+    supabase.from('perfiles').select('rol').eq('id', user.id).single(),
+    carpetaActualId
+      ? supabase
+        .from('carpetas')
+        .select('id, nombre, carpeta_padre_id, es_privada')
+        .eq('id', carpetaActualId)
+        .eq('es_privada', false)
+        .single()
+      : Promise.resolve({ data: null }),
+    carpetaActualId
+      ? carpetasBase.eq('carpeta_padre_id', carpetaActualId)
+      : carpetasBase.is('carpeta_padre_id', null),
+    carpetaActualId
+      ? archivosBase.eq('carpeta_id', carpetaActualId)
+      : archivosBase.is('carpeta_id', null),
+    listarAccesos(carpetaActualId),
+  ])
 
-
-
-  const { data: accesos, error: errorAccesos } = await listarAccesos(carpetaActualId)
+  const isAdmin = perfilRes.data?.rol === 'admin'
+  const carpetaActual = carpetaRes.data as { id: string; nombre: string; carpeta_padre_id: string | null } | null
+  const carpetas = carpetasRes.data ?? []
+  const archivos = archivosRes.data ?? []
+  const accesos = accesosRes.data ?? []
+  const errorAccesos = ('error' in accesosRes && accesosRes.error) || null
   if (errorAccesos) console.error('[Área Común] listarAccesos:', errorAccesos)
-  const tieneContenido = (carpetas?.length ?? 0) > 0 || (archivos?.length ?? 0) > 0 || (accesos?.length ?? 0) > 0
+  const tieneContenido = carpetas.length > 0 || archivos.length > 0 || accesos.length > 0
 
   return (
     <div className="page-content animate-fade-in">

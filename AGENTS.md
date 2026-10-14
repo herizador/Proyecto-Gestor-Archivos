@@ -37,7 +37,7 @@ npm run lint     # ESLint (sin prettier/biome)
 ## Caché / PWA (pantallas congeladas en móvil)
 - `public/sw.js` (`CACHE_NAME = 'gestor-familiar-v2'`) es **network-first** con fallback a caché solo sin red, y el evento `activate` borra cachés viejas + `clients.claim()`. Solo cachea `/` y `/manifest.json`: **no cachear rutas del dashboard ni URLs firmadas**.
 - Al desplegar un cambio que afecte al SW, **sube la versión de `CACHE_NAME`** o los móviles seguirán con la vieja.
-- `next.config.ts` inyecta `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate` + `Pragma: no-cache` + `Expires: 0` en `/(.*)`. No añadir caché HTTP a vistas dinámicas.
+- `next.config.ts` inyecta `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate` + `Pragma: no-cache` + `Expires: 0` en rutas dinámicas, **excluyendo** `/_next/static|_next/image|icons` (pisarlos obligaba a re-descargar JS/CSS en cada navegación). No añadir caché HTTP a vistas dinámicas.
 
 ## Fechas e hidratación (error 418 recurrente)
 - Usar siempre `<DateDisplay date={...} />` (`components/DateDisplay.tsx`: `suppressHydrationWarning` + `es-ES`). Nunca `new Date(...).toLocaleDateString()` directo en un client component.
@@ -65,7 +65,8 @@ npm run lint     # ESLint (sin prettier/biome)
 
 ## Convenciones UI
 - Wrappers interactivos con patrón `<Componente>Wrapper.tsx` (`UploadModalWrapper`, `NewFolderModalWrapper`, `FileListWrapper`) para modales/selección bajo padres server.
-- Iconos `lucide-react`, fechas `date-fns`, tema oscuro por variables CSS en `app/globals.css`. Nombres largos se truncan con `ellipsis` (ver `FileCard`).
+- Iconos `lucide-react`, fechas `date-fns`, tema oscuro por variables CSS en `app/globals.css` (fuente Inter vía `next/font`, autohospedada). Nombres largos se truncan con `ellipsis` (ver `FileCard`).
+- **Rendimiento**: las páginas lanzan sus consultas Supabase en `Promise.all` (nunca en serie), `enriquecerAccesos()` en 2 lotes, `app/(dashboard)/loading.tsx` da feedback instantáneo al navegar. No romper estos patrones.
 - Rediseño premium oscuro (F1–F3 + tarjetas limpias): fondo con resplandores + ruido fijo en `body`, mosaicos por tipo (`ft-image/pdf/video/audio/archive/doc` en `FileCard`), carpeta con degradado índigo, halo en `card-hover` (atenuado en móvil), indicador activo en sidebar, topbar con blur, press `scale(.97)`, `focus-visible` y `::selection`. Entrada escalonada de rejillas por CSS (`nth-child`, fill `backwards` para no pisar el hover), modal con easing resorte, filas `skeleton` con shimmer en `ExploradorDestino`, y `prefers-reduced-motion` que apaga todo. Avisos propios en `components/Avisos.tsx` (`avisar()` toasts + `confirmar()` modal, host en `app/layout.tsx`): cero `alert`/`confirm` nativos en UI. Acciones en menú ⋯ (`components/MenuAcciones.tsx`, desplegable en portal con cierre por fuera/scroll/Escape): tarjetas solo con icono+nombre+meta, renombrar inline desde el menú, "Enlace" vía botón oculto de `NuevoAccesoModal`. Solo `transform`/`opacity` en animaciones.
 
 ## Entorno

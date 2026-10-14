@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from 'next'
+import { Inter } from 'next/font/google'
 import './globals.css'
 import { AvisosHost } from '@/components/Avisos'
+
+// Inter autohospedada (antes @import de Google Fonts bloqueando el render)
+const inter = Inter({ subsets: ['latin'], display: 'swap' })
 
 export const metadata: Metadata = {
   title: 'Gestor de Archivos Familiar',
@@ -27,7 +31,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="es" className={inter.className}>
       <body>
         {children}
         <AvisosHost />

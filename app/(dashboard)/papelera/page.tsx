@@ -9,14 +9,18 @@ export default async function PapeleraPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single()
-  const isAdmin = perfil?.rol === 'admin'
+  // Perfil y papelera en paralelo (antes en serie)
+  const [perfilRes, archivosRes] = await Promise.all([
+    supabase.from('perfiles').select('rol').eq('id', user.id).single(),
+    supabase
+      .from('archivos')
+      .select('*, subido_por_perfil:perfiles(nombre_completo)')
+      .eq('estado', 'papelera')
+      .order('fecha_papelera', { ascending: false }),
+  ])
 
-  const { data: archivos } = await supabase
-    .from('archivos')
-    .select('*, subido_por_perfil:perfiles(nombre_completo)')
-    .eq('estado', 'papelera')
-    .order('fecha_papelera', { ascending: false })
+  const isAdmin = perfilRes.data?.rol === 'admin'
+  const archivos = archivosRes.data ?? []
 
   return (
     <div className="page-content animate-fade-in">
