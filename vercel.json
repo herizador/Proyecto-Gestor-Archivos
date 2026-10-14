@@ -1,6 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  // Funciones junto a Supabase (eu-central-1 Fráncfort): antes corrían en iad1
-  // (Washington) y cada ida a la BD pagaba el Atlántico. Aplica en el próximo deploy.
   "regions": ["fra1"]
 }
