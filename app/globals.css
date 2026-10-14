@@ -955,6 +955,7 @@ tbody tr:hover td { background: var(--color-surface-2); }
 
 .file-card-details {
   flex: 1;
+  min-width: 0; /* sin esto el nombre sin cortar impone su ancho a la fila */
   overflow: hidden;
 }
 
@@ -1158,6 +1159,10 @@ tbody tr:hover td { background: var(--color-surface-2); }
        columnas los datos (nombre, fecha, autor) no cabían y se cortaban */
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+  /* Los items de rejilla tampoco pueden imponer su contenido mínimo */
+  .grid-files > *, .grid-folders > *, .grid-members > * {
+    min-width: 0;
   }
   
   .file-actions-group {
