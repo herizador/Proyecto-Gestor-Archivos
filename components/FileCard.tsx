@@ -1,10 +1,11 @@
 'use client'
 
-import { FileText, Image, Download, Trash2, Eye, Link2, Pencil, Check, X, Film, Music, Archive, Star } from 'lucide-react'
+import { FileText, Image, Download, Trash2, Eye, Link2, Pencil, Check, X, Film, Music, Archive, Star, UserPlus } from 'lucide-react'
 import { ArchivoConAutor } from '@/types/database'
 import { visualizarArchivo, descargarArchivo, moverAPapelera, renombrarArchivo } from '@/actions/files'
 import { eliminarAcceso } from '@/actions/accesos'
 import NuevoAccesoModal from '@/components/NuevoAccesoModal'
+import CompartirDialog from '@/components/CompartirDialog'
 import MenuAcciones, { type ItemMenu } from '@/components/MenuAcciones'
 import { avisar, confirmar } from '@/components/Avisos'
 import { useRouter } from 'next/navigation'
@@ -31,6 +32,7 @@ export default function FileCard({
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(file.nombre_original)
   const [guardando, setGuardando] = useState(false)
+  const [compartirAbierto, setCompartirAbierto] = useState(false)
   const enlaceRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -202,6 +204,14 @@ export default function FileCard({
     ...(puedeEnlazar
       ? [{ icono: <Link2 size={16} />, texto: 'Crear enlace', onClick: dispararEnlace, deshabilitado: loading }]
       : []),
+    ...(puedeEnlazar
+      ? [{
+          icono: <UserPlus size={16} />,
+          texto: 'Compartir',
+          onClick: () => setCompartirAbierto(true),
+          deshabilitado: loading,
+        }]
+      : []),
     ...(puedeBorrar
       ? [{
           icono: <Trash2 size={16} />,
@@ -222,6 +232,15 @@ export default function FileCard({
         <div ref={enlaceRef} style={{ display: 'none' }} aria-hidden="true">
           <NuevoAccesoModal objetivoTipo="archivo" objetivoId={file.id} objetivoNombre={file.nombre_original} />
         </div>
+      )}
+      {puedeEnlazar && (
+        <CompartirDialog
+          tipo="archivo"
+          id={file.id}
+          nombre={file.nombre_original}
+          abierto={compartirAbierto}
+          alCerrar={() => setCompartirAbierto(false)}
+        />
       )}
       <div className={`file-preview fp-${kindArchivo}`}>
         <IconoTipo size={30} />

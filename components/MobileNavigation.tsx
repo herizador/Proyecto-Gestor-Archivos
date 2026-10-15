@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ShieldCheck, FolderHeart, Users, Lock, Trash2, ShieldAlert, LogOut, Menu, X, Settings, History, Star } from 'lucide-react'
+import { ShieldCheck, FolderHeart, Users, Lock, Trash2, ShieldAlert, LogOut, Menu, X, Settings, History, Star, UserCheck } from 'lucide-react'
 import { logout } from '@/actions/auth'
 
 export default function MobileNavigation({
@@ -87,6 +87,10 @@ export default function MobileNavigation({
           <Link href="/favoritos" className="nav-item" onClick={closeMenu}>
             <Star size={18} />
             Favoritos
+          </Link>
+          <Link href="/compartido" className="nav-item" onClick={closeMenu}>
+            <UserCheck size={18} />
+            Compartido conmigo
           </Link>
           <Link href="/papelera" className="nav-item" onClick={closeMenu}>
             <Trash2 size={18} />

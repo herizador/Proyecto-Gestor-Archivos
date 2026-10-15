@@ -1,11 +1,12 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Folder, Link2, Trash2, FolderX, Pencil, Check, X, Star } from 'lucide-react'
+import { Folder, Link2, Trash2, FolderX, Pencil, Check, X, Star, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { renombrarCarpeta, cambiarColorCarpeta } from '@/actions/folders'
 import MenuAcciones, { type ItemMenu } from '@/components/MenuAcciones'
+import CompartirDialog from '@/components/CompartirDialog'
 import { COLORES_CARPETA, colorCarpetaDe } from '@/lib/colores-carpetas'
 import type { Carpeta } from '@/types/database'
 import DateDisplay from '@/components/DateDisplay'
@@ -50,6 +51,7 @@ export default function FolderCard({
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(carpeta.nombre)
   const [guardando, setGuardando] = useState(false)
+  const [compartirAbierto, setCompartirAbierto] = useState(false)
   const enlaceRef = useRef<HTMLDivElement>(null)
 
   // Renombrar solo en originales: el enlace sigue al original automáticamente
@@ -124,6 +126,13 @@ export default function FolderCard({
       : []),
     ...(crearEnlace
       ? [{ icono: <Link2 size={16} />, texto: 'Crear enlace', onClick: dispararEnlace }]
+      : []),
+    ...(editable
+      ? [{
+          icono: <UserPlus size={16} />,
+          texto: 'Compartir',
+          onClick: () => setCompartirAbierto(true),
+        }]
       : []),
     ...(!esAcceso && onAlternarFavorito
       ? [{
@@ -269,6 +278,15 @@ export default function FolderCard({
         <div ref={enlaceRef} style={{ display: 'none' }} aria-hidden="true">
           {crearEnlace}
         </div>
+      )}
+      {editable && (
+        <CompartirDialog
+          tipo="carpeta"
+          id={carpeta.id}
+          nombre={carpeta.nombre}
+          abierto={compartirAbierto}
+          alCerrar={() => setCompartirAbierto(false)}
+        />
       )}
       {huerfano ? (
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '20px 16px', width: '100%', opacity: 0.6 }}>

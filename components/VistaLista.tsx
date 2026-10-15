@@ -3,11 +3,12 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FileText, Image, Film, Music, Archive, Folder, FolderX, Eye, Download, Trash2, Link2, Pencil, Check, X, Star } from 'lucide-react'
+import { FileText, Image, Film, Music, Archive, Folder, FolderX, Eye, Download, Trash2, Link2, Pencil, Check, X, Star, UserPlus } from 'lucide-react'
 import { visualizarArchivo, descargarArchivo, moverAPapelera, renombrarArchivo } from '@/actions/files'
 import { renombrarCarpeta } from '@/actions/folders'
 import { eliminarAcceso } from '@/actions/accesos'
 import NuevoAccesoModal from '@/components/NuevoAccesoModal'
+import CompartirDialog from '@/components/CompartirDialog'
 import MenuAcciones, { type ItemMenu } from '@/components/MenuAcciones'
 import { colorCarpetaDe } from '@/lib/colores-carpetas'
 import { avisar, confirmar } from '@/components/Avisos'
@@ -63,6 +64,7 @@ export function FilaArchivo({
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(file.nombre_original)
   const [guardando, setGuardando] = useState(false)
+  const [compartirAbierto, setCompartirAbierto] = useState(false)
   const enlaceRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const kind = kindDe(file.tipo_mime)
@@ -160,6 +162,14 @@ export function FilaArchivo({
     ...(puedeEnlazar
       ? [{ icono: <Link2 size={16} />, texto: 'Crear enlace', onClick: () => enlaceRef.current?.querySelector('button')?.click(), deshabilitado: loading }]
       : []),
+    ...(puedeEnlazar
+      ? [{
+          icono: <UserPlus size={16} />,
+          texto: 'Compartir',
+          onClick: () => setCompartirAbierto(true),
+          deshabilitado: loading,
+        }]
+      : []),
     ...((isAdmin || isOwner)
       ? [{
           icono: <Trash2 size={16} />,
@@ -242,6 +252,15 @@ export function FilaArchivo({
           <NuevoAccesoModal objetivoTipo="archivo" objetivoId={file.id} objetivoNombre={file.nombre_original} />
         </div>
       )}
+      {puedeEnlazar && (
+        <CompartirDialog
+          tipo="archivo"
+          id={file.id}
+          nombre={file.nombre_original}
+          abierto={compartirAbierto}
+          alCerrar={() => setCompartirAbierto(false)}
+        />
+      )}
     </div>
   )
 }
@@ -270,6 +289,7 @@ export function FilaCarpeta({
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(carpeta.nombre)
   const [guardando, setGuardando] = useState(false)
+  const [compartirAbierto, setCompartirAbierto] = useState(false)
   const enlaceRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const editable = puedeRenombrar && !esAcceso
@@ -322,6 +342,13 @@ export function FilaCarpeta({
       : []),
     ...(crearEnlace
       ? [{ icono: <Link2 size={16} />, texto: 'Crear enlace', onClick: () => enlaceRef.current?.querySelector('button')?.click() }]
+      : []),
+    ...(editable
+      ? [{
+          icono: <UserPlus size={16} />,
+          texto: 'Compartir',
+          onClick: () => setCompartirAbierto(true),
+        }]
       : []),
     ...(!esAcceso && onAlternarFavorito
       ? [{
@@ -411,6 +438,15 @@ export function FilaCarpeta({
         <div ref={enlaceRef} style={{ display: 'none' }} aria-hidden="true">
           {crearEnlace}
         </div>
+      )}
+      {editable && (
+        <CompartirDialog
+          tipo="carpeta"
+          id={carpeta.id}
+          nombre={carpeta.nombre}
+          abierto={compartirAbierto}
+          alCerrar={() => setCompartirAbierto(false)}
+        />
       )}
     </div>
   )

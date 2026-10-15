@@ -69,7 +69,7 @@ anti-ciclo de accesos) y reescribiendo ambas policies sobre ella. **Probar con
 EXPLAIN en cada cambio**: un EXISTS recursivo por fila puede degradar listados
 grandes; si duele, materializar `ruta` (ltree o array de ancestros) en carpetas.
 
-## 3. Acciones (`actions/compartir-usuarios.ts`, nombre pendiente)
+## 3. Acciones — IMPLEMENTADO en `actions/compartir-usuarios.ts`
 
 - `compartirCon({ tipo, id, usuarioId })`: verifica que soy dueño o admin del
   recurso, que el destino es otro miembro, inserta (duplicado = omitido) y audita
@@ -79,7 +79,7 @@ grandes; si duele, materializar `ruta` (ltree o array de ancestros) en carpetas.
   `enriquecerAccesos`: base + lotes, nunca joins por FK).
 - `listarMiembros()` para el selector (perfiles visibles según RLS).
 
-## 4. UI
+## 4. UI — IMPLEMENTADA (`CompartirDialog.tsx` en el ⋯, página `/compartido`)
 
 - Diálogo "Compartir" en el ⋯ de archivos/carpetas propios (selector de miembro
   + resumen de con quién ya está compartido + revocar). Reutiliza el modal por

@@ -273,6 +273,11 @@ ALTER TABLE public.perfiles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "perfiles_select_propio" ON public.perfiles
   FOR SELECT USING (id = auth.uid() OR public.get_user_role() = 'admin');
 
+-- Directorio familiar (Compartido conmigo): todo autenticado ve id + nombre del
+-- resto para poder cederles. Solo expone el directorio, no más columnas.
+CREATE POLICY "perfiles_select_directorio" ON public.perfiles
+  FOR SELECT TO authenticated USING (true);
+
 CREATE POLICY "perfiles_update_propio" ON public.perfiles
   FOR UPDATE USING (id = auth.uid());
 
