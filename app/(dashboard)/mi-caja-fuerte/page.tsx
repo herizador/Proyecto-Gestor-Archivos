@@ -72,6 +72,7 @@ export default async function CajaFuertePage({
           <Lock size={28} />
         </div>
         <div>
+          <p className="eyebrow">Espacio familiar / Caja fuerte</p>
           <h1 className="page-title" style={{ fontSize: '1.4rem' }}>Mi Caja Fuerte</h1>
           <p className="page-subtitle">Nadie más de tu familia puede ver estos archivos.</p>
           {carpetaActual && (

@@ -165,6 +165,7 @@ export default function DocumentSearchBar({
                       carpeta={{
                         id: objetivo?.id ?? acceso.id,
                         nombre: acceso.nombre_personalizado || objetivo?.nombre || 'Enlace no disponible',
+                        color: objetivo?.color ?? 'indigo',
                         creado_por: acceso.creado_por,
                         es_privada: false,
                         carpeta_padre_id: null,

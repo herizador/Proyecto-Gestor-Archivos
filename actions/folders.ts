@@ -2,12 +2,14 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { logActivity } from '@/actions/storage'
+import { esColorCarpeta, COLOR_POR_DEFECTO } from '@/lib/colores-carpetas'
 import { revalidatePath } from 'next/cache'
 
 export async function crearCarpeta(params: {
   nombre: string
   esPrivada: boolean
   carpetaPadreId: string | null
+  color?: string
 }) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -23,14 +25,30 @@ export async function crearCarpeta(params: {
     if (padreError || !padre) return { error: 'Carpeta padre no válida.' }
   }
 
+  const color = esColorCarpeta(params.color) ? params.color : COLOR_POR_DEFECTO
   const { error } = await supabase.from('carpetas').insert({
     nombre: params.nombre,
     creado_por: user.id,
     es_privada: params.esPrivada,
     carpeta_padre_id: params.carpetaPadreId,
+    color,
   })
 
-  if (error) return { error: error.message }
+  if (error) {
+    // Compatibilidad: si la columna color aún no existe en la BD (migración
+    // pendiente), se reintenta sin ella en vez de romper la creación
+    if (/color/i.test(error.message)) {
+      const { error: error2 } = await supabase.from('carpetas').insert({
+        nombre: params.nombre,
+        creado_por: user.id,
+        es_privada: params.esPrivada,
+        carpeta_padre_id: params.carpetaPadreId,
+      })
+      if (error2) return { error: error2.message }
+    } else {
+      return { error: error.message }
+    }
+  }
 
   await logActivity({
     accion: 'CREAR_CARPETA',
@@ -79,6 +97,42 @@ export async function renombrarCarpeta(carpetaId: string, nombre: string) {
     accion: 'RENOMBRAR_CARPETA',
     detalles: { carpeta_id: carpetaId, anterior: carpeta.nombre, nuevo: limpio },
   })
+
+  revalidatePath('/')
+  revalidatePath('/familia')
+  revalidatePath('/mi-caja-fuerte')
+  return { success: true }
+}
+
+// ---------------------------------------------------------------------------
+// Cambiar el color de una carpeta (cosmético, sin auditoría)
+// ---------------------------------------------------------------------------
+export async function cambiarColorCarpeta(carpetaId: string, color: string) {
+  if (!esColorCarpeta(color)) return { error: 'Color no válido.' }
+
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'No autenticado.' }
+
+  const { data: carpeta } = await supabase
+    .from('carpetas')
+    .select('id, creado_por')
+    .eq('id', carpetaId)
+    .single()
+  if (!carpeta) return { error: 'Carpeta no encontrada o sin permisos.' }
+
+  const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single()
+  if (carpeta.creado_por !== user.id && perfil?.rol !== 'admin') {
+    return { error: 'Sin permiso para editar esta carpeta.' }
+  }
+
+  const { error } = await supabase.from('carpetas').update({ color }).eq('id', carpetaId)
+  if (error) {
+    if (/color/i.test(error.message)) {
+      return { error: 'Falta aplicar la migración de color en la base de datos.' }
+    }
+    return { error: error.message }
+  }
 
   revalidatePath('/')
   revalidatePath('/familia')

@@ -305,6 +305,9 @@ CREATE POLICY "carpetas_delete" ON public.carpetas
     OR public.get_user_role() = 'admin'
   );
 
+-- Color de carpeta (Figma en oscuro, 2026-10): rellena las existentes con índigo
+ALTER TABLE public.carpetas ADD COLUMN IF NOT EXISTS color TEXT NOT NULL DEFAULT 'indigo';
+
 -- ─── RLS: archivos ────────────────────────────────────────────────────────────
 ALTER TABLE public.archivos ENABLE ROW LEVEL SECURITY;
 

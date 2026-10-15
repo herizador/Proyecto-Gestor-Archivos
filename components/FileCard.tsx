@@ -66,6 +66,33 @@ export default function FileCard({
     return 'doc'
   })()
   const sizeKb = (file.tamano_bytes / 1024).toFixed(1)
+  const extension = (() => {
+    const porMime: Record<string, string> = {
+      'application/pdf': 'PDF',
+      'image/jpeg': 'JPG',
+      'image/png': 'PNG',
+      'image/webp': 'WEBP',
+      'image/gif': 'GIF',
+      'video/mp4': 'MP4',
+      'audio/mpeg': 'MP3',
+      'text/plain': 'TXT',
+      'text/csv': 'CSV',
+      'application/zip': 'ZIP',
+      'application/msword': 'DOC',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'DOCX',
+      'application/vnd.ms-excel': 'XLS',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'XLSX',
+    }
+    if (porMime[file.tipo_mime]) return porMime[file.tipo_mime]
+    const i = file.nombre_original.lastIndexOf('.')
+    if (i > 0 && file.nombre_original.length - i <= 6) return file.nombre_original.slice(i + 1).toUpperCase()
+    return (file.tipo_mime.split('/')[1] ?? 'FILE').toUpperCase().slice(0, 4)
+  })()
+  const IconoTipo = kindArchivo === 'image' ? Image
+    : kindArchivo === 'video' ? Film
+    : kindArchivo === 'audio' ? Music
+    : kindArchivo === 'archive' ? Archive
+    : FileText
 
   async function handleView() {
     setLoading(true)
@@ -185,6 +212,10 @@ export default function FileCard({
           <NuevoAccesoModal objetivoTipo="archivo" objetivoId={file.id} objetivoNombre={file.nombre_original} />
         </div>
       )}
+      <div className={`file-preview fp-${kindArchivo}`}>
+        <IconoTipo size={30} />
+        <span className="file-ext">{extension}</span>
+      </div>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', paddingRight: '40px' }}>
         {onToggleSelect && (
           <div style={{ paddingTop: '4px' }}>
@@ -198,14 +229,6 @@ export default function FileCard({
           </div>
         )}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div className="file-card-header" style={{ marginBottom: 0 }}>
-            <div className={`file-card-icon-wrap ft-${kindArchivo}`}>
-              {kindArchivo === 'image' ? <Image size={24} />
-                : kindArchivo === 'video' ? <Film size={24} />
-                : kindArchivo === 'audio' ? <Music size={24} />
-                : kindArchivo === 'archive' ? <Archive size={24} />
-                : <FileText size={24} />}
-            </div>
             <div className="file-card-details">
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                 {editando ? (
@@ -272,7 +295,6 @@ export default function FileCard({
                 Por: {file.subido_por_perfil?.nombre_completo || 'Desconocido'}
               </p>
             </div>
-          </div>
         </div>
       </div>
     </div>

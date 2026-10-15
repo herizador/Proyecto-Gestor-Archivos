@@ -30,12 +30,30 @@ async function enriquecerAccesos(
   const contenedoraIds = [...new Set(filas.map((a) => a.carpeta_contenedora_id).filter((x) => typeof x === 'string' && x.length > 0))]
 
   type FilaArchivo = { id: string; nombre_original: string; tamano_bytes: number; tipo_mime: string; estado: string; fecha_subida: string; subido_por: string; carpeta_id: string | null }
-  type FilaCarpeta = { id: string; nombre: string; carpeta_padre_id?: string | null }
+  type FilaCarpeta = { id: string; nombre: string; color: string; carpeta_padre_id?: string | null }
   type IdNombre = { id: string; nombre: string }
   type IdAutor = { id: string; nombre_completo: string }
 
+  // Compatibilidad: si la columna color aún no existe (migración pendiente),
+  // se reintenta sin ella y todo cae a índigo en vez de romper el listado
+  async function carpetasObjetivo(ids: string[]): Promise<FilaCarpeta[]> {
+    const intento = await supabase.from('carpetas').select('id, nombre, color, carpeta_padre_id').in('id', ids)
+    if (!intento.error) return (intento.data ?? []) as FilaCarpeta[]
+    if (!/color/i.test(intento.error.message)) {
+      console.error('[accesos] no se pudieron resolver carpetas objetivo:', intento.error.message)
+      return []
+    }
+    const base = await supabase.from('carpetas').select('id, nombre, carpeta_padre_id').in('id', ids)
+    if (base.error) {
+      console.error('[accesos] no se pudieron resolver carpetas objetivo:', base.error.message)
+      return []
+    }
+    return ((base.data ?? []) as Array<{ id: string; nombre: string; carpeta_padre_id?: string | null }>)
+      .map((c) => ({ ...c, color: 'indigo' }))
+  }
+
   // Lote 1: todo lo derivable de las filas (en paralelo, antes en serie)
-  const [archivosRes, carpetasRes, contenedorasRes] = await Promise.all([
+  const [archivosRes, carpetas, contenedorasRes] = await Promise.all([
     archivoIds.length > 0
       ? supabase
         .from('archivos')
@@ -43,16 +61,14 @@ async function enriquecerAccesos(
         .in('id', archivoIds)
       : Promise.resolve({ data: [] as FilaArchivo[], error: null }),
     carpetaIds.length > 0
-      ? supabase.from('carpetas').select('id, nombre, carpeta_padre_id').in('id', carpetaIds)
-      : Promise.resolve({ data: [] as FilaCarpeta[], error: null }),
+      ? carpetasObjetivo(carpetaIds)
+      : Promise.resolve([] as FilaCarpeta[]),
     contenedoraIds.length > 0
       ? supabase.from('carpetas').select('id, nombre').in('id', contenedoraIds)
       : Promise.resolve({ data: [] as IdNombre[], error: null }),
   ])
   if (archivosRes.error) console.error('[accesos] no se pudieron resolver archivos objetivo:', archivosRes.error.message)
-  if (carpetasRes.error) console.error('[accesos] no se pudieron resolver carpetas objetivo:', carpetasRes.error.message)
   const archivos = (archivosRes.data ?? []) as FilaArchivo[]
-  const carpetas = (carpetasRes.data ?? []) as FilaCarpeta[]
   const contenedoras = (contenedorasRes.data ?? []) as IdNombre[]
 
   const autorIds = [...new Set(archivos.map((a) => a.subido_por).filter((x) => typeof x === 'string' && x.length > 0))]
@@ -107,6 +123,7 @@ async function enriquecerAccesos(
         ? {
             id: carp.id,
             nombre: carp.nombre,
+            color: carp.color,
             padre: padre ? { id: padre.id, nombre: padre.nombre } : null,
           }
         : null,

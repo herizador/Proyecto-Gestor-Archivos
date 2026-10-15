@@ -45,6 +45,7 @@ export type Database = {
           creado_por: string
           es_privada: boolean
           carpeta_padre_id: string | null
+          color: string
           fecha_creacion: string
         }
         Insert: {
@@ -53,6 +54,7 @@ export type Database = {
           creado_por: string
           es_privada?: boolean
           carpeta_padre_id?: string | null
+          color?: string
           fecha_creacion?: string
         }
         Update: {
@@ -61,6 +63,7 @@ export type Database = {
           creado_por?: string
           es_privada?: boolean
           carpeta_padre_id?: string | null
+          color?: string
           fecha_creacion?: string
         }
         Relationships: [
@@ -398,7 +401,7 @@ export type AccesoConObjetivo = AccesoDirecto & {
     subido_por_perfil: Pick<Perfil, 'nombre_completo'> | null
     carpeta: Pick<Carpeta, 'id' | 'nombre'> | null
   }) | null
-  carpeta_objetivo: (Pick<Carpeta, 'id' | 'nombre'> & {
+  carpeta_objetivo: (Pick<Carpeta, 'id' | 'nombre' | 'color'> & {
     padre: Pick<Carpeta, 'id' | 'nombre'> | null
   }) | null
   carpeta_contenedora: Pick<Carpeta, 'id' | 'nombre'> | null

@@ -7,7 +7,12 @@ import NewFolderModalWrapper from '@/components/NewFolderModalWrapper'
 import DocumentSearchBar from '@/components/DocumentSearchBar'
 import StorageBar from '@/components/StorageBar'
 import FileListWrapper from '@/components/FileListWrapper'
+import ResumenFamiliar from '@/components/ResumenFamiliar'
 import { listarAccesos } from '@/actions/accesos'
+import { getStorageUsage } from '@/actions/files'
+
+// Cupo familiar (mismo que el trigger validar_limite_almacenamiento y el Worker)
+const LIMITE_BYTES = 9663676416 // 9 GB
 
 export default async function DashboardComun({
   searchParams,
@@ -35,7 +40,7 @@ export default async function DashboardComun({
     .eq('estado', 'activo')
     .order('fecha_subida', { ascending: false })
 
-  const [perfilRes, carpetaRes, carpetasRes, archivosRes, accesosRes] = await Promise.all([
+  const [perfilRes, carpetaRes, carpetasRes, archivosRes, accesosRes, usoRes, totalArchivosRes, miembrosRes] = await Promise.all([
     supabase.from('perfiles').select('rol').eq('id', user.id).single(),
     carpetaActualId
       ? supabase
@@ -52,6 +57,9 @@ export default async function DashboardComun({
       ? archivosBase.eq('carpeta_id', carpetaActualId)
       : archivosBase.is('carpeta_id', null),
     listarAccesos(carpetaActualId),
+    getStorageUsage(),
+    supabase.from('archivos').select('id', { count: 'exact', head: true }).eq('estado', 'activo'),
+    supabase.from('perfiles').select('id', { count: 'exact', head: true }),
   ])
 
   const isAdmin = perfilRes.data?.rol === 'admin'
@@ -69,7 +77,8 @@ export default async function DashboardComun({
         className="page-header"
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}
       >
-        <div>
+        <div>
+          <p className="eyebrow">Espacio familiar / Área común{carpetaActual ? ` / ${carpetaActual.nombre}` : ''}</p>
           <h1 className="page-title">Área Común</h1>
           <p className="page-subtitle">Documentos visibles para toda la familia</p>
           {carpetaActual && (
@@ -89,6 +98,15 @@ export default async function DashboardComun({
       </div>
 
       {isAdmin && <StorageBar isAdmin={isAdmin} />}
+
+      {!carpetaActual && (
+        <ResumenFamiliar
+          usoBytes={usoRes}
+          limiteBytes={LIMITE_BYTES}
+          archivos={totalArchivosRes.count ?? 0}
+          miembros={miembrosRes.count ?? 0}
+        />
+      )}
 
       {errorAccesos && (
         <p className="error-msg" style={{ marginBottom: '12px' }}>

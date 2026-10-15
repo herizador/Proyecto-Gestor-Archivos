@@ -50,6 +50,7 @@ export default async function FamiliaPage() {
   return (
     <div className="page-content animate-fade-in">
       <div className="page-header">
+        <p className="eyebrow">Espacio familiar / Mi familia</p>
         <h1 className="page-title">Mi Familia</h1>
         <p className="page-subtitle">Toca un miembro para ver sus archivos públicos.</p>
       </div>

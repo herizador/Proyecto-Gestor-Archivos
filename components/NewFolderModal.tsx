@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { FolderPlus, X, Loader2 } from 'lucide-react'
 import { crearCarpeta } from '@/actions/folders'
+import { COLORES_CARPETA, COLOR_POR_DEFECTO, type ColorCarpeta } from '@/lib/colores-carpetas'
 import { useRouter } from 'next/navigation'
 
 export default function NewFolderModal({
@@ -19,6 +20,7 @@ export default function NewFolderModal({
   const [nombre, setNombre] = useState('')
   // En la caja fuerte las carpetas siempre son privadas (sin interruptor)
   const [esPrivada, setEsPrivada] = useState(soloPrivada)
+  const [color, setColor] = useState<ColorCarpeta>(COLOR_POR_DEFECTO)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
@@ -39,6 +41,7 @@ export default function NewFolderModal({
       nombre: trimmed,
       esPrivada,
       carpetaPadreId,
+      color,
     })
 
     setLoading(false)
@@ -50,6 +53,7 @@ export default function NewFolderModal({
 
     setNombre('')
     setEsPrivada(soloPrivada)
+    setColor(COLOR_POR_DEFECTO)
     onClose()
     router.refresh()
   }
@@ -84,6 +88,26 @@ export default function NewFolderModal({
             disabled={loading}
             autoFocus
           />
+        </div>
+
+        <div style={{ marginBottom: '20px' }}>
+          <span className="input-label">Color</span>
+          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }} role="radiogroup" aria-label="Color de la carpeta">
+            {COLORES_CARPETA.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                role="radio"
+                aria-checked={color === c.id}
+                title={c.nombre}
+                aria-label={`Color ${c.nombre}`}
+                onClick={() => setColor(c.id)}
+                disabled={loading}
+                className={`punto-color pc-${c.id}${color === c.id ? ' activo' : ''}`}
+                style={{ width: '36px', height: '36px' }}
+              />
+            ))}
+          </div>
         </div>
 
         <div className="switch-row">

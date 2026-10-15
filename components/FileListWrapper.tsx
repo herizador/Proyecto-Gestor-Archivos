@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Share2, X, Check, Link, List } from 'lucide-react'
+import { Share2, X, Check, Link, List, LayoutGrid } from 'lucide-react'
 import { generarEnlaceCompartido } from '@/actions/share'
 import { eliminarAcceso, type ObjetivoEnlace } from '@/actions/accesos'
 import FileCard from '@/components/FileCard'
@@ -11,11 +11,59 @@ import NuevoAccesoModal from '@/components/NuevoAccesoModal'
 import EnlazarSeleccionModal from '@/components/EnlazarSeleccionModal'
 import EnviarSeleccionButton from '@/components/EnviarSeleccionButton'
 import MoverSeleccionModal from '@/components/MoverSeleccionModal'
+import { FilaArchivo, FilaCarpeta } from '@/components/VistaLista'
 import { avisar } from '@/components/Avisos'
 import type { AccesoConObjetivo, ArchivoConAutor, Carpeta } from '@/types/database'
 
 type CarpetaConAutor = Carpeta & {
   creado_por_perfil?: { nombre_completo: string } | null
+}
+
+type Orden = 'recientes' | 'nombre' | 'tamano'
+type Vista = 'cuadricula' | 'lista'
+
+function porFechaDesc(a: string, b: string) {
+  return +new Date(b) - +new Date(a)
+}
+
+// Los accesos se muestran con datos derivados (personalizado u original);
+// estas ayudas unifican rejilla y lista para que ordenen y muestren igual.
+function displayAccesoArchivo(a: AccesoConObjetivo) {
+  const objetivo = a.archivo_objetivo
+  return {
+    file: {
+      id: a.id,
+      nombre_original: a.nombre_personalizado || objetivo?.nombre_original || 'Enlace no disponible',
+      ruta_r2: '',
+      tamano_bytes: objetivo?.tamano_bytes ?? 0,
+      tipo_mime: objetivo?.tipo_mime ?? 'application/octet-stream',
+      carpeta_id: a.carpeta_contenedora_id,
+      subido_por: objetivo?.subido_por ?? a.creado_por,
+      estado: 'activo',
+      fecha_subida: objetivo?.fecha_subida ?? a.fecha_creacion,
+      fecha_papelera: null,
+      subido_por_perfil: objetivo?.subido_por_perfil ?? null,
+    } as ArchivoConAutor,
+    huerfano: !objetivo || objetivo.estado !== 'activo',
+    origenNombre: objetivo?.carpeta?.nombre ?? 'otra ubicación',
+  }
+}
+
+function displayAccesoCarpeta(a: AccesoConObjetivo) {
+  const objetivo = a.carpeta_objetivo
+  return {
+    carpeta: {
+      id: objetivo?.id ?? a.id,
+      nombre: a.nombre_personalizado || objetivo?.nombre || 'Enlace no disponible',
+      color: objetivo?.color ?? 'indigo',
+      creado_por: a.creado_por,
+      es_privada: false,
+      carpeta_padre_id: null,
+      fecha_creacion: a.fecha_creacion,
+    } as CarpetaConAutor,
+    huerfano: !objetivo,
+    origenNombre: objetivo?.padre?.nombre ?? 'otra ubicación',
+  }
 }
 
 export default function FileListWrapper({
@@ -115,6 +163,53 @@ export default function FileListWrapper({
 
   const isAllSelected = selectedIds.length === allIds.length && allIds.length > 0
   const hasItems = allIds.length > 0
+
+  const [orden, setOrden] = useState<Orden>('recientes')
+  const [vista, setVista] = useState<Vista>('cuadricula')
+
+  // Ordenación en cliente (sin idas extra): recientes, nombre A-Z o tamaño
+  const cmpArchivos = useMemo(() => {
+    const fns: Record<Orden, (a: ArchivoConAutor, b: ArchivoConAutor) => number> = {
+      recientes: (a, b) => porFechaDesc(a.fecha_subida, b.fecha_subida),
+      nombre: (a, b) => a.nombre_original.localeCompare(b.nombre_original, 'es'),
+      tamano: (a, b) => b.tamano_bytes - a.tamano_bytes,
+    }
+    return fns[orden]
+  }, [orden])
+  const cmpCarpetas = useMemo(() => {
+    const fns: Record<Orden, (a: CarpetaConAutor, b: CarpetaConAutor) => number> = {
+      recientes: (a, b) => porFechaDesc(a.fecha_creacion, b.fecha_creacion),
+      nombre: (a, b) => a.nombre.localeCompare(b.nombre, 'es'),
+      tamano: (a, b) => a.nombre.localeCompare(b.nombre, 'es'),
+    }
+    return fns[orden]
+  }, [orden])
+
+  const archivosOrdenados = useMemo(() => [...archivos].sort(cmpArchivos), [archivos, cmpArchivos])
+  const carpetasOrdenadas = useMemo(() => [...carpetas].sort(cmpCarpetas), [carpetas, cmpCarpetas])
+  const accesosArchivosOrdenados = useMemo(
+    () => [...accesosArchivos].sort((a, b) => {
+      const da = displayAccesoArchivo(a)
+      const db = displayAccesoArchivo(b)
+      if (orden === 'nombre') return da.file.nombre_original.localeCompare(db.file.nombre_original, 'es')
+      if (orden === 'tamano') return db.file.tamano_bytes - da.file.tamano_bytes
+      return porFechaDesc(da.file.fecha_subida, db.file.fecha_subida)
+    }),
+    [accesosArchivos, orden]
+  )
+  const accesosCarpetasOrdenados = useMemo(
+    () => [...accesosCarpetas].sort((a, b) => {
+      const da = displayAccesoCarpeta(a)
+      const db = displayAccesoCarpeta(b)
+      if (orden === 'nombre') return da.carpeta.nombre.localeCompare(db.carpeta.nombre, 'es')
+      return porFechaDesc(da.carpeta.fecha_creacion, db.carpeta.fecha_creacion)
+    }),
+    [accesosCarpetas, orden]
+  )
+
+  const enLista = vista === 'lista'
+  const sel = (id: string) => isSelectionMode && selectedIds.includes(id)
+  const alAlternar = isSelectionMode ? toggleSelect : undefined
 
   // Objetivos para el enlace en lote: los accesos nunca entran en allIds,
   // así que aquí solo hay archivos y carpetas reales.
@@ -255,16 +350,92 @@ export default function FileListWrapper({
         )}
       </div>
 
+      {/* Barra de orden y vista (estilo Figma, en oscuro) */}
+      {hasItems && (
+        <div
+          style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}
+        >
+          <label className="sr-only" htmlFor="orden-lista">Ordenar por</label>
+          <select
+            id="orden-lista"
+            className="input"
+            value={orden}
+            onChange={(e) => setOrden(e.target.value as Orden)}
+            style={{ width: 'auto', minHeight: '44px', flexShrink: 0 }}
+          >
+            <option value="recientes">Más recientes</option>
+            <option value="nombre">Nombre (A-Z)</option>
+            <option value="tamano">Tamaño</option>
+          </select>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }} role="group" aria-label="Tipo de vista">
+            <button
+              type="button"
+              className={`btn-ghost btn-icon${vista === 'cuadricula' ? ' vista-activa' : ''}`}
+              onClick={() => setVista('cuadricula')}
+              title="Vista de cuadrícula"
+              aria-label="Vista de cuadrícula"
+              aria-pressed={vista === 'cuadricula'}
+              style={{ minWidth: '44px', minHeight: '44px' }}
+            >
+              <LayoutGrid size={18} />
+            </button>
+            <button
+              type="button"
+              className={`btn-ghost btn-icon${vista === 'lista' ? ' vista-activa' : ''}`}
+              onClick={() => setVista('lista')}
+              title="Vista de lista"
+              aria-label="Vista de lista"
+              aria-pressed={vista === 'lista'}
+              style={{ minWidth: '44px', minHeight: '44px' }}
+            >
+              <List size={18} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {(carpetas.length > 0 || accesosCarpetas.length > 0) && (
         <section style={{ marginBottom: '24px' }}>
           <h2 className="section-title">Carpetas</h2>
+          {enLista ? (
+            <div className="lista-archivos">
+              {carpetasOrdenadas.map((carpeta) => (
+                <FilaCarpeta
+                  key={carpeta.id}
+                  carpeta={carpeta}
+                  selected={sel(carpeta.id)}
+                  onToggleSelect={alAlternar}
+                  basePath={basePath}
+                  crearEnlace={(isAdmin || carpeta.creado_por === userId) ? (
+                    <NuevoAccesoModal objetivoTipo="carpeta" objetivoId={carpeta.id} objetivoNombre={carpeta.nombre} />
+                  ) : null}
+                  puedeRenombrar={isAdmin || carpeta.creado_por === userId}
+                />
+              ))}
+              {accesosCarpetasOrdenados.map((acceso) => {
+                const d = displayAccesoCarpeta(acceso)
+                return (
+                  <FilaCarpeta
+                    key={acceso.id}
+                    carpeta={d.carpeta}
+                    basePath={basePath}
+                    esAcceso
+                    accesoId={acceso.id}
+                    origenNombre={d.origenNombre}
+                    huerfano={d.huerfano}
+                    onEliminarAcceso={handleEliminarAcceso}
+                  />
+                )
+              })}
+            </div>
+          ) : (
           <div className="grid-folders">
-            {carpetas.map((carpeta) => (
+            {carpetasOrdenadas.map((carpeta) => (
               <FolderCard
                 key={carpeta.id}
                 carpeta={carpeta}
-                selected={isSelectionMode && selectedIds.includes(carpeta.id)}
-                onToggleSelect={isSelectionMode ? toggleSelect : undefined}
+                selected={sel(carpeta.id)}
+                onToggleSelect={alAlternar}
                 basePath={basePath}
                 crearEnlace={(isAdmin || carpeta.creado_por === userId) ? (
                   <NuevoAccesoModal objetivoTipo="carpeta" objetivoId={carpeta.id} objetivoNombre={carpeta.nombre} />
@@ -272,75 +443,84 @@ export default function FileListWrapper({
                 puedeRenombrar={isAdmin || carpeta.creado_por === userId}
               />
             ))}
-            {accesosCarpetas.map((acceso) => {
-              const objetivo = acceso.carpeta_objetivo
-              const huerfano = !objetivo
+            {accesosCarpetasOrdenados.map((acceso) => {
+              const d = displayAccesoCarpeta(acceso)
               return (
                 <FolderCard
                   key={acceso.id}
-                  carpeta={{
-                    id: objetivo?.id ?? acceso.id,
-                    nombre: acceso.nombre_personalizado || objetivo?.nombre || 'Enlace no disponible',
-                    creado_por: acceso.creado_por,
-                    es_privada: false,
-                    carpeta_padre_id: null,
-                    fecha_creacion: acceso.fecha_creacion,
-                  }}
+                  carpeta={d.carpeta}
                   basePath={basePath}
                   esAcceso
                   accesoId={acceso.id}
-                  origenNombre={objetivo?.padre?.nombre ?? 'otra ubicación'}
-                  huerfano={huerfano}
+                  origenNombre={d.origenNombre}
+                  huerfano={d.huerfano}
                   onEliminarAcceso={handleEliminarAcceso}
                 />
               )
             })}
           </div>
+          )}
         </section>
       )}
 
       {(archivos.length > 0 || accesosArchivos.length > 0) && (
         <section>
           {(carpetas.length > 0 || accesosCarpetas.length > 0) && <h2 className="section-title">Archivos</h2>}
+          {enLista ? (
+            <div className="lista-archivos">
+              {archivosOrdenados.map((archivo) => (
+                <FilaArchivo
+                  key={archivo.id}
+                  file={archivo}
+                  isAdmin={isAdmin}
+                  isOwner={archivo.subido_por === userId || showOwner}
+                  selected={sel(archivo.id)}
+                  onToggleSelect={alAlternar}
+                />
+              ))}
+              {accesosArchivosOrdenados.map((acceso) => {
+                const d = displayAccesoArchivo(acceso)
+                return (
+                  <FilaArchivo
+                    key={acceso.id}
+                    file={d.file}
+                    isAdmin={isAdmin}
+                    isOwner={acceso.creado_por === userId || isAdmin}
+                    esAcceso
+                    origenNombre={d.origenNombre}
+                    huerfano={d.huerfano}
+                  />
+                )
+              })}
+            </div>
+          ) : (
           <div className="grid-files">
-            {archivos.map((archivo) => (
+            {archivosOrdenados.map((archivo) => (
               <FileCard
                 key={archivo.id}
                 file={archivo}
                 isAdmin={isAdmin}
                 isOwner={archivo.subido_por === userId || showOwner}
-                selected={isSelectionMode && selectedIds.includes(archivo.id)}
-                onToggleSelect={isSelectionMode ? toggleSelect : undefined}
+                selected={sel(archivo.id)}
+                onToggleSelect={alAlternar}
               />
             ))}
-            {accesosArchivos.map((acceso) => {
-              const objetivo = acceso.archivo_objetivo
-              const huerfano = !objetivo || objetivo.estado !== 'activo'
+            {accesosArchivosOrdenados.map((acceso) => {
+              const d = displayAccesoArchivo(acceso)
               return (
                 <FileCard
                   key={acceso.id}
-                  file={{
-                    id: acceso.id,
-                    nombre_original: acceso.nombre_personalizado || objetivo?.nombre_original || 'Enlace no disponible',
-                    ruta_r2: '',
-                    tamano_bytes: objetivo?.tamano_bytes ?? 0,
-                    tipo_mime: objetivo?.tipo_mime ?? 'application/octet-stream',
-                    carpeta_id: acceso.carpeta_contenedora_id,
-                    subido_por: objetivo?.subido_por ?? acceso.creado_por,
-                    estado: 'activo',
-                    fecha_subida: objetivo?.fecha_subida ?? acceso.fecha_creacion,
-                    fecha_papelera: null,
-                    subido_por_perfil: objetivo?.subido_por_perfil ?? null,
-                  }}
+                  file={d.file}
                   isAdmin={isAdmin}
                   isOwner={acceso.creado_por === userId || isAdmin}
                   esAcceso
-                  origenNombre={objetivo?.carpeta?.nombre ?? 'otra ubicación'}
-                  huerfano={huerfano}
+                  origenNombre={d.origenNombre}
+                  huerfano={d.huerfano}
                 />
               )
             })}
           </div>
+          )}
         </section>
       )}
     </div>

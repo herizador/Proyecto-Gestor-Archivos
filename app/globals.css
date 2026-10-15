@@ -381,6 +381,14 @@ input, textarea, select { font-family: inherit; }
 .page-content { padding: 32px; flex: 1; max-width: 1200px; }
 
 .page-header { margin-bottom: 32px; }
+.eyebrow {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
 .page-title { font-size: 1.75rem; font-weight: 700; color: var(--color-text); }
 .page-subtitle { font-size: 0.9rem; color: var(--color-text-muted); margin-top: 4px; }
 
@@ -560,6 +568,7 @@ input, textarea, select { font-family: inherit; }
 .menu-item:disabled { opacity: 0.45; cursor: not-allowed; }
 .menu-item-peligro { color: var(--color-danger); }
 .menu-item-peligro:hover { background: var(--color-danger-dim); }
+.menu-nodo { padding: 2px 0; }
 .menu-separador {
   height: 1px;
   background: var(--color-border);
@@ -685,6 +694,32 @@ input, textarea, select { font-family: inherit; }
   margin-bottom: 12px;
   box-shadow: 0 4px 16px rgba(79,142,247,0.2);
 }
+/* Colores de carpeta (Figma en oscuro): el icono hereda el tono */
+.folder-card-icon.fc-indigo { background: linear-gradient(135deg, rgba(79,142,247,0.4), rgba(79,142,247,0.12)); border-color: rgba(79,142,247,0.25); color: #cfe2ff; box-shadow: 0 4px 16px rgba(79,142,247,0.2); }
+.folder-card-icon.fc-violeta { background: linear-gradient(135deg, rgba(167,139,250,0.4), rgba(167,139,250,0.12)); border-color: rgba(167,139,250,0.25); color: #ddd0ff; box-shadow: 0 4px 16px rgba(167,139,250,0.2); }
+.folder-card-icon.fc-cian { background: linear-gradient(135deg, rgba(34,211,238,0.4), rgba(34,211,238,0.12)); border-color: rgba(34,211,238,0.25); color: #b5f1ff; box-shadow: 0 4px 16px rgba(34,211,238,0.2); }
+.folder-card-icon.fc-verde { background: linear-gradient(135deg, rgba(52,211,153,0.4), rgba(52,211,153,0.12)); border-color: rgba(52,211,153,0.25); color: #b8f4dc; box-shadow: 0 4px 16px rgba(52,211,153,0.2); }
+.folder-card-icon.fc-ambar { background: linear-gradient(135deg, rgba(251,191,36,0.4), rgba(251,191,36,0.12)); border-color: rgba(251,191,36,0.25); color: #ffe9b8; box-shadow: 0 4px 16px rgba(251,191,36,0.2); }
+.folder-card-icon.fc-rosa { background: linear-gradient(135deg, rgba(244,114,182,0.4), rgba(244,114,182,0.12)); border-color: rgba(244,114,182,0.25); color: #ffd3e8; box-shadow: 0 4px 16px rgba(244,114,182,0.2); }
+
+/* Puntos de color (picker de Nueva Carpeta + menú ⋯) */
+.punto-color {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.punto-color:hover { transform: scale(1.12); }
+.punto-color.activo { border-color: #fff; box-shadow: 0 0 0 2px var(--color-accent); }
+.punto-color.pc-indigo { background: linear-gradient(135deg, #4f8ef7, #3730a3); }
+.punto-color.pc-violeta { background: linear-gradient(135deg, #a78bfa, #6d28d9); }
+.punto-color.pc-cian { background: linear-gradient(135deg, #22d3ee, #0e7490); }
+.punto-color.pc-verde { background: linear-gradient(135deg, #34d399, #047857); }
+.punto-color.pc-ambar { background: linear-gradient(135deg, #fbbf24, #b45309); }
+.punto-color.pc-rosa { background: linear-gradient(135deg, #f472b6, #be185d); }
 .folder-card-name {
   font-size: 0.9rem;
   font-weight: 600;
@@ -935,23 +970,6 @@ tbody tr:hover td { background: var(--color-surface-2); }
   align-items: center;
   justify-content: center;
 }
-
-/* Mosaicos por tipo de archivo (premium oscuro F1) */
-.file-card-icon-wrap.ft-image,
-.file-card-icon-wrap.ft-pdf,
-.file-card-icon-wrap.ft-video,
-.file-card-icon-wrap.ft-audio,
-.file-card-icon-wrap.ft-archive,
-.file-card-icon-wrap.ft-doc {
-  color: #fff;
-  border: 1px solid rgba(255,255,255,0.12);
-}
-.file-card-icon-wrap.ft-image   { background: linear-gradient(135deg, #10b981, #047857); box-shadow: 0 4px 14px var(--glow-image); }
-.file-card-icon-wrap.ft-pdf     { background: linear-gradient(135deg, #f87171, #b91c1c); box-shadow: 0 4px 14px var(--glow-pdf); }
-.file-card-icon-wrap.ft-video   { background: linear-gradient(135deg, #a78bfa, #6d28d9); box-shadow: 0 4px 14px var(--glow-video); }
-.file-card-icon-wrap.ft-audio   { background: linear-gradient(135deg, #22d3ee, #0e7490); box-shadow: 0 4px 14px var(--glow-audio); }
-.file-card-icon-wrap.ft-archive { background: linear-gradient(135deg, #fbbf24, #b45309); box-shadow: 0 4px 14px var(--glow-archive); }
-.file-card-icon-wrap.ft-doc     { background: linear-gradient(135deg, #6ba3ff, #3730a3); box-shadow: 0 4px 14px var(--glow-doc); }
 
 .file-card-details {
   flex: 1;
@@ -1214,4 +1232,62 @@ tbody tr:hover td { background: var(--color-surface-2); }
   .safe-actions { margin-left: 0 !important; width: 100%; display: flex; gap: 10px; }
   .safe-actions > * { flex: 1; min-width: 0; }
   .safe-actions .btn { justify-content: center; width: 100%; }
+}
+
+/* ============================================================
+   VISTA PREVIA DE ARCHIVO con badge de extensión (Figma en oscuro)
+   ============================================================ */
+.file-preview {
+  margin: -16px -16px 12px;
+  padding: 22px 16px 18px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+.file-preview.fp-image   { background: linear-gradient(135deg, rgba(16,185,129,0.22), rgba(16,185,129,0.05)); color: #34d399; }
+.file-preview.fp-pdf     { background: linear-gradient(135deg, rgba(248,113,113,0.22), rgba(248,113,113,0.05)); color: #f87171; }
+.file-preview.fp-video   { background: linear-gradient(135deg, rgba(167,139,250,0.22), rgba(167,139,250,0.05)); color: #a78bfa; }
+.file-preview.fp-audio   { background: linear-gradient(135deg, rgba(34,211,238,0.22), rgba(34,211,238,0.05)); color: #22d3ee; }
+.file-preview.fp-archive { background: linear-gradient(135deg, rgba(251,191,36,0.22), rgba(251,191,36,0.05)); color: #fbbf24; }
+.file-preview.fp-doc     { background: linear-gradient(135deg, rgba(79,142,247,0.22), rgba(79,142,247,0.05)); color: #6ba3ff; }
+.file-ext {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(0,0,0,0.3);
+  border: 1px solid var(--color-border-hover);
+  color: var(--color-text-subtle);
+}
+
+/* ============================================================
+   VISTA DE LISTA (filas compactas, Figma en oscuro)
+   ============================================================ */
+.lista-archivos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lista-archivos > * {
+  animation: riseIn 0.4s var(--ease-spring) backwards;
+}
+.fila-lista {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-base);
+}
+.fila-lista:hover { border-color: var(--color-border-hover); }
+.btn-ghost.vista-activa {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: var(--color-accent-dim);
 }

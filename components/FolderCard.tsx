@@ -4,8 +4,9 @@ import { useRef, useState } from 'react'
 import { Folder, Link2, Trash2, FolderX, Pencil, Check, X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { renombrarCarpeta } from '@/actions/folders'
+import { renombrarCarpeta, cambiarColorCarpeta } from '@/actions/folders'
 import MenuAcciones, { type ItemMenu } from '@/components/MenuAcciones'
+import { COLORES_CARPETA, colorCarpetaDe } from '@/lib/colores-carpetas'
 import type { Carpeta } from '@/types/database'
 import DateDisplay from '@/components/DateDisplay'
 import type { ReactNode } from 'react'
@@ -93,6 +94,17 @@ export default function FolderCard({
     enlaceRef.current?.querySelector('button')?.click()
   }
 
+  async function handleColor(nuevo: string) {
+    const res = await cambiarColorCarpeta(carpeta.id, nuevo)
+    if ('error' in res && res.error) {
+      avisar('error', res.error)
+      return
+    }
+    router.refresh()
+  }
+
+  const colorActual = colorCarpetaDe(carpeta)
+
   const hayMenu = editable || !!crearEnlace || !!(esAcceso && onEliminarAcceso && accesoId)
 
   const itemsMenu: ItemMenu[] = [
@@ -109,6 +121,35 @@ export default function FolderCard({
     ...(crearEnlace
       ? [{ icono: <Link2 size={16} />, texto: 'Crear enlace', onClick: dispararEnlace }]
       : []),
+    ...(editable
+      ? [{
+          clave: 'color',
+          nodo: (
+            <div style={{ padding: '6px 12px 10px' }}>
+              <p style={{ fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
+                Color
+              </p>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {COLORES_CARPETA.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    title={c.nombre}
+                    aria-label={`Color ${c.nombre}`}
+                    aria-pressed={colorActual === c.id}
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      handleColor(c.id)
+                    }}
+                    className={`punto-color pc-${c.id}${colorActual === c.id ? ' activo' : ''}`}
+                  />
+                ))}
+              </div>
+            </div>
+          ),
+        }]
+      : []),
     ...(esAcceso && onEliminarAcceso && accesoId
       ? [{
           icono: <Trash2 size={16} />,
@@ -121,7 +162,7 @@ export default function FolderCard({
 
   const contenido = (
     <>
-      <div className="folder-card-icon">
+      <div className={`folder-card-icon fc-${colorActual}`}>
         {huerfano ? <FolderX size={28} /> : <Folder size={28} />}
       </div>
       {editando ? (

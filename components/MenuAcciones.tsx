@@ -4,13 +4,16 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreVertical } from 'lucide-react'
 
-export type ItemMenu = {
-  icono: React.ReactNode
-  texto: string
-  onClick: () => void | Promise<void>
-  peligroso?: boolean
-  deshabilitado?: boolean
-}
+export type ItemMenu =
+  | {
+      icono: React.ReactNode
+      texto: string
+      onClick: () => void | Promise<void>
+      peligroso?: boolean
+      deshabilitado?: boolean
+    }
+  // Fila personalizada dentro del desplegable (p. ej. selector de color)
+  | { nodo: React.ReactNode; clave: string }
 
 // Menú ⋯ de tarjeta: disparador de 44px + desplegable en portal (fuera de la
 // tarjeta, para que ninguna tarjeta vecina lo tape). Se cierra con selección,
@@ -87,24 +90,30 @@ export default function MenuAcciones({
                 }}
               />
               <div className="menu-desplegable" role="menu" style={{ top: pos.top, left: pos.left }}>
-                {items.map((it, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    role="menuitem"
-                    disabled={it.deshabilitado}
-                    className={`menu-item${it.peligroso ? ' menu-item-peligro' : ''}`}
-                    onClick={async (e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      setAbierto(false)
-                      await it.onClick()
-                    }}
-                  >
-                    {it.icono}
-                    <span>{it.texto}</span>
-                  </button>
-                ))}
+                {items.map((it, i) =>
+                  'nodo' in it ? (
+                    <div key={it.clave} className="menu-nodo">
+                      {it.nodo}
+                    </div>
+                  ) : (
+                    <button
+                      key={i}
+                      type="button"
+                      role="menuitem"
+                      disabled={it.deshabilitado}
+                      className={`menu-item${it.peligroso ? ' menu-item-peligro' : ''}`}
+                      onClick={async (e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setAbierto(false)
+                        await it.onClick()
+                      }}
+                    >
+                      {it.icono}
+                      <span>{it.texto}</span>
+                    </button>
+                  )
+                )}
               </div>
             </>,
             document.body

@@ -1,6 +1,6 @@
 'use client'
 
-import { FileText, Image, RefreshCw, Trash2 } from 'lucide-react'
+import { FileText, Image, RefreshCw, Trash2, Film, Music, Archive } from 'lucide-react'
 import { ArchivoConAutor } from '@/types/database'
 import { restaurarArchivo, eliminarArchivoPermanente } from '@/actions/files'
 import MenuAcciones, { type ItemMenu } from '@/components/MenuAcciones'
@@ -21,7 +21,26 @@ export default function TrashFileCard({
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  const isImage = file.tipo_mime.startsWith('image/')
+  const kindArchivo = (() => {
+    const mime = file.tipo_mime || ''
+    if (mime.startsWith('image/')) return 'image'
+    if (mime === 'application/pdf') return 'pdf'
+    if (mime.startsWith('video/')) return 'video'
+    if (mime.startsWith('audio/')) return 'audio'
+    if (mime.includes('zip') || mime.includes('compressed') || mime.includes('rar') || mime.includes('7z')) return 'archive'
+    return 'doc'
+  })()
+  const extension = (() => {
+    const i = file.nombre_original.lastIndexOf('.')
+    if (i > 0 && file.nombre_original.length - i <= 6) return file.nombre_original.slice(i + 1).toUpperCase()
+    return (file.tipo_mime.split('/')[1] ?? 'FILE').toUpperCase().slice(0, 4)
+  })()
+  const IconoTipo = kindArchivo === 'image' ? Image
+    : kindArchivo === 'video' ? Film
+    : kindArchivo === 'audio' ? Music
+    : kindArchivo === 'archive' ? Archive
+    : FileText
+
   const sizeKb = (file.tamano_bytes / 1024).toFixed(1)
 
   async function handleRestore() {
@@ -78,10 +97,11 @@ export default function TrashFileCard({
           <MenuAcciones items={itemsMenu} etiqueta={`Acciones de ${file.nombre_original}`} />
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', marginBottom: 0, paddingRight: canManage ? '40px' : 0 }}>
-        <div style={{ padding: '12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', color: 'var(--color-danger)' }}>
-          {isImage ? <Image size={24} /> : <FileText size={24} />}
-        </div>
+      <div className={`file-preview fp-${kindArchivo}`}>
+        <IconoTipo size={30} />
+        <span className="file-ext">{extension}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', paddingRight: canManage ? '40px' : 0 }}>
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <h3 style={{ fontSize: '0.9rem', fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
             {file.nombre_original}
