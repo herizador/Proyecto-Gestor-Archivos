@@ -4,9 +4,7 @@ import Link from 'next/link'
 import { FolderHeart, ChevronRight, Home } from 'lucide-react'
 import UploadModalWrapper from './UploadModalWrapper'
 import NewFolderModalWrapper from '@/components/NewFolderModalWrapper'
-import DocumentSearchBar from '@/components/DocumentSearchBar'
-import StorageBar from '@/components/StorageBar'
-import FileListWrapper from '@/components/FileListWrapper'
+import ExploradorArchivos from '@/components/ExploradorArchivos'
 import ResumenFamiliar from '@/components/ResumenFamiliar'
 import { listarAccesos } from '@/actions/accesos'
 import { getStorageUsage } from '@/actions/files'
@@ -69,7 +67,6 @@ export default async function DashboardComun({
   const accesos = accesosRes.data ?? []
   const errorAccesos = ('error' in accesosRes && accesosRes.error) || null
   if (errorAccesos) console.error('[Área Común] listarAccesos:', errorAccesos)
-  const tieneContenido = carpetas.length > 0 || archivos.length > 0 || accesos.length > 0
 
   return (
     <div className="page-content animate-fade-in">
@@ -97,8 +94,6 @@ export default async function DashboardComun({
         </div>
       </div>
 
-      {isAdmin && <StorageBar isAdmin={isAdmin} />}
-
       {!carpetaActual && (
         <ResumenFamiliar
           usoBytes={usoRes}
@@ -114,30 +109,27 @@ export default async function DashboardComun({
         </p>
       )}
 
-      <DocumentSearchBar userId={user.id} isAdmin={isAdmin}>
-        {!tieneContenido ? (
-          <div className="empty-state">
-            <FolderHeart size={64} className="empty-state-icon" />
-            <h3 className="empty-state-title">
-              {carpetaActual ? 'Esta carpeta está vacía' : 'No hay documentos comunes'}
-            </h3>
-            <p className="empty-state-text">
-              {carpetaActual
-                ? 'Sube archivos o crea subcarpetas para organizar el contenido.'
-                : 'Sube el primer archivo o crea una carpeta para compartir con tu familia.'}
-            </p>
-          </div>
-        ) : (
-          <FileListWrapper
-            archivos={archivos ?? []}
-            carpetas={carpetas ?? []}
-            accesos={accesos ?? []}
-            isAdmin={isAdmin}
-            userId={user.id}
-          />
-        )}
-      </DocumentSearchBar>
-    </div>
-  )
+      <ExploradorArchivos
+        archivos={archivos ?? []}
+        carpetas={carpetas ?? []}
+        accesos={accesos ?? []}
+        isAdmin={isAdmin}
+        userId={user.id}
+        vacio={
+          <div className="empty-state">
+            <FolderHeart size={64} className="empty-state-icon" />
+            <h3 className="empty-state-title">
+              {carpetaActual ? 'Esta carpeta está vacía' : 'No hay documentos comunes'}
+            </h3>
+            <p className="empty-state-text">
+              {carpetaActual
+                ? 'Sube archivos o crea subcarpetas para organizar el contenido.'
+                : 'Sube el primer archivo o crea una carpeta para compartir con tu familia.'}
+            </p>
+          </div>
+        }
+      />
+    </div>
+  )
 }
 

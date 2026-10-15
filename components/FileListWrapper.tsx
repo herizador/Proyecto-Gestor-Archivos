@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Share2, X, Check, Link, List, LayoutGrid } from 'lucide-react'
+import { Share2, X, Check, Link, List } from 'lucide-react'
 import { generarEnlaceCompartido } from '@/actions/share'
 import { eliminarAcceso, type ObjetivoEnlace } from '@/actions/accesos'
 import FileCard from '@/components/FileCard'
@@ -11,6 +11,7 @@ import NuevoAccesoModal from '@/components/NuevoAccesoModal'
 import EnlazarSeleccionModal from '@/components/EnlazarSeleccionModal'
 import EnviarSeleccionButton from '@/components/EnviarSeleccionButton'
 import MoverSeleccionModal from '@/components/MoverSeleccionModal'
+import BarraOrdenVista, { type Orden, type Vista } from '@/components/BarraOrdenVista'
 import { FilaArchivo, FilaCarpeta } from '@/components/VistaLista'
 import { avisar } from '@/components/Avisos'
 import type { AccesoConObjetivo, ArchivoConAutor, Carpeta } from '@/types/database'
@@ -18,9 +19,6 @@ import type { AccesoConObjetivo, ArchivoConAutor, Carpeta } from '@/types/databa
 type CarpetaConAutor = Carpeta & {
   creado_por_perfil?: { nombre_completo: string } | null
 }
-
-type Orden = 'recientes' | 'nombre' | 'tamano'
-type Vista = 'cuadricula' | 'lista'
 
 function porFechaDesc(a: string, b: string) {
   return +new Date(b) - +new Date(a)
@@ -74,6 +72,11 @@ export default function FileListWrapper({
   userId,
   showOwner = false,
   basePath = '/',
+  ordenExterno,
+  vistaExterna,
+  ocultarBarra = false,
+  alCambiarOrden,
+  alCambiarVista,
 }: {
   archivos: ArchivoConAutor[]
   carpetas: CarpetaConAutor[]
@@ -82,6 +85,11 @@ export default function FileListWrapper({
   userId: string
   showOwner?: boolean
   basePath?: string
+  ordenExterno?: Orden
+  vistaExterna?: Vista
+  ocultarBarra?: boolean
+  alCambiarOrden?: (o: Orden) => void
+  alCambiarVista?: (v: Vista) => void
 }) {
   const router = useRouter()
   const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -164,8 +172,18 @@ export default function FileListWrapper({
   const isAllSelected = selectedIds.length === allIds.length && allIds.length > 0
   const hasItems = allIds.length > 0
 
-  const [orden, setOrden] = useState<Orden>('recientes')
-  const [vista, setVista] = useState<Vista>('cuadricula')
+  const [ordenInterno, setOrdenInterno] = useState<Orden>('recientes')
+  const [vistaInterna, setVistaInterna] = useState<Vista>('cuadricula')
+  const orden = ordenExterno ?? ordenInterno
+  const vista = vistaExterna ?? vistaInterna
+  function cambiarOrden(o: Orden) {
+    if (alCambiarOrden) alCambiarOrden(o)
+    else setOrdenInterno(o)
+  }
+  function cambiarVista(v: Vista) {
+    if (alCambiarVista) alCambiarVista(v)
+    else setVistaInterna(v)
+  }
 
   // Ordenación en cliente (sin idas extra): recientes, nombre A-Z o tamaño
   const cmpArchivos = useMemo(() => {
@@ -350,48 +368,9 @@ export default function FileListWrapper({
         )}
       </div>
 
-      {/* Barra de orden y vista (estilo Figma, en oscuro) */}
-      {hasItems && (
-        <div
-          style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap' }}
-        >
-          <label className="sr-only" htmlFor="orden-lista">Ordenar por</label>
-          <select
-            id="orden-lista"
-            className="input"
-            value={orden}
-            onChange={(e) => setOrden(e.target.value as Orden)}
-            style={{ width: 'auto', minHeight: '44px', flexShrink: 0 }}
-          >
-            <option value="recientes">Más recientes</option>
-            <option value="nombre">Nombre (A-Z)</option>
-            <option value="tamano">Tamaño</option>
-          </select>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }} role="group" aria-label="Tipo de vista">
-            <button
-              type="button"
-              className={`btn-ghost btn-icon${vista === 'cuadricula' ? ' vista-activa' : ''}`}
-              onClick={() => setVista('cuadricula')}
-              title="Vista de cuadrícula"
-              aria-label="Vista de cuadrícula"
-              aria-pressed={vista === 'cuadricula'}
-              style={{ minWidth: '44px', minHeight: '44px' }}
-            >
-              <LayoutGrid size={18} />
-            </button>
-            <button
-              type="button"
-              className={`btn-ghost btn-icon${vista === 'lista' ? ' vista-activa' : ''}`}
-              onClick={() => setVista('lista')}
-              title="Vista de lista"
-              aria-label="Vista de lista"
-              aria-pressed={vista === 'lista'}
-              style={{ minWidth: '44px', minHeight: '44px' }}
-            >
-              <List size={18} />
-            </button>
-          </div>
-        </div>
+      {/* Barra de orden y vista (en Área Común vive en la fila de búsqueda) */}
+      {!ocultarBarra && hasItems && (
+        <BarraOrdenVista orden={orden} vista={vista} onOrden={cambiarOrden} onVista={cambiarVista} />
       )}
 
       {(carpetas.length > 0 || accesosCarpetas.length > 0) && (

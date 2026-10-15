@@ -620,6 +620,19 @@ input, textarea, select { font-family: inherit; }
 }
 
 .search-section { margin-bottom: 28px; }
+/* Fila única: búsqueda + controles (orden/vista). En móvil se parte en dos. */
+.fila-busqueda {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.fila-busqueda .search-bar-wrap {
+  flex: 1 1 240px;
+  margin-bottom: 0;
+  min-width: 0;
+}
 .search-bar-wrap {
   position: relative;
   display: flex;

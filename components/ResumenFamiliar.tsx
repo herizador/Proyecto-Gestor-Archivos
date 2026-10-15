@@ -1,7 +1,8 @@
 import { HardDrive, Files, Users } from 'lucide-react'
 
-function formatoGB(bytes: number): string {
-  return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+function formatoCorto(bytes: number): string {
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+  return `${(bytes / 1024 ** 2).toFixed(1)} MB`
 }
 
 // Tarjeta resumen del espacio familiar (estilo Figma, en oscuro): progreso del
@@ -26,8 +27,8 @@ export default function ResumenFamiliar({
         </div>
         <div style={{ minWidth: 0 }}>
           <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Almacenamiento familiar</p>
-          <p style={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
-            {formatoGB(usoBytes)} <span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>de {formatoGB(limiteBytes)}</span>
+          <p style={{ fontWeight: 700, whiteSpace: 'nowrap' }} title={`${usoBytes.toLocaleString('es-ES')} bytes usados`}>
+            {formatoCorto(usoBytes)} <span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>de {formatoCorto(limiteBytes)}</span>
           </p>
         </div>
       </div>

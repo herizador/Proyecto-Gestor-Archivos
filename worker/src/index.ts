@@ -226,7 +226,7 @@ type ItemProp = {
   cuota?: { usada: number; libre: number } | null
 }
 
-// Uso total (misma función que usa la PWA en StorageBar). Si falla, se omite la
+// Uso total (misma función get_storage_usage que muestra ResumenFamiliar). Si falla, se omite la
 // cuota y Windows vuelve a mostrar su estimación local: nunca rompe el listado.
 async function usoAlmacenamiento(env: Env): Promise<{ usada: number; libre: number } | null> {
   try {

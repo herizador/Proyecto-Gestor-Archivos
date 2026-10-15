@@ -1,0 +1,63 @@
+'use client'
+
+import { useState, type ReactNode } from 'react'
+import DocumentSearchBar from '@/components/DocumentSearchBar'
+import FileListWrapper from '@/components/FileListWrapper'
+import BarraOrdenVista, { type Orden, type Vista } from '@/components/BarraOrdenVista'
+import type { AccesoConObjetivo, ArchivoConAutor, Carpeta } from '@/types/database'
+
+type CarpetaConAutor = Carpeta & {
+  creado_por_perfil?: { nombre_completo: string } | null
+}
+
+// Explorador del Área Común: búsqueda + orden/vista en una sola fila y lista.
+// El estado de orden/vista vive aquí para compartirlo entre la fila de
+// búsqueda (DocumentSearchBar) y la lista (FileListWrapper).
+export default function ExploradorArchivos({
+  archivos,
+  carpetas,
+  accesos = [],
+  isAdmin,
+  userId,
+  vacio,
+}: {
+  archivos: ArchivoConAutor[]
+  carpetas: CarpetaConAutor[]
+  accesos?: AccesoConObjetivo[]
+  isAdmin: boolean
+  userId: string
+  vacio: ReactNode
+}) {
+  const [orden, setOrden] = useState<Orden>('recientes')
+  const [vista, setVista] = useState<Vista>('cuadricula')
+  const hayContenido = archivos.length > 0 || carpetas.length > 0 || accesos.length > 0
+
+  return (
+    <DocumentSearchBar
+      userId={userId}
+      isAdmin={isAdmin}
+      controles={
+        hayContenido ? (
+          <BarraOrdenVista orden={orden} vista={vista} onOrden={setOrden} onVista={setVista} compacta />
+        ) : null
+      }
+    >
+      {!hayContenido ? (
+        vacio
+      ) : (
+        <FileListWrapper
+          archivos={archivos}
+          carpetas={carpetas}
+          accesos={accesos}
+          isAdmin={isAdmin}
+          userId={userId}
+          ordenExterno={orden}
+          vistaExterna={vista}
+          alCambiarOrden={setOrden}
+          alCambiarVista={setVista}
+          ocultarBarra
+        />
+      )}
+    </DocumentSearchBar>
+  )
+}

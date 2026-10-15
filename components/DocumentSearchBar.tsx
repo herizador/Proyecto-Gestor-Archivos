@@ -14,10 +14,12 @@ export default function DocumentSearchBar({
   userId,
   isAdmin,
   children,
+  controles,
 }: {
   userId: string
   isAdmin: boolean
   children?: ReactNode
+  controles?: ReactNode
 }) {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -72,27 +74,30 @@ export default function DocumentSearchBar({
 
   return (
     <div className="search-section">
-      <div className="search-bar-wrap">
-        <Search size={18} className="search-bar-icon" />
-        <input
-          type="text"
-          className="input search-bar-input"
-          placeholder="Buscar documentos por nombre..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          aria-label="Buscar documentos"
-        />
-        {query && (
-          <button
-            type="button"
-            className="btn-ghost btn-icon search-bar-clear"
-            onClick={() => setQuery('')}
-            title="Limpiar búsqueda"
-          >
-            <X size={16} />
-          </button>
-        )}
-        {loading && <Loader2 size={18} className="animate-spin search-bar-spinner" />}
+      <div className="fila-busqueda">
+        <div className="search-bar-wrap">
+          <Search size={18} className="search-bar-icon" />
+          <input
+            type="text"
+            className="input search-bar-input"
+            placeholder="Buscar documentos por nombre..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Buscar documentos"
+          />
+          {query && (
+            <button
+              type="button"
+              className="btn-ghost btn-icon search-bar-clear"
+              onClick={() => setQuery('')}
+              title="Limpiar búsqueda"
+            >
+              <X size={16} />
+            </button>
+          )}
+          {loading && <Loader2 size={18} className="animate-spin search-bar-spinner" />}
+        </div>
+        {controles}
       </div>
 
       {!isSearching && children}
