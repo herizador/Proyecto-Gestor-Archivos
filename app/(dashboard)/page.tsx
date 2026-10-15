@@ -8,6 +8,7 @@ import ExploradorArchivos from '@/components/ExploradorArchivos'
 import ResumenFamiliar from '@/components/ResumenFamiliar'
 import { listarAccesos } from '@/actions/accesos'
 import { getStorageUsage } from '@/actions/files'
+import { listarIdsFavoritos } from '@/actions/favoritos'
 
 // Cupo familiar (mismo que el trigger validar_limite_almacenamiento y el Worker)
 const LIMITE_BYTES = 9663676416 // 9 GB
@@ -38,7 +39,7 @@ export default async function DashboardComun({
     .eq('estado', 'activo')
     .order('fecha_subida', { ascending: false })
 
-  const [perfilRes, carpetaRes, carpetasRes, archivosRes, accesosRes, usoRes, totalArchivosRes, miembrosRes] = await Promise.all([
+  const [perfilRes, carpetaRes, carpetasRes, archivosRes, accesosRes, usoRes, totalArchivosRes, miembrosRes, favIds] = await Promise.all([
     supabase.from('perfiles').select('rol').eq('id', user.id).single(),
     carpetaActualId
       ? supabase
@@ -58,6 +59,7 @@ export default async function DashboardComun({
     getStorageUsage(),
     supabase.from('archivos').select('id', { count: 'exact', head: true }).eq('estado', 'activo'),
     supabase.from('perfiles').select('id', { count: 'exact', head: true }),
+    listarIdsFavoritos(),
   ])
 
   const isAdmin = perfilRes.data?.rol === 'admin'
@@ -115,6 +117,7 @@ export default async function DashboardComun({
         accesos={accesos ?? []}
         isAdmin={isAdmin}
         userId={user.id}
+        favoritosIniciales={favIds}
         vacio={
           <div className="empty-state">
             <FolderHeart size={64} className="empty-state-icon" />

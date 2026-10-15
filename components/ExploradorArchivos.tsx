@@ -4,6 +4,8 @@ import { useState, type ReactNode } from 'react'
 import DocumentSearchBar from '@/components/DocumentSearchBar'
 import FileListWrapper from '@/components/FileListWrapper'
 import BarraOrdenVista, { type Orden, type Vista } from '@/components/BarraOrdenVista'
+import { abrirPaleta } from '@/components/PaletaComandos'
+import { Command } from 'lucide-react'
 import type { AccesoConObjetivo, ArchivoConAutor, Carpeta } from '@/types/database'
 
 type CarpetaConAutor = Carpeta & {
@@ -20,6 +22,7 @@ export default function ExploradorArchivos({
   isAdmin,
   userId,
   vacio,
+  favoritosIniciales = [],
 }: {
   archivos: ArchivoConAutor[]
   carpetas: CarpetaConAutor[]
@@ -27,6 +30,7 @@ export default function ExploradorArchivos({
   isAdmin: boolean
   userId: string
   vacio: ReactNode
+  favoritosIniciales?: string[]
 }) {
   const [orden, setOrden] = useState<Orden>('recientes')
   const [vista, setVista] = useState<Vista>('cuadricula')
@@ -38,7 +42,19 @@ export default function ExploradorArchivos({
       isAdmin={isAdmin}
       controles={
         hayContenido ? (
-          <BarraOrdenVista orden={orden} vista={vista} onOrden={setOrden} onVista={setVista} compacta />
+          <>
+            <BarraOrdenVista orden={orden} vista={vista} onOrden={setOrden} onVista={setVista} compacta />
+            <button
+              type="button"
+              className="btn-ghost btn-icon"
+              onClick={abrirPaleta}
+              title="Búsqueda rápida (Ctrl+K)"
+              aria-label="Búsqueda rápida (Ctrl+K)"
+              style={{ minWidth: '44px', minHeight: '44px', flexShrink: 0 }}
+            >
+              <Command size={18} />
+            </button>
+          </>
         ) : null
       }
     >
@@ -56,6 +72,7 @@ export default function ExploradorArchivos({
           alCambiarOrden={setOrden}
           alCambiarVista={setVista}
           ocultarBarra
+          favoritosIniciales={favoritosIniciales}
         />
       )}
     </DocumentSearchBar>

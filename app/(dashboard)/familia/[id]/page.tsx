@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ChevronRight, Home, UserCircle, Users } from 'lucide-react'
 import FileListWrapper from '@/components/FileListWrapper'
 import type { ArchivoConAutor } from '@/types/database'
+import { listarIdsFavoritos } from '@/actions/favoritos'
 
 // Archivos públicos de un miembro: del explorador principal pero filtrados.
 // Las carpetas enlazan a /?carpeta= para seguir navegando con normalidad.
@@ -53,7 +54,7 @@ export default async function MiembroPage({
     .eq('estado', 'activo')
     .order('fecha_subida', { ascending: false })
     .limit(50)
-  const [enCarpetas, enRaiz] = await Promise.all([
+  const [enCarpetas, enRaiz, favIds] = await Promise.all([
     idsPublicas.length > 0 ? archivosBase.in('carpeta_id', idsPublicas) : Promise.resolve({ data: [] }),
     supabase
       .from('archivos')
@@ -64,6 +65,7 @@ export default async function MiembroPage({
       .like('ruta_r2', 'comun/%')
       .order('fecha_subida', { ascending: false })
       .limit(50),
+    listarIdsFavoritos(),
   ])
   const archivos = ([...(enCarpetas.data ?? []), ...(enRaiz.data ?? [])] as ArchivoConAutor[])
     .sort((a, b) => +new Date(b.fecha_subida) - +new Date(a.fecha_subida))
@@ -107,6 +109,7 @@ export default async function MiembroPage({
           accesos={[]}
           isAdmin={isAdmin}
           userId={user.id}
+          favoritosIniciales={favIds}
         />
       )}
     </div>

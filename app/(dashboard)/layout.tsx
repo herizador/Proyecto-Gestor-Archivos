@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { ShieldCheck, FolderHeart, Users, Lock, LogOut, ShieldAlert, Trash2, Settings } from 'lucide-react'
+import { ShieldCheck, FolderHeart, Users, Lock, LogOut, ShieldAlert, Trash2, Settings, History, Star } from 'lucide-react'
 import { logout } from '@/actions/auth'
 import MobileNavigation from '@/components/MobileNavigation'
+import PaletaComandos from '@/components/PaletaComandos'
 
 export default async function DashboardLayout({
   children,
@@ -48,6 +49,10 @@ export default async function DashboardLayout({
             <FolderHeart size={18} />
             Área Común
           </Link>
+          <Link href="/recientes" className="nav-item">
+            <History size={18} />
+            Recientes
+          </Link>
           <Link href="/familia" className="nav-item">
             <Users size={18} />
             Mi Familia
@@ -55,6 +60,10 @@ export default async function DashboardLayout({
           <Link href="/mi-caja-fuerte" className="nav-item">
             <Lock size={18} />
             Mi Caja Fuerte
+          </Link>
+          <Link href="/favoritos" className="nav-item">
+            <Star size={18} />
+            Favoritos
           </Link>
           <Link href="/papelera" className="nav-item">
             <Trash2 size={18} />
@@ -102,6 +111,7 @@ export default async function DashboardLayout({
       <main className="main-content">
         {children}
       </main>
+      <PaletaComandos />
     </div>
   )
 }

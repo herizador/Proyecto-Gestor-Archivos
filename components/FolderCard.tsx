@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Folder, Link2, Trash2, FolderX, Pencil, Check, X } from 'lucide-react'
+import { Folder, Link2, Trash2, FolderX, Pencil, Check, X, Star } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { renombrarCarpeta, cambiarColorCarpeta } from '@/actions/folders'
@@ -28,6 +28,8 @@ export default function FolderCard({
   onEliminarAcceso,
   crearEnlace = null,
   puedeRenombrar = false,
+  esFavorito = false,
+  onAlternarFavorito,
 }: {
   carpeta: CarpetaConAutor
   selected?: boolean
@@ -40,6 +42,8 @@ export default function FolderCard({
   onEliminarAcceso?: (accesoId: string) => void
   crearEnlace?: ReactNode
   puedeRenombrar?: boolean
+  esFavorito?: boolean
+  onAlternarFavorito?: () => void
 }) {
   const folderHref = `${basePath}?carpeta=${carpeta.id}`
   const router = useRouter()
@@ -120,6 +124,13 @@ export default function FolderCard({
       : []),
     ...(crearEnlace
       ? [{ icono: <Link2 size={16} />, texto: 'Crear enlace', onClick: dispararEnlace }]
+      : []),
+    ...(!esAcceso && onAlternarFavorito
+      ? [{
+          icono: <Star size={16} fill={esFavorito ? 'currentColor' : 'none'} />,
+          texto: esFavorito ? 'Quitar de favoritos' : 'Añadir a favoritos',
+          onClick: onAlternarFavorito,
+        }]
       : []),
     ...(editable
       ? [{

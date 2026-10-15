@@ -1,6 +1,6 @@
 'use client'
 
-import { FileText, Image, Download, Trash2, Eye, Link2, Pencil, Check, X, Film, Music, Archive } from 'lucide-react'
+import { FileText, Image, Download, Trash2, Eye, Link2, Pencil, Check, X, Film, Music, Archive, Star } from 'lucide-react'
 import { ArchivoConAutor } from '@/types/database'
 import { visualizarArchivo, descargarArchivo, moverAPapelera, renombrarArchivo } from '@/actions/files'
 import { eliminarAcceso } from '@/actions/accesos'
@@ -14,6 +14,7 @@ import DateDisplay from '@/components/DateDisplay'
 export default function FileCard({
   file, isAdmin, isOwner, selected, onToggleSelect,
   esAcceso = false, origenNombre = null, huerfano = false,
+  esFavorito = false, onAlternarFavorito,
 }: {
   file: ArchivoConAutor
   isAdmin: boolean
@@ -23,6 +24,8 @@ export default function FileCard({
   esAcceso?: boolean
   origenNombre?: string | null
   huerfano?: boolean
+  esFavorito?: boolean
+  onAlternarFavorito?: () => void
 }) {
   const [loading, setLoading] = useState(false)
   const [editando, setEditando] = useState(false)
@@ -177,6 +180,14 @@ export default function FileCard({
   const itemsMenu: ItemMenu[] = [
     { icono: <Eye size={16} />, texto: 'Visualizar', onClick: handleView, deshabilitado: loading || huerfano },
     { icono: <Download size={16} />, texto: 'Descargar', onClick: handleDownload, deshabilitado: loading || huerfano },
+    ...(!esAcceso && onAlternarFavorito
+      ? [{
+          icono: <Star size={16} fill={esFavorito ? 'currentColor' : 'none'} />,
+          texto: esFavorito ? 'Quitar de favoritos' : 'Añadir a favoritos',
+          onClick: onAlternarFavorito,
+          deshabilitado: loading,
+        }]
+      : []),
     ...(editable
       ? [{
           icono: <Pencil size={16} />,

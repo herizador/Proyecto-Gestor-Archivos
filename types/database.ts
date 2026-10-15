@@ -260,6 +260,34 @@ export type Database = {
           },
         ]
       }
+      compartidos: {
+        Row: {
+          id: string
+          creado_por: string
+          compartido_con: string
+          archivo_id: string | null
+          carpeta_id: string | null
+          fecha_creacion: string
+        }
+        Insert: {
+          id?: string
+          creado_por: string
+          compartido_con: string
+          archivo_id?: string | null
+          carpeta_id?: string | null
+          fecha_creacion?: string
+        }
+        Update: Record<string, never>
+        Relationships: [
+          {
+            foreignKeyName: 'compartidos_creado_por_fkey'
+            columns: ['creado_por']
+            isOneToOne: false
+            referencedRelation: 'perfiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       tokens_dav: {
         Row: {
           id: string
@@ -291,6 +319,32 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: 'tokens_dav_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'perfiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      favoritos: {
+        Row: {
+          id: string
+          usuario_id: string
+          archivo_id: string | null
+          carpeta_id: string | null
+          fecha_creacion: string
+        }
+        Insert: {
+          id?: string
+          usuario_id: string
+          archivo_id?: string | null
+          carpeta_id?: string | null
+          fecha_creacion?: string
+        }
+        Update: Record<string, never>
+        Relationships: [
+          {
+            foreignKeyName: 'favoritos_usuario_id_fkey'
             columns: ['usuario_id']
             isOneToOne: false
             referencedRelation: 'perfiles'
@@ -391,6 +445,9 @@ export type EnlaceCompartido = Database['public']['Tables']['enlaces_compartidos
 
 // Acceso directo (enlace): un físico visible en N ubicaciones sin duplicar bytes
 export type AccesoDirecto = Database['public']['Tables']['accesos_directos']['Row']
+
+// Tipo para cesiones nominales entre miembros (Compartido conmigo)
+export type Compartido = Database['public']['Tables']['compartidos']['Row']
 
 // Token de Explorador para el puente WebDAV (el claro solo existe al crearlo)
 export type TokenDav = Database['public']['Tables']['tokens_dav']['Row']

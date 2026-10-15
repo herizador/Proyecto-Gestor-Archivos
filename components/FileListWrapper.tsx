@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Share2, X, Check, Link, List } from 'lucide-react'
 import { generarEnlaceCompartido } from '@/actions/share'
 import { eliminarAcceso, type ObjetivoEnlace } from '@/actions/accesos'
+import { alternarFavorito } from '@/actions/favoritos'
 import FileCard from '@/components/FileCard'
 import FolderCard from '@/components/FolderCard'
 import NuevoAccesoModal from '@/components/NuevoAccesoModal'
@@ -77,6 +78,7 @@ export default function FileListWrapper({
   ocultarBarra = false,
   alCambiarOrden,
   alCambiarVista,
+  favoritosIniciales = [],
 }: {
   archivos: ArchivoConAutor[]
   carpetas: CarpetaConAutor[]
@@ -90,6 +92,7 @@ export default function FileListWrapper({
   ocultarBarra?: boolean
   alCambiarOrden?: (o: Orden) => void
   alCambiarVista?: (v: Vista) => void
+  favoritosIniciales?: string[]
 }) {
   const router = useRouter()
   const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -184,6 +187,33 @@ export default function FileListWrapper({
     if (alCambiarVista) alCambiarVista(v)
     else setVistaInterna(v)
   }
+
+  // Favoritos: estado local optimista sobre los ids iniciales del servidor
+  const [favs, setFavs] = useState<Set<string>>(() => new Set(favoritosIniciales))
+
+  async function handleFavorito(tipo: 'archivo' | 'carpeta', id: string) {
+    const clave = `${tipo === 'archivo' ? 'a' : 'c'}:${id}`
+    const tenia = favs.has(clave)
+    setFavs((prev) => {
+      const siguiente = new Set(prev)
+      if (tenia) siguiente.delete(clave)
+      else siguiente.add(clave)
+      return siguiente
+    })
+    const res = await alternarFavorito({ tipo, id })
+    if ('error' in res && res.error) {
+      setFavs((prev) => {
+        const siguiente = new Set(prev)
+        if (tenia) siguiente.add(clave)
+        else siguiente.delete(clave)
+        return siguiente
+      })
+      avisar('error', res.error)
+    }
+  }
+
+  const esFavArchivo = (id: string) => favs.has(`a:${id}`)
+  const esFavCarpeta = (id: string) => favs.has(`c:${id}`)
 
   // Ordenación en cliente (sin idas extra): recientes, nombre A-Z o tamaño
   const cmpArchivos = useMemo(() => {
@@ -389,6 +419,8 @@ export default function FileListWrapper({
                     <NuevoAccesoModal objetivoTipo="carpeta" objetivoId={carpeta.id} objetivoNombre={carpeta.nombre} />
                   ) : null}
                   puedeRenombrar={isAdmin || carpeta.creado_por === userId}
+                  esFavorito={esFavCarpeta(carpeta.id)}
+                  onAlternarFavorito={() => handleFavorito('carpeta', carpeta.id)}
                 />
               ))}
               {accesosCarpetasOrdenados.map((acceso) => {
@@ -420,6 +452,8 @@ export default function FileListWrapper({
                   <NuevoAccesoModal objetivoTipo="carpeta" objetivoId={carpeta.id} objetivoNombre={carpeta.nombre} />
                 ) : null}
                 puedeRenombrar={isAdmin || carpeta.creado_por === userId}
+                esFavorito={esFavCarpeta(carpeta.id)}
+                onAlternarFavorito={() => handleFavorito('carpeta', carpeta.id)}
               />
             ))}
             {accesosCarpetasOrdenados.map((acceso) => {
@@ -455,6 +489,8 @@ export default function FileListWrapper({
                   isOwner={archivo.subido_por === userId || showOwner}
                   selected={sel(archivo.id)}
                   onToggleSelect={alAlternar}
+                  esFavorito={esFavArchivo(archivo.id)}
+                  onAlternarFavorito={() => handleFavorito('archivo', archivo.id)}
                 />
               ))}
               {accesosArchivosOrdenados.map((acceso) => {
@@ -482,6 +518,8 @@ export default function FileListWrapper({
                 isOwner={archivo.subido_por === userId || showOwner}
                 selected={sel(archivo.id)}
                 onToggleSelect={alAlternar}
+                esFavorito={esFavArchivo(archivo.id)}
+                onAlternarFavorito={() => handleFavorito('archivo', archivo.id)}
               />
             ))}
             {accesosArchivosOrdenados.map((acceso) => {

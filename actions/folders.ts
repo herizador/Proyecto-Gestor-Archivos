@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { logActivity } from '@/actions/storage'
+import type { Carpeta } from '@/types/database'
 import { esColorCarpeta, COLOR_POR_DEFECTO } from '@/lib/colores-carpetas'
 import { revalidatePath } from 'next/cache'
 
@@ -150,6 +151,30 @@ export async function eliminarCarpeta(carpetaId: string) {
 
   revalidatePath('/')
   return { success: true }
+}
+
+// ---------------------------------------------------------------------------
+// Búsqueda de carpetas visibles por nombre (para la paleta ⌘K)
+// ---------------------------------------------------------------------------
+export async function buscarCarpetas(termino: string) {
+  const trimmed = termino.trim()
+  if (!trimmed) return { data: [] as Carpeta[] }
+
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'No autenticado.', data: [] as Carpeta[] }
+
+  const escaped = trimmed.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_')
+
+  const { data, error } = await supabase
+    .from('carpetas')
+    .select('*')
+    .ilike('nombre', `%${escaped}%`)
+    .order('fecha_creacion', { ascending: false })
+    .limit(25)
+
+  if (error) return { error: error.message, data: [] as Carpeta[] }
+  return { data: (data ?? []) as Carpeta[] }
 }
 
 export async function listarCarpetas(carpetaPadreId: string | null = null) {

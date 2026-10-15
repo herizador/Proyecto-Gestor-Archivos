@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FileText, Image, Film, Music, Archive, Folder, FolderX, Eye, Download, Trash2, Link2, Pencil, Check, X } from 'lucide-react'
+import { FileText, Image, Film, Music, Archive, Folder, FolderX, Eye, Download, Trash2, Link2, Pencil, Check, X, Star } from 'lucide-react'
 import { visualizarArchivo, descargarArchivo, moverAPapelera, renombrarArchivo } from '@/actions/files'
 import { renombrarCarpeta } from '@/actions/folders'
 import { eliminarAcceso } from '@/actions/accesos'
@@ -46,6 +46,7 @@ function IconoTipo({ kind }: { kind: string }) {
 export function FilaArchivo({
   file, isAdmin, isOwner, selected, onToggleSelect,
   esAcceso = false, origenNombre = null, huerfano = false,
+  esFavorito = false, onAlternarFavorito,
 }: {
   file: ArchivoConAutor
   isAdmin: boolean
@@ -55,6 +56,8 @@ export function FilaArchivo({
   esAcceso?: boolean
   origenNombre?: string | null
   huerfano?: boolean
+  esFavorito?: boolean
+  onAlternarFavorito?: () => void
 }) {
   const [loading, setLoading] = useState(false)
   const [editando, setEditando] = useState(false)
@@ -135,6 +138,14 @@ export function FilaArchivo({
   const itemsMenu: ItemMenu[] = [
     { icono: <Eye size={16} />, texto: 'Visualizar', onClick: handleView, deshabilitado: loading || huerfano },
     { icono: <Download size={16} />, texto: 'Descargar', onClick: handleDownload, deshabilitado: loading || huerfano },
+    ...(!esAcceso && onAlternarFavorito
+      ? [{
+          icono: <Star size={16} fill={esFavorito ? 'currentColor' : 'none'} />,
+          texto: esFavorito ? 'Quitar de favoritos' : 'Añadir a favoritos',
+          onClick: onAlternarFavorito,
+          deshabilitado: loading,
+        }]
+      : []),
     ...(editable
       ? [{
           icono: <Pencil size={16} />,
@@ -240,6 +251,7 @@ export function FilaCarpeta({
   carpeta, selected, onToggleSelect, basePath = '/',
   esAcceso = false, accesoId = null, origenNombre = null, huerfano = false,
   onEliminarAcceso, crearEnlace = null, puedeRenombrar = false,
+  esFavorito = false, onAlternarFavorito,
 }: {
   carpeta: CarpetaConAutor
   selected?: boolean
@@ -252,6 +264,8 @@ export function FilaCarpeta({
   onEliminarAcceso?: (accesoId: string) => void
   crearEnlace?: React.ReactNode
   puedeRenombrar?: boolean
+  esFavorito?: boolean
+  onAlternarFavorito?: () => void
 }) {
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(carpeta.nombre)
@@ -308,6 +322,13 @@ export function FilaCarpeta({
       : []),
     ...(crearEnlace
       ? [{ icono: <Link2 size={16} />, texto: 'Crear enlace', onClick: () => enlaceRef.current?.querySelector('button')?.click() }]
+      : []),
+    ...(!esAcceso && onAlternarFavorito
+      ? [{
+          icono: <Star size={16} fill={esFavorito ? 'currentColor' : 'none'} />,
+          texto: esFavorito ? 'Quitar de favoritos' : 'Añadir a favoritos',
+          onClick: onAlternarFavorito,
+        }]
       : []),
     ...(esAcceso && onEliminarAcceso && accesoId
       ? [{ icono: <Trash2 size={16} />, texto: 'Eliminar enlace', peligroso: true, onClick: () => handleEliminar() }]

@@ -279,12 +279,12 @@ CREATE POLICY "perfiles_update_propio" ON public.perfiles
 -- ─── RLS: carpetas ────────────────────────────────────────────────────────────
 ALTER TABLE public.carpetas ENABLE ROW LEVEL SECURITY;
 
--- Ver: carpetas públicas ó propias ó si es admin
+-- Ver: pública, propia, compartida conmigo o con un ancestro visible (herencia),
+-- o admin. La herencia vive en carpeta_visible_para (abajo, junto a compartidos).
 CREATE POLICY "carpetas_select" ON public.carpetas
   FOR SELECT USING (
-    es_privada = FALSE
-    OR creado_por = auth.uid()
-    OR public.get_user_role() = 'admin'
+    public.get_user_role() = 'admin'
+    OR public.carpeta_visible_para(auth.uid(), carpetas.id)
   );
 
 -- Crear: cualquier usuario autenticado
@@ -308,6 +308,99 @@ CREATE POLICY "carpetas_delete" ON public.carpetas
 -- Color de carpeta (Figma en oscuro, 2026-10): rellena las existentes con índigo
 ALTER TABLE public.carpetas ADD COLUMN IF NOT EXISTS color TEXT NOT NULL DEFAULT 'indigo';
 
+-- Favoritos por usuario (Fase 2 Figma): un favorito apunta a un archivo O a
+-- una carpeta (nunca ambos). Los duplicados se impiden con índices únicos.
+CREATE TABLE IF NOT EXISTS public.favoritos (
+  id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  usuario_id  UUID NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
+  archivo_id  UUID REFERENCES public.archivos(id) ON DELETE CASCADE,
+  carpeta_id  UUID REFERENCES public.carpetas(id) ON DELETE CASCADE,
+  fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_favorito_un_objetivo CHECK (
+    (archivo_id IS NOT NULL AND carpeta_id IS NULL) OR
+    (archivo_id IS NULL AND carpeta_id IS NOT NULL)
+  )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_favorito_archivo
+  ON public.favoritos(usuario_id, archivo_id) WHERE archivo_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_favorito_carpeta
+  ON public.favoritos(usuario_id, carpeta_id) WHERE carpeta_id IS NOT NULL;
+
+ALTER TABLE public.favoritos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "favoritos_propio" ON public.favoritos
+  FOR ALL USING (usuario_id = auth.uid()) WITH CHECK (usuario_id = auth.uid());
+
+-- =============================================================================
+-- TABLA: compartidos (cesiones nominales entre miembros)
+-- Ver docs/diseno-compartidos.md. La visibilidad con herencia vive en
+-- carpeta_visible_para(), usada por carpetas_select y archivos_select.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.compartidos (
+  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  creado_por     UUID NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
+  compartido_con UUID NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
+  archivo_id     UUID REFERENCES public.archivos(id) ON DELETE CASCADE,
+  carpeta_id     UUID REFERENCES public.carpetas(id) ON DELETE CASCADE,
+  fecha_creacion TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT chk_compartido_un_recurso CHECK (
+    (archivo_id IS NOT NULL AND carpeta_id IS NULL) OR
+    (archivo_id IS NULL AND carpeta_id IS NOT NULL)
+  ),
+  CONSTRAINT chk_no_autocompartir CHECK (creado_por <> compartido_con)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_compartido_archivo
+  ON public.compartidos(compartido_con, archivo_id) WHERE archivo_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_compartido_carpeta
+  ON public.compartidos(compartido_con, carpeta_id) WHERE carpeta_id IS NOT NULL;
+
+ALTER TABLE public.compartidos ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "compartidos_select" ON public.compartidos;
+CREATE POLICY "compartidos_select" ON public.compartidos
+  FOR SELECT USING (compartido_con = auth.uid() OR public.get_user_role() = 'admin');
+
+DROP POLICY IF EXISTS "compartidos_insert" ON public.compartidos;
+CREATE POLICY "compartidos_insert" ON public.compartidos
+  FOR INSERT WITH CHECK (creado_por = auth.uid());
+
+DROP POLICY IF EXISTS "compartidos_delete" ON public.compartidos;
+CREATE POLICY "compartidos_delete" ON public.compartidos
+  FOR DELETE USING (creado_por = auth.uid() OR compartido_con = auth.uid() OR public.get_user_role() = 'admin');
+
+-- ¿Puede uid ver esta carpeta? Ella o algún ancestro es propio, público o
+-- compartido con él. Tope de 50 niveles (anti-ciclos heredados).
+CREATE OR REPLACE FUNCTION public.carpeta_visible_para(p_uid UUID, p_carpeta UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path = public
+AS $$
+  WITH RECURSIVE cadena AS (
+    SELECT c.id, c.carpeta_padre_id, c.es_privada, c.creado_por, 1 AS nivel
+      FROM public.carpetas c WHERE c.id = p_carpeta
+    UNION ALL
+    SELECT p.id, p.carpeta_padre_id, p.es_privada, p.creado_por, h.nivel + 1
+      FROM public.carpetas p
+      JOIN cadena h ON p.id = h.carpeta_padre_id
+     WHERE h.nivel < 50
+  )
+  SELECT EXISTS (
+    SELECT 1 FROM cadena
+     WHERE creado_por = p_uid
+        OR es_privada = FALSE
+        OR EXISTS (
+          SELECT 1 FROM public.compartidos co
+           WHERE co.carpeta_id = cadena.id
+             AND co.compartido_con = p_uid
+        )
+  );
+$$;
+
 -- ─── RLS: archivos ────────────────────────────────────────────────────────────
 ALTER TABLE public.archivos ENABLE ROW LEVEL SECURITY;
 
@@ -317,9 +410,13 @@ CREATE POLICY "archivos_select" ON public.archivos
     subido_por = auth.uid()
     OR public.get_user_role() = 'admin'
     OR EXISTS (
-      SELECT 1 FROM public.carpetas c
-       WHERE c.id = archivos.carpeta_id
-         AND c.es_privada = FALSE
+      SELECT 1 FROM public.compartidos co
+       WHERE co.archivo_id = archivos.id
+         AND co.compartido_con = auth.uid()
+    )
+    OR (
+      archivos.carpeta_id IS NOT NULL
+      AND public.carpeta_visible_para(auth.uid(), archivos.carpeta_id)
     )
   );
 

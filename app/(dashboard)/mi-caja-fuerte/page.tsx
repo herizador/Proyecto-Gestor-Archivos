@@ -6,6 +6,7 @@ import UploadModalWrapper from '../UploadModalWrapper'
 import NewFolderModalWrapper from '@/components/NewFolderModalWrapper'
 import FileListWrapper from '@/components/FileListWrapper'
 import { listarAccesos } from '@/actions/accesos'
+import { listarIdsFavoritos } from '@/actions/favoritos'
 
 export default async function CajaFuertePage({
   searchParams,
@@ -35,7 +36,7 @@ export default async function CajaFuertePage({
     .like('ruta_r2', '%/privado/%')
     .order('fecha_subida', { ascending: false })
 
-  const [perfilRes, carpetaRes, carpetasRes, archivosRes, accesosRes] = await Promise.all([
+  const [perfilRes, carpetaRes, carpetasRes, archivosRes, accesosRes, favIds] = await Promise.all([
     supabase.from('perfiles').select('rol').eq('id', user.id).single(),
     carpetaActualId
       ? supabase
@@ -53,6 +54,7 @@ export default async function CajaFuertePage({
       ? archivosBase.eq('carpeta_id', carpetaActualId)
       : archivosBase.is('carpeta_id', null),
     listarAccesos(carpetaActualId),
+    listarIdsFavoritos(),
   ])
 
   const isAdmin = perfilRes.data?.rol === 'admin'
@@ -118,6 +120,7 @@ export default async function CajaFuertePage({
           userId={user.id}
           showOwner
           basePath="/mi-caja-fuerte"
+          favoritosIniciales={favIds}
           />
         </>
       )}
