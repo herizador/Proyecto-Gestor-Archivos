@@ -1,12 +1,13 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Folder, Link2, Trash2, FolderX, Pencil, Check, X, Star, UserPlus } from 'lucide-react'
+import { Folder, Link2, Trash2, FolderX, Pencil, Check, X, Star, UserPlus, BellPlus } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { renombrarCarpeta, cambiarColorCarpeta } from '@/actions/folders'
 import MenuAcciones, { type ItemMenu } from '@/components/MenuAcciones'
 import CompartirDialog from '@/components/CompartirDialog'
+import RecordatorioModal from '@/components/RecordatorioModal'
 import { COLORES_CARPETA, colorCarpetaDe } from '@/lib/colores-carpetas'
 import type { Carpeta } from '@/types/database'
 import DateDisplay from '@/components/DateDisplay'
@@ -52,6 +53,7 @@ export default function FolderCard({
   const [nuevoNombre, setNuevoNombre] = useState(carpeta.nombre)
   const [guardando, setGuardando] = useState(false)
   const [compartirAbierto, setCompartirAbierto] = useState(false)
+  const [recordatorioAbierto, setRecordatorioAbierto] = useState(false)
   const enlaceRef = useRef<HTMLDivElement>(null)
 
   // Renombrar solo en originales: el enlace sigue al original automáticamente
@@ -132,6 +134,13 @@ export default function FolderCard({
           icono: <UserPlus size={16} />,
           texto: 'Compartir',
           onClick: () => setCompartirAbierto(true),
+        }]
+      : []),
+    ...(editable
+      ? [{
+          icono: <BellPlus size={16} />,
+          texto: 'Crear recordatorio',
+          onClick: () => setRecordatorioAbierto(true),
         }]
       : []),
     ...(!esAcceso && onAlternarFavorito
@@ -286,6 +295,13 @@ export default function FolderCard({
           nombre={carpeta.nombre}
           abierto={compartirAbierto}
           alCerrar={() => setCompartirAbierto(false)}
+        />
+      )}
+      {editable && (
+        <RecordatorioModal
+          abierto={recordatorioAbierto}
+          alCerrar={() => setRecordatorioAbierto(false)}
+          preset={{ tipo: 'carpeta', id: carpeta.id, nombre: carpeta.nombre }}
         />
       )}
       {huerfano ? (

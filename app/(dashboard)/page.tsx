@@ -5,13 +5,8 @@ import { FolderHeart, ChevronRight, Home } from 'lucide-react'
 import UploadModalWrapper from './UploadModalWrapper'
 import NewFolderModalWrapper from '@/components/NewFolderModalWrapper'
 import ExploradorArchivos from '@/components/ExploradorArchivos'
-import ResumenFamiliar from '@/components/ResumenFamiliar'
 import { listarAccesos } from '@/actions/accesos'
-import { getStorageUsage } from '@/actions/files'
 import { listarIdsFavoritos } from '@/actions/favoritos'
-
-// Cupo familiar (mismo que el trigger validar_limite_almacenamiento y el Worker)
-const LIMITE_BYTES = 9663676416 // 9 GB
 
 export default async function DashboardComun({
   searchParams,
@@ -26,6 +21,10 @@ export default async function DashboardComun({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  // Sin carpeta, la portada plana de /todos es la vista canónica (esta ruta
+  // queda para navegar por el árbol clásico: /?carpeta=<id>)
+  if (!carpetaActualId) redirect('/todos')
+
   // Todo lo independiente viaja en una sola tanda (las consultas se lanzan
   // juntas; antes iban en serie y cada navegación pagaba 5-6 idas a la BD)
   const carpetasBase = supabase
@@ -39,31 +38,24 @@ export default async function DashboardComun({
     .eq('estado', 'activo')
     .order('fecha_subida', { ascending: false })
 
-  const [perfilRes, carpetaRes, carpetasRes, archivosRes, accesosRes, usoRes, totalArchivosRes, miembrosRes, favIds] = await Promise.all([
+  const [perfilRes, carpetaRes, carpetasRes, archivosRes, accesosRes, favIds] = await Promise.all([
     supabase.from('perfiles').select('rol').eq('id', user.id).single(),
-    carpetaActualId
-      ? supabase
-        .from('carpetas')
-        .select('id, nombre, carpeta_padre_id, es_privada')
-        .eq('id', carpetaActualId)
-        .eq('es_privada', false)
-        .single()
-      : Promise.resolve({ data: null }),
-    carpetaActualId
-      ? carpetasBase.eq('carpeta_padre_id', carpetaActualId)
-      : carpetasBase.is('carpeta_padre_id', null),
-    carpetaActualId
-      ? archivosBase.eq('carpeta_id', carpetaActualId)
-      : archivosBase.is('carpeta_id', null),
+    supabase
+      .from('carpetas')
+      .select('id, nombre, carpeta_padre_id, es_privada')
+      .eq('id', carpetaActualId)
+      .eq('es_privada', false)
+      .single(),
+    carpetasBase.eq('carpeta_padre_id', carpetaActualId),
+    archivosBase.eq('carpeta_id', carpetaActualId),
     listarAccesos(carpetaActualId),
-    getStorageUsage(),
-    supabase.from('archivos').select('id', { count: 'exact', head: true }).eq('estado', 'activo'),
-    supabase.from('perfiles').select('id', { count: 'exact', head: true }),
     listarIdsFavoritos(),
   ])
 
   const isAdmin = perfilRes.data?.rol === 'admin'
   const carpetaActual = carpetaRes.data as { id: string; nombre: string; carpeta_padre_id: string | null } | null
+  // Id inexistente o sin permiso: de vuelta al plano general en vez de vacío confuso
+  if (!carpetaActual) redirect('/todos')
   const carpetas = carpetasRes.data ?? []
   const archivos = archivosRes.data ?? []
   const accesos = accesosRes.data ?? []
@@ -77,18 +69,16 @@ export default async function DashboardComun({
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}
       >
         <div>
-          <p className="eyebrow">Espacio familiar / Área común{carpetaActual ? ` / ${carpetaActual.nombre}` : ''}</p>
-          <h1 className="page-title">Área Común</h1>
-          <p className="page-subtitle">Documentos visibles para toda la familia</p>
-          {carpetaActual && (
-            <nav className="breadcrumb" aria-label="Ruta de carpetas">
-              <Link href="/" className="breadcrumb-link">
-                <Home size={14} /> Raíz
-              </Link>
-              <ChevronRight size={14} className="breadcrumb-sep" />
-              <span>{carpetaActual.nombre}</span>
-            </nav>
-          )}
+          <p className="eyebrow">Espacio familiar / Área común / {carpetaActual?.nombre ?? ''}</p>
+          <h1 className="page-title">Área Común</h1>
+          <p className="page-subtitle">Documentos visibles para toda la familia</p>
+          <nav className="breadcrumb" aria-label="Ruta de carpetas">
+            <Link href="/todos" className="breadcrumb-link">
+              <Home size={14} /> Raíz
+            </Link>
+            <ChevronRight size={14} className="breadcrumb-sep" />
+            <span>{carpetaActual?.nombre}</span>
+          </nav>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <NewFolderModalWrapper carpetaPadreId={carpetaActualId} />
@@ -96,15 +86,6 @@ export default async function DashboardComun({
         </div>
       </div>
 
-      {!carpetaActual && (
-        <ResumenFamiliar
-          usoBytes={usoRes}
-          limiteBytes={LIMITE_BYTES}
-          archivos={totalArchivosRes.count ?? 0}
-          miembros={miembrosRes.count ?? 0}
-        />
-      )}
-
       {errorAccesos && (
         <p className="error-msg" style={{ marginBottom: '12px' }}>
           <span>No se pudieron cargar los enlaces de esta carpeta ({errorAccesos}). Archivos y carpetas se muestran igual.</span>

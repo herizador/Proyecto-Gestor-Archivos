@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ShieldCheck, FolderHeart, Users, Lock, Trash2, ShieldAlert, LogOut, Menu, X, Settings, History, Star, UserCheck } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { ShieldCheck, LogOut, Menu, X } from 'lucide-react'
 import { logout } from '@/actions/auth'
+import { SECCIONES_NAV, rutaActiva } from '@/components/NavegacionLateral'
 
 export default function MobileNavigation({
   perfil,
@@ -13,6 +15,7 @@ export default function MobileNavigation({
   isAdmin: boolean
 }) {
   const [isOpen, setIsOpen] = useState(false)
+  const pathname = usePathname()
 
   function toggleMenu() {
     setIsOpen(!isOpen)
@@ -67,49 +70,27 @@ export default function MobileNavigation({
         </div>
 
         <nav className="sidebar-nav" style={{ flex: 1 }}>
-          <div className="nav-section-title">Navegación</div>
-          <Link href="/" className="nav-item" onClick={closeMenu}>
-            <FolderHeart size={18} />
-            Área Común
-          </Link>
-          <Link href="/recientes" className="nav-item" onClick={closeMenu}>
-            <History size={18} />
-            Recientes
-          </Link>
-          <Link href="/familia" className="nav-item" onClick={closeMenu}>
-            <Users size={18} />
-            Mi Familia
-          </Link>
-          <Link href="/mi-caja-fuerte" className="nav-item" onClick={closeMenu}>
-            <Lock size={18} />
-            Mi Caja Fuerte
-          </Link>
-          <Link href="/favoritos" className="nav-item" onClick={closeMenu}>
-            <Star size={18} />
-            Favoritos
-          </Link>
-          <Link href="/compartido" className="nav-item" onClick={closeMenu}>
-            <UserCheck size={18} />
-            Compartido conmigo
-          </Link>
-          <Link href="/papelera" className="nav-item" onClick={closeMenu}>
-            <Trash2 size={18} />
-            Papelera de Reciclaje
-          </Link>
-          <Link href="/ajustes" className="nav-item" onClick={closeMenu}>
-            <Settings size={18} />
-            Ajustes
-          </Link>
-
-          {isAdmin && (
-            <>
-              <div className="nav-section-title" style={{ marginTop: '16px' }}>Administración</div>
-              <Link href="/admin/historial" className="nav-item" onClick={closeMenu}>
-                <ShieldAlert size={18} />
-                Historial (Auditoría)
-              </Link>
-            </>
-          )}
+          {SECCIONES_NAV.map((sec, i) => (
+            <div key={sec.titulo}>
+              <div className="nav-section-title" style={i > 0 ? { marginTop: '16px' } : undefined}>
+                {sec.titulo}
+              </div>
+              {sec.items
+                .filter((it) => !it.admin || isAdmin)
+                .map((it) => (
+                  <Link
+                    key={it.href}
+                    href={it.href}
+                    className={`nav-item${rutaActiva(pathname, it.href) ? ' active' : ''}`}
+                    onClick={closeMenu}
+                    aria-current={rutaActiva(pathname, it.href) ? 'page' : undefined}
+                  >
+                    {it.icono}
+                    {it.texto}
+                  </Link>
+                ))}
+            </div>
+          ))}
         </nav>
 
         <div className="sidebar-footer">

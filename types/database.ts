@@ -352,6 +352,50 @@ export type Database = {
           },
         ]
       }
+      recordatorios: {
+        Row: {
+          id: string
+          usuario_id: string
+          titulo: string
+          detalle: string | null
+          vence_el: string
+          archivo_id: string | null
+          carpeta_id: string | null
+          completado: boolean
+          fecha_creacion: string
+        }
+        Insert: {
+          id?: string
+          usuario_id: string
+          titulo: string
+          detalle?: string | null
+          vence_el: string
+          archivo_id?: string | null
+          carpeta_id?: string | null
+          completado?: boolean
+          fecha_creacion?: string
+        }
+        Update: {
+          id?: string
+          usuario_id?: string
+          titulo?: string
+          detalle?: string | null
+          vence_el?: string
+          archivo_id?: string | null
+          carpeta_id?: string | null
+          completado?: boolean
+          fecha_creacion?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'recordatorios_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'perfiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       invitaciones_pendientes: {
         Row: {
           id: string
@@ -449,6 +493,9 @@ export type AccesoDirecto = Database['public']['Tables']['accesos_directos']['Ro
 
 // Tipo para cesiones nominales entre miembros (Compartido conmigo)
 export type Compartido = Database['public']['Tables']['compartidos']['Row']
+
+// Recordatorio de vencimiento (nunca borra archivos, solo avisa)
+export type Recordatorio = Database['public']['Tables']['recordatorios']['Row']
 
 // Token de Explorador para el puente WebDAV (el claro solo existe al crearlo)
 export type TokenDav = Database['public']['Tables']['tokens_dav']['Row']

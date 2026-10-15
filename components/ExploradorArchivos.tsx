@@ -23,6 +23,7 @@ export default function ExploradorArchivos({
   userId,
   vacio,
   favoritosIniciales = [],
+  ubicaciones = {},
 }: {
   archivos: ArchivoConAutor[]
   carpetas: CarpetaConAutor[]
@@ -31,6 +32,7 @@ export default function ExploradorArchivos({
   userId: string
   vacio: ReactNode
   favoritosIniciales?: string[]
+  ubicaciones?: Record<string, string>
 }) {
   const [orden, setOrden] = useState<Orden>('recientes')
   const [vista, setVista] = useState<Vista>('cuadricula')
@@ -73,6 +75,7 @@ export default function ExploradorArchivos({
           alCambiarVista={setVista}
           ocultarBarra
           favoritosIniciales={favoritosIniciales}
+          ubicaciones={ubicaciones}
         />
       )}
     </DocumentSearchBar>

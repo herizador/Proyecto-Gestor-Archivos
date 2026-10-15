@@ -1,9 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { ShieldCheck, FolderHeart, Users, Lock, LogOut, ShieldAlert, Trash2, Settings, History, Star, UserCheck } from 'lucide-react'
+import { ShieldCheck, LogOut } from 'lucide-react'
 import { logout } from '@/actions/auth'
 import MobileNavigation from '@/components/MobileNavigation'
+import NavegacionLateral from '@/components/NavegacionLateral'
 import PaletaComandos from '@/components/PaletaComandos'
 
 export default async function DashboardLayout({
@@ -43,51 +43,7 @@ export default async function DashboardLayout({
           </div>
         </div>
 
-        <nav className="sidebar-nav">
-          <div className="nav-section-title">Navegación</div>
-          <Link href="/" className="nav-item">
-            <FolderHeart size={18} />
-            Área Común
-          </Link>
-          <Link href="/recientes" className="nav-item">
-            <History size={18} />
-            Recientes
-          </Link>
-          <Link href="/familia" className="nav-item">
-            <Users size={18} />
-            Mi Familia
-          </Link>
-          <Link href="/mi-caja-fuerte" className="nav-item">
-            <Lock size={18} />
-            Mi Caja Fuerte
-          </Link>
-          <Link href="/favoritos" className="nav-item">
-            <Star size={18} />
-            Favoritos
-          </Link>
-          <Link href="/compartido" className="nav-item">
-            <UserCheck size={18} />
-            Compartido conmigo
-          </Link>
-          <Link href="/papelera" className="nav-item">
-            <Trash2 size={18} />
-            Papelera de Reciclaje
-          </Link>
-          <Link href="/ajustes" className="nav-item">
-            <Settings size={18} />
-            Ajustes
-          </Link>
-
-          {isAdmin && (
-            <>
-              <div className="nav-section-title" style={{ marginTop: '16px' }}>Administración</div>
-              <Link href="/admin/historial" className="nav-item">
-                <ShieldAlert size={18} />
-                Historial (Auditoría)
-              </Link>
-            </>
-          )}
-        </nav>
+        <NavegacionLateral isAdmin={isAdmin} />
 
         <div className="sidebar-footer">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>

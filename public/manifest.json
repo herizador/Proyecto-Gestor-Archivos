@@ -2,7 +2,7 @@
   "name": "Gestor Familiar",
   "short_name": "Gestor Familiar",
   "description": "Gestor de Archivos Familiar Privado y Seguro",
-  "start_url": "/",
+  "start_url": "/inicio",
   "scope": "/",
   "id": "/",
   "display": "standalone",

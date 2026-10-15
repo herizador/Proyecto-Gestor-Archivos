@@ -79,6 +79,7 @@ export default function FileListWrapper({
   alCambiarOrden,
   alCambiarVista,
   favoritosIniciales = [],
+  ubicaciones = {},
 }: {
   archivos: ArchivoConAutor[]
   carpetas: CarpetaConAutor[]
@@ -93,6 +94,7 @@ export default function FileListWrapper({
   alCambiarOrden?: (o: Orden) => void
   alCambiarVista?: (v: Vista) => void
   favoritosIniciales?: string[]
+  ubicaciones?: Record<string, string>
 }) {
   const router = useRouter()
   const [isSelectionMode, setIsSelectionMode] = useState(false)
@@ -491,6 +493,7 @@ export default function FileListWrapper({
                   onToggleSelect={alAlternar}
                   esFavorito={esFavArchivo(archivo.id)}
                   onAlternarFavorito={() => handleFavorito('archivo', archivo.id)}
+                  ubicacion={ubicaciones[archivo.id] ?? null}
                 />
               ))}
               {accesosArchivosOrdenados.map((acceso) => {
@@ -520,6 +523,7 @@ export default function FileListWrapper({
                 onToggleSelect={alAlternar}
                 esFavorito={esFavArchivo(archivo.id)}
                 onAlternarFavorito={() => handleFavorito('archivo', archivo.id)}
+                ubicacion={ubicaciones[archivo.id] ?? null}
               />
             ))}
             {accesosArchivosOrdenados.map((acceso) => {

@@ -3,12 +3,13 @@
 import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FileText, Image, Film, Music, Archive, Folder, FolderX, Eye, Download, Trash2, Link2, Pencil, Check, X, Star, UserPlus } from 'lucide-react'
+import { FileText, Image, Film, Music, Archive, Folder, FolderX, Eye, Download, Trash2, Link2, Pencil, Check, X, Star, UserPlus, BellPlus } from 'lucide-react'
 import { visualizarArchivo, descargarArchivo, moverAPapelera, renombrarArchivo } from '@/actions/files'
 import { renombrarCarpeta } from '@/actions/folders'
 import { eliminarAcceso } from '@/actions/accesos'
 import NuevoAccesoModal from '@/components/NuevoAccesoModal'
 import CompartirDialog from '@/components/CompartirDialog'
+import RecordatorioModal from '@/components/RecordatorioModal'
 import MenuAcciones, { type ItemMenu } from '@/components/MenuAcciones'
 import { colorCarpetaDe } from '@/lib/colores-carpetas'
 import { avisar, confirmar } from '@/components/Avisos'
@@ -48,6 +49,7 @@ export function FilaArchivo({
   file, isAdmin, isOwner, selected, onToggleSelect,
   esAcceso = false, origenNombre = null, huerfano = false,
   esFavorito = false, onAlternarFavorito,
+  ubicacion = null,
 }: {
   file: ArchivoConAutor
   isAdmin: boolean
@@ -59,12 +61,14 @@ export function FilaArchivo({
   huerfano?: boolean
   esFavorito?: boolean
   onAlternarFavorito?: () => void
+  ubicacion?: string | null
 }) {
   const [loading, setLoading] = useState(false)
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(file.nombre_original)
   const [guardando, setGuardando] = useState(false)
   const [compartirAbierto, setCompartirAbierto] = useState(false)
+  const [recordatorioAbierto, setRecordatorioAbierto] = useState(false)
   const enlaceRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const kind = kindDe(file.tipo_mime)
@@ -170,6 +174,14 @@ export function FilaArchivo({
           deshabilitado: loading,
         }]
       : []),
+    ...(puedeEnlazar
+      ? [{
+          icono: <BellPlus size={16} />,
+          texto: 'Crear recordatorio',
+          onClick: () => setRecordatorioAbierto(true),
+          deshabilitado: loading,
+        }]
+      : []),
     ...((isAdmin || isOwner)
       ? [{
           icono: <Trash2 size={16} />,
@@ -242,6 +254,7 @@ export function FilaArchivo({
         <p className="file-card-meta">
           {sizeKb} KB • <DateDisplay date={file.fecha_subida} />
           {esAcceso && (huerfano ? ' • Enlace no disponible' : ` • Enlace de ${origenNombre ?? 'origen desconocido'}`)}
+          {ubicacion && ` • En ${ubicacion}`}
         </p>
       </div>
       <div style={{ flexShrink: 0 }}>
@@ -259,6 +272,13 @@ export function FilaArchivo({
           nombre={file.nombre_original}
           abierto={compartirAbierto}
           alCerrar={() => setCompartirAbierto(false)}
+        />
+      )}
+      {puedeEnlazar && (
+        <RecordatorioModal
+          abierto={recordatorioAbierto}
+          alCerrar={() => setRecordatorioAbierto(false)}
+          preset={{ tipo: 'archivo', id: file.id, nombre: file.nombre_original }}
         />
       )}
     </div>
@@ -290,6 +310,7 @@ export function FilaCarpeta({
   const [nuevoNombre, setNuevoNombre] = useState(carpeta.nombre)
   const [guardando, setGuardando] = useState(false)
   const [compartirAbierto, setCompartirAbierto] = useState(false)
+  const [recordatorioAbierto, setRecordatorioAbierto] = useState(false)
   const enlaceRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
   const editable = puedeRenombrar && !esAcceso
@@ -348,6 +369,13 @@ export function FilaCarpeta({
           icono: <UserPlus size={16} />,
           texto: 'Compartir',
           onClick: () => setCompartirAbierto(true),
+        }]
+      : []),
+    ...(editable
+      ? [{
+          icono: <BellPlus size={16} />,
+          texto: 'Crear recordatorio',
+          onClick: () => setRecordatorioAbierto(true),
         }]
       : []),
     ...(!esAcceso && onAlternarFavorito
@@ -446,6 +474,13 @@ export function FilaCarpeta({
           nombre={carpeta.nombre}
           abierto={compartirAbierto}
           alCerrar={() => setCompartirAbierto(false)}
+        />
+      )}
+      {editable && (
+        <RecordatorioModal
+          abierto={recordatorioAbierto}
+          alCerrar={() => setRecordatorioAbierto(false)}
+          preset={{ tipo: 'carpeta', id: carpeta.id, nombre: carpeta.nombre }}
         />
       )}
     </div>

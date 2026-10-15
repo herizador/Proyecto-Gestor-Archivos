@@ -1,11 +1,12 @@
 'use client'
 
-import { FileText, Image, Download, Trash2, Eye, Link2, Pencil, Check, X, Film, Music, Archive, Star, UserPlus } from 'lucide-react'
+import { FileText, Image, Download, Trash2, Eye, Link2, Pencil, Check, X, Film, Music, Archive, Star, UserPlus, BellPlus } from 'lucide-react'
 import { ArchivoConAutor } from '@/types/database'
 import { visualizarArchivo, descargarArchivo, moverAPapelera, renombrarArchivo } from '@/actions/files'
 import { eliminarAcceso } from '@/actions/accesos'
 import NuevoAccesoModal from '@/components/NuevoAccesoModal'
 import CompartirDialog from '@/components/CompartirDialog'
+import RecordatorioModal from '@/components/RecordatorioModal'
 import MenuAcciones, { type ItemMenu } from '@/components/MenuAcciones'
 import { avisar, confirmar } from '@/components/Avisos'
 import { useRouter } from 'next/navigation'
@@ -16,6 +17,7 @@ export default function FileCard({
   file, isAdmin, isOwner, selected, onToggleSelect,
   esAcceso = false, origenNombre = null, huerfano = false,
   esFavorito = false, onAlternarFavorito,
+  ubicacion = null,
 }: {
   file: ArchivoConAutor
   isAdmin: boolean
@@ -27,12 +29,14 @@ export default function FileCard({
   huerfano?: boolean
   esFavorito?: boolean
   onAlternarFavorito?: () => void
+  ubicacion?: string | null
 }) {
   const [loading, setLoading] = useState(false)
   const [editando, setEditando] = useState(false)
   const [nuevoNombre, setNuevoNombre] = useState(file.nombre_original)
   const [guardando, setGuardando] = useState(false)
   const [compartirAbierto, setCompartirAbierto] = useState(false)
+  const [recordatorioAbierto, setRecordatorioAbierto] = useState(false)
   const enlaceRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -212,6 +216,14 @@ export default function FileCard({
           deshabilitado: loading,
         }]
       : []),
+    ...(puedeEnlazar
+      ? [{
+          icono: <BellPlus size={16} />,
+          texto: 'Crear recordatorio',
+          onClick: () => setRecordatorioAbierto(true),
+          deshabilitado: loading,
+        }]
+      : []),
     ...(puedeBorrar
       ? [{
           icono: <Trash2 size={16} />,
@@ -240,6 +252,13 @@ export default function FileCard({
           nombre={file.nombre_original}
           abierto={compartirAbierto}
           alCerrar={() => setCompartirAbierto(false)}
+        />
+      )}
+      {puedeEnlazar && (
+        <RecordatorioModal
+          abierto={recordatorioAbierto}
+          alCerrar={() => setRecordatorioAbierto(false)}
+          preset={{ tipo: 'archivo', id: file.id, nombre: file.nombre_original }}
         />
       )}
       <div className={`file-preview fp-${kindArchivo}`}>
@@ -324,6 +343,11 @@ export default function FileCard({
               <p className="file-card-author">
                 Por: {file.subido_por_perfil?.nombre_completo || 'Desconocido'}
               </p>
+              {ubicacion && (
+                <p className="file-card-meta" title={ubicacion} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  En {ubicacion}
+                </p>
+              )}
             </div>
         </div>
       </div>

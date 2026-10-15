@@ -411,6 +411,23 @@ input, textarea, select { font-family: inherit; }
   gap: 16px;
 }
 
+/* Portada: tarjetas de indicadores + dos columnas (actividad/recordatorios) */
+.grid-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.dos-columnas {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .dos-columnas { grid-template-columns: 1fr; }
+}
+
 /* ============================================================
    AVATAR
    ============================================================ */
