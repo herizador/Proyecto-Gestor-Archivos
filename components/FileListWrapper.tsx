@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Share2, X, Check, Link, List, Trash2 } from 'lucide-react'
 import { generarEnlaceCompartido } from '@/actions/share'
@@ -329,116 +330,20 @@ export default function FileListWrapper({
 
   return (
     <div>
-      {/* Barra de selección */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '10px',
-          padding: '10px 16px',
-          marginBottom: '16px',
-          borderRadius: 'var(--radius-md)',
-          flexWrap: 'wrap',
-          ...(isSelectionMode
-            ? { background: 'var(--color-accent-dim)', border: '1px solid rgba(79,142,247,0.25)' }
-            : {}),
-        }}
-      >
-        {!isSelectionMode ? (
-          hasItems && !ocultarSeleccion && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => setModo(true)}
-              style={{ minHeight: '36px' }}
-            >
-              <List size={16} />
-              Seleccionar
-            </button>
-          )
-        ) : (
-          <>
-            <span style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--color-accent)' }}>
-              {selectedIds.length} seleccionado{selectedIds.length !== 1 ? 's' : ''}
-            </span>
-
-            <button type="button" className="btn btn-ghost btn-sm" onClick={handleToggleAll} style={{ minHeight: '36px' }}>
-              <Check size={14} />
-              {isAllSelected ? 'Deseleccionar todos' : 'Seleccionar todos'}
-            </button>
-
-            <button type="button" className="btn btn-ghost btn-sm" onClick={exitSelectionMode} style={{ minHeight: '36px' }}>
-              <X size={14} />
-              Cancelar
-            </button>
-
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <EnviarSeleccionButton ids={selectedIds} />
-              <MoverSeleccionModal
-                ids={selectedIds}
-                basePath={basePath}
-                onMovidos={handleMovidos}
-              />
-              <EnlazarSeleccionModal
-                ids={selectedIds}
-                basePath={basePath}
-                onEnlazados={handleEnlazados}
-              />
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={handleShare}
-                disabled={shareLoading || selectedIds.length === 0}
-                style={{ minHeight: '36px' }}
-                title="Genera un enlace público para lo seleccionado"
-              >
-                <Share2 size={14} />
-                {shareLoading ? 'Generando...' : 'Compartir por enlace'}
-              </button>
-              <button
-                type="button"
-                className="btn btn-danger btn-sm"
-                onClick={handlePapeleraLote}
-                disabled={selectedIds.length === 0}
-                style={{ minHeight: '36px' }}
-                title="Mueve los archivos seleccionados a la papelera"
-              >
-                <Trash2 size={14} />
-                Papelera ({selectedIds.length})
-              </button>
-            </div>
-
-            {shareResult && 'url' in shareResult && (
-              <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                <Link size={14} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
-                <input
-                  type="text"
-                  className="input"
-                  value={shareResult.url}
-                  readOnly
-                  style={{ fontSize: '0.8rem', padding: '6px 10px', flex: 1 }}
-                  onClick={(e) => (e.target as HTMLInputElement).select()}
-                />
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => navigator.clipboard.writeText(shareResult.url)}
-                  style={{ minHeight: '36px', flexShrink: 0 }}
-                  title="Copiar enlace"
-                >
-                  Copiar
-                </button>
-              </div>
-            )}
-
-            {shareResult && 'error' in shareResult && (
-              <span style={{ color: 'var(--color-danger)', fontSize: '0.85rem', width: '100%' }}>
-                {shareResult.error}
-              </span>
-            )}
-          </>
-        )}
-      </div>
+      {/* Entrada al modo selección (el resto vive en la píldora flotante) */}
+      {!isSelectionMode && hasItems && !ocultarSeleccion && (
+        <div style={{ marginBottom: '16px' }}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => setModo(true)}
+            style={{ minHeight: '36px' }}
+          >
+            <List size={16} />
+            Seleccionar
+          </button>
+        </div>
+      )}
 
       {/* Barra de orden y vista (en Área Común vive en la fila de búsqueda) */}
       {!ocultarBarra && hasItems && (
@@ -583,6 +488,91 @@ export default function FileListWrapper({
           </div>
           )}
         </section>
+      )}
+
+      {/* Píldora flotante de selección (estilo Figma): siempre visible en modo
+          selección, con todas las acciones en lote */}
+      {isSelectionMode && typeof document !== 'undefined' && createPortal(
+        <>
+          {shareResult && ('url' in shareResult || 'error' in shareResult) && (
+            <div className="pill-resultado" role="status">
+              {'url' in shareResult ? (
+                <>
+                  <Link size={14} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
+                  <input
+                    type="text"
+                    className="input"
+                    value={shareResult.url}
+                    readOnly
+                    style={{ fontSize: '0.8rem', padding: '6px 10px', flex: 1, minWidth: 0 }}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                    aria-label="Enlace generado"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => navigator.clipboard.writeText(shareResult.url)}
+                    style={{ minHeight: '36px', flexShrink: 0 }}
+                    title="Copiar enlace"
+                  >
+                    Copiar
+                  </button>
+                </>
+              ) : (
+                <span style={{ color: 'var(--color-danger)', fontSize: '0.85rem' }}>
+                  {(shareResult as { error: string }).error}
+                </span>
+              )}
+            </div>
+          )}
+          <div className="pill-seleccion" role="toolbar" aria-label="Acciones en lote">
+            <span className="pill-conteo">
+              {selectedIds.length} seleccionado{selectedIds.length !== 1 ? 's' : ''}
+            </span>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={handleToggleAll} style={{ minHeight: '36px' }} title={isAllSelected ? 'Deseleccionar la vista actual' : 'Seleccionar la vista actual'}>
+              <Check size={14} />
+              {isAllSelected ? 'Ninguno' : 'Todos'}
+            </button>
+            <EnviarSeleccionButton ids={selectedIds} />
+            <MoverSeleccionModal
+              ids={selectedIds}
+              basePath={basePath}
+              onMovidos={handleMovidos}
+            />
+            <EnlazarSeleccionModal
+              ids={selectedIds}
+              basePath={basePath}
+              onEnlazados={handleEnlazados}
+            />
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={handleShare}
+              disabled={shareLoading || selectedIds.length === 0}
+              style={{ minHeight: '36px' }}
+              title="Genera un enlace público para lo seleccionado"
+            >
+              <Share2 size={14} />
+              {shareLoading ? 'Generando...' : 'Compartir por enlace'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-danger btn-sm"
+              onClick={handlePapeleraLote}
+              disabled={selectedIds.length === 0}
+              style={{ minHeight: '36px' }}
+              title="Mueve los archivos seleccionados a la papelera"
+            >
+              <Trash2 size={14} />
+              Papelera
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={exitSelectionMode} style={{ minHeight: '36px' }} title="Salir del modo selección">
+              <X size={14} />
+              Cerrar
+            </button>
+          </div>
+        </>,
+        document.body
       )}
     </div>
   )
