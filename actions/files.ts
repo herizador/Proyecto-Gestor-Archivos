@@ -338,6 +338,59 @@ export async function moverAPapelera(archivoId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Mover varios archivos a la papelera (modo selección, entre carpetas).
+// La auditoría MOVER_A_PAPELERA la pone el trigger trg_cambio_estado_archivo.
+// ---------------------------------------------------------------------------
+export async function moverAPapeleraBatch(archivoIds: string[]) {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'No autenticado.' }
+
+  const unicos = [...new Set(archivoIds)].slice(0, 50)
+  if (unicos.length === 0) return { error: 'Selecciona al menos un archivo.' }
+
+  const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single()
+  const isAdmin = perfil?.rol === 'admin'
+
+  let movidos = 0
+  const fallidos: Array<{ id: string; nombre: string; error: string }> = []
+
+  for (const id of unicos) {
+    const { data: archivo } = await supabase
+      .from('archivos')
+      .select('id, nombre_original, subido_por, estado')
+      .eq('id', id)
+      .single()
+    if (!archivo) {
+      fallidos.push({ id, nombre: id.slice(0, 8), error: 'No encontrado o sin permisos.' })
+      continue
+    }
+    if (archivo.subido_por !== user.id && !isAdmin) {
+      fallidos.push({ id, nombre: archivo.nombre_original, error: 'Sin permiso.' })
+      continue
+    }
+    if (archivo.estado === 'papelera') continue
+    const { error } = await supabase
+      .from('archivos')
+      .update({ estado: 'papelera', fecha_papelera: new Date().toISOString() })
+      .eq('id', id)
+    if (error) {
+      fallidos.push({ id, nombre: archivo.nombre_original, error: error.message })
+      continue
+    }
+    movidos += 1
+  }
+
+  revalidatePath('/')
+  revalidatePath('/todos')
+  revalidatePath('/papelera')
+  revalidatePath('/mi-caja-fuerte')
+  revalidatePath('/recientes')
+  revalidatePath('/favoritos')
+  return { success: true, movidos, fallidos, total: unicos.length }
+}
+
+// ---------------------------------------------------------------------------
 // Restaurar archivo de la papelera
 // ---------------------------------------------------------------------------
 export async function restaurarArchivo(archivoId: string) {

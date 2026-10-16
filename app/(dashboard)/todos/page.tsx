@@ -77,49 +77,6 @@ export default async function TodosPage() {
         miembros={miembrosRes.count ?? 0}
       />
 
-      {(comunes.length > 0 || privadas.length > 0) && (
-        <section style={{ marginBottom: '24px' }}>
-          <h2 className="section-title">Carpetas</h2>
-          {comunes.length > 0 && (
-            <>
-              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '8px' }}>Comunes</p>
-              <div className="grid-folders" style={{ marginBottom: '16px' }}>
-                {comunes.map((carpeta) => (
-                  <FolderCard
-                    key={carpeta.id}
-                    carpeta={carpeta}
-                    basePath="/"
-                    crearEnlace={(isAdmin || carpeta.creado_por === user.id) ? (
-                      <NuevoAccesoModal objetivoTipo="carpeta" objetivoId={carpeta.id} objetivoNombre={carpeta.nombre} />
-                    ) : null}
-                    puedeRenombrar={isAdmin || carpeta.creado_por === user.id}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-          {privadas.length > 0 && (
-            <>
-              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '8px' }}>Tus privadas</p>
-              <div className="grid-folders">
-                {privadas.map((carpeta) => (
-                  <FolderCard
-                    key={carpeta.id}
-                    carpeta={carpeta}
-                    basePath="/mi-caja-fuerte"
-                    crearEnlace={(isAdmin || carpeta.creado_por === user.id) ? (
-                      <NuevoAccesoModal objetivoTipo="carpeta" objetivoId={carpeta.id} objetivoNombre={carpeta.nombre} />
-                    ) : null}
-                    puedeRenombrar={isAdmin || carpeta.creado_por === user.id}
-                  />
-                ))}
-              </div>
-            </>
-          )}
-        </section>
-      )}
-
-      <h2 className="section-title">Archivos</h2>
       <ExploradorArchivos
         archivos={archivos}
         carpetas={[]}
@@ -128,6 +85,58 @@ export default async function TodosPage() {
         userId={user.id}
         favoritosIniciales={favIds}
         ubicaciones={ubicaciones}
+        seccionCarpetas={
+          (comunes.length > 0 || privadas.length > 0) ? (
+            <section style={{ marginBottom: '24px' }}>
+              <h2 className="section-title">Carpetas</h2>
+              {comunes.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>Carpetas familiares <span className="badge badge-miembro">{comunes.length}</span></p>
+                    <span className="badge badge-activo" style={{ marginLeft: 'auto' }}>Visibles para la familia</span>
+                  </div>
+                  <div className="grid-folders" style={{ marginBottom: '16px' }}>
+                    {comunes.map((carpeta) => (
+                      <FolderCard
+                        key={carpeta.id}
+                        carpeta={carpeta}
+                        basePath="/"
+                        crearEnlace={(isAdmin || carpeta.creado_por === user.id) ? (
+                          <NuevoAccesoModal objetivoTipo="carpeta" objetivoId={carpeta.id} objetivoNombre={carpeta.nombre} />
+                        ) : null}
+                        puedeRenombrar={isAdmin || carpeta.creado_por === user.id}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+              {privadas.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                    <p style={{ fontSize: '0.85rem', fontWeight: 600 }}>Tus carpetas privadas <span className="badge badge-miembro">{privadas.length}</span></p>
+                    <span className="badge badge-privado" style={{ marginLeft: 'auto' }}>Solo visibles para ti</span>
+                  </div>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--color-text-muted)', marginBottom: '8px' }}>
+                    También aparecen aquí para que tengas todos tus archivos a mano. El resto de la familia no puede verlas.
+                  </p>
+                  <div className="grid-folders">
+                    {privadas.map((carpeta) => (
+                      <FolderCard
+                        key={carpeta.id}
+                        carpeta={carpeta}
+                        basePath="/mi-caja-fuerte"
+                        crearEnlace={(isAdmin || carpeta.creado_por === user.id) ? (
+                          <NuevoAccesoModal objetivoTipo="carpeta" objetivoId={carpeta.id} objetivoNombre={carpeta.nombre} />
+                        ) : null}
+                        puedeRenombrar={isAdmin || carpeta.creado_por === user.id}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </section>
+          ) : null
+        }
         vacio={
           <div className="empty-state">
             <p className="empty-state-title">Sin archivos visibles</p>

@@ -1,9 +1,5 @@
 import { HardDrive, Files, Users } from 'lucide-react'
-
-function formatoCorto(bytes: number): string {
-  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
-  return `${(bytes / 1024 ** 2).toFixed(1)} MB`
-}
+import { formatoCorto } from '@/lib/formatos'
 
 // Tarjeta resumen del espacio familiar (estilo Figma, en oscuro): progreso del
 // cupo + conteos. Solo lectura; los números los calcula la página servidora.

@@ -211,7 +211,7 @@ export default function FileCard({
     ...(puedeEnlazar
       ? [{
           icono: <UserPlus size={16} />,
-          texto: 'Compartir',
+          texto: 'Compartir con un miembro',
           onClick: () => setCompartirAbierto(true),
           deshabilitado: loading,
         }]

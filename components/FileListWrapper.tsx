@@ -2,10 +2,13 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Share2, X, Check, Link, List } from 'lucide-react'
+import { Share2, X, Check, Link, List, Trash2 } from 'lucide-react'
 import { generarEnlaceCompartido } from '@/actions/share'
-import { eliminarAcceso, type ObjetivoEnlace } from '@/actions/accesos'
+import { eliminarAcceso } from '@/actions/accesos'
 import { alternarFavorito } from '@/actions/favoritos'
+import { moverAPapeleraBatch } from '@/actions/files'
+import { resolverSeleccion } from '@/actions/seleccion'
+import { useSeleccion, fijarSeleccion } from '@/lib/seleccion'
 import FileCard from '@/components/FileCard'
 import FolderCard from '@/components/FolderCard'
 import NuevoAccesoModal from '@/components/NuevoAccesoModal'
@@ -14,7 +17,7 @@ import EnviarSeleccionButton from '@/components/EnviarSeleccionButton'
 import MoverSeleccionModal from '@/components/MoverSeleccionModal'
 import BarraOrdenVista, { type Orden, type Vista } from '@/components/BarraOrdenVista'
 import { FilaArchivo, FilaCarpeta } from '@/components/VistaLista'
-import { avisar } from '@/components/Avisos'
+import { avisar, confirmar } from '@/components/Avisos'
 import type { AccesoConObjetivo, ArchivoConAutor, Carpeta } from '@/types/database'
 
 type CarpetaConAutor = Carpeta & {
@@ -98,7 +101,9 @@ export default function FileListWrapper({
 }) {
   const router = useRouter()
   const [isSelectionMode, setIsSelectionMode] = useState(false)
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  // Selección GLOBAL de la sesión (lib/seleccion.ts): sobrevive a navegar
+  // entre carpetas; al actuar se rehidrata con resolverSeleccion().
+  const selectedIds = useSeleccion()
   const [shareLoading, setShareLoading] = useState(false)
   const [shareResult, setShareResult] = useState<{ url: string } | { error: string } | null>(null)
 
@@ -124,57 +129,90 @@ export default function FileListWrapper({
   }, [archivos, carpetas])
 
   function toggleSelect(id: string) {
-    setSelectedIds(prev => {
-      if (prev.includes(id)) return prev.filter(i => i !== id)
-      return [...prev, id]
-    })
+    fijarSeleccion(
+      selectedIds.includes(id) ? selectedIds.filter((i) => i !== id) : [...selectedIds, id]
+    )
     setShareResult(null)
   }
 
+  // "Todos" opera sobre la vista actual (la selección puede traer de otras)
   function handleToggleAll() {
-    if (selectedIds.length === allIds.length) {
-      setSelectedIds([])
-    } else {
-      setSelectedIds([...allIds])
-    }
+    const aqui = new Set(allIds)
+    const todosAqui = allIds.length > 0 && allIds.every((id) => selectedIds.includes(id))
+    fijarSeleccion(todosAqui ? selectedIds.filter((id) => !aqui.has(id)) : [...selectedIds, ...allIds.filter((id) => !selectedIds.includes(id))])
     setShareResult(null)
   }
 
   function exitSelectionMode() {
     setIsSelectionMode(false)
-    setSelectedIds([])
+    fijarSeleccion([])
     setShareResult(null)
   }
 
   async function handleShare() {
-    const archivoIds: string[] = []
-    const carpetaIds: string[] = []
-    const carpetaIdSet = new Set(carpetas.map(c => c.id))
-
-    selectedIds.forEach(id => {
-      if (carpetaIdSet.has(id)) carpetaIds.push(id)
-      else archivoIds.push(id)
-    })
-
+    if (selectedIds.length === 0) return
     setShareLoading(true)
-    const result = await generarEnlaceCompartido({ archivoIds, carpetaIds })
-    setShareLoading(false)
-
-    if ('url' in result && result.url) {
-      setShareResult({ url: result.url })
-      if (typeof navigator !== 'undefined' && 'share' in navigator) {
-        try {
-          await navigator.share({ title: 'Compartir documentos', url: result.url })
-        } catch {
-          // user cancelled
-        }
+    try {
+      const sel = await resolverSeleccion(selectedIds)
+      if ('error' in sel) {
+        setShareResult({ error: sel.error ?? 'No se pudo leer la selección.' })
+        return
       }
-    } else {
-      setShareResult({ error: ('error' in result ? result.error : 'Error al generar enlace') ?? 'Error al generar enlace' })
+      const result = await generarEnlaceCompartido({
+        archivoIds: sel.archivos.map((a) => a.id),
+        carpetaIds: sel.carpetas.map((c) => c.id),
+      })
+      if ('url' in result && result.url) {
+        setShareResult({ url: result.url })
+        if (typeof navigator !== 'undefined' && 'share' in navigator) {
+          try {
+            await navigator.share({ title: 'Compartir documentos', url: result.url })
+          } catch {
+            // user cancelled
+          }
+        }
+      } else {
+        setShareResult({ error: ('error' in result ? result.error : 'Error al generar enlace') ?? 'Error al generar enlace' })
+      }
+    } finally {
+      setShareLoading(false)
     }
   }
 
-  const isAllSelected = selectedIds.length === allIds.length && allIds.length > 0
+  async function handlePapeleraLote() {
+    if (selectedIds.length === 0) return
+    const sel = await resolverSeleccion(selectedIds)
+    if ('error' in sel) {
+      avisar('error', sel.error ?? 'No se pudo leer la selección.')
+      return
+    }
+    const idsArchivos = sel.archivos.map((a) => a.id)
+    if (sel.carpetas.length > 0) {
+      avisar('info', 'Las carpetas no van a la papelera: elimínalas una a una desde su menú.')
+    }
+    if (idsArchivos.length === 0) return
+    const ok = await confirmar({
+      titulo: 'Mover a papelera',
+      mensaje: `¿Mover ${idsArchivos.length} archivo(s) a la papelera?`,
+      textoOk: 'Mover',
+      peligroso: true,
+    })
+    if (!ok) return
+    const res = await moverAPapeleraBatch(idsArchivos)
+    if ('error' in res && res.error) {
+      avisar('error', res.error)
+      return
+    }
+    if ('success' in res && res.success) {
+      if (res.movidos > 0) avisar('exito', `${res.movidos} archivo(s) a la papelera.`)
+      for (const f of res.fallidos ?? []) avisar('error', `«${f.nombre}»: ${f.error}`)
+      exitSelectionMode()
+      router.refresh()
+    }
+  }
+
+  // "Todos" se refiere a la vista actual (la selección puede traer de otras)
+  const isAllSelected = allIds.length > 0 && allIds.every((id) => selectedIds.includes(id))
   const hasItems = allIds.length > 0
 
   const [ordenInterno, setOrdenInterno] = useState<Orden>('recientes')
@@ -262,20 +300,8 @@ export default function FileListWrapper({
   const alAlternar = isSelectionMode ? toggleSelect : undefined
 
   // Objetivos para el enlace en lote: los accesos nunca entran en allIds,
-  // así que aquí solo hay archivos y carpetas reales.
-  const objetivosEnlace = useMemo<ObjetivoEnlace[]>(() => {
-    const carpetaIdSet = new Set(carpetas.map((c) => c.id))
-    const nombresArchivos = new Map(archivos.map((a) => [a.id, a.nombre_original]))
-    const nombresCarpetas = new Map(carpetas.map((c) => [c.id, c.nombre]))
-    return selectedIds.flatMap((id): ObjetivoEnlace[] => {
-      if (carpetaIdSet.has(id)) {
-        const nombre = nombresCarpetas.get(id)
-        return nombre ? [{ tipo: 'carpeta', id, nombre }] : []
-      }
-      const nombre = nombresArchivos.get(id)
-      return nombre ? [{ tipo: 'archivo', id, nombre }] : []
-    })
-  }, [selectedIds, archivos, carpetas])
+  // así que aquí solo hay archivos y carpetas reales. (Los modales de lote
+  // rehidratan por ids via resolverSeleccion: vale entre carpetas.)
 
   function handleEnlazados() {
     exitSelectionMode()
@@ -286,18 +312,6 @@ export default function FileListWrapper({
     exitSelectionMode()
     router.refresh()
   }
-
-  // Archivos seleccionados para Enviar (las carpetas no viajan como ficheros)
-  const archivosParaEnviar = useMemo(
-    () => {
-      const nombres = new Map(archivos.map((a) => [a.id, a.nombre_original]))
-      return selectedIds.flatMap((id) => {
-        const nombre = nombres.get(id)
-        return nombre ? [{ id, nombre }] : []
-      })
-    },
-    [selectedIds, archivos]
-  )
 
   return (
     <div>
@@ -345,14 +359,14 @@ export default function FileListWrapper({
             </button>
 
             <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <EnviarSeleccionButton archivos={archivosParaEnviar} />
+              <EnviarSeleccionButton ids={selectedIds} />
               <MoverSeleccionModal
-                objetivos={objetivosEnlace}
+                ids={selectedIds}
                 basePath={basePath}
                 onMovidos={handleMovidos}
               />
               <EnlazarSeleccionModal
-                objetivos={objetivosEnlace}
+                ids={selectedIds}
                 basePath={basePath}
                 onEnlazados={handleEnlazados}
               />
@@ -362,9 +376,21 @@ export default function FileListWrapper({
                 onClick={handleShare}
                 disabled={shareLoading || selectedIds.length === 0}
                 style={{ minHeight: '36px' }}
+                title="Genera un enlace público para lo seleccionado"
               >
                 <Share2 size={14} />
-                {shareLoading ? 'Generando...' : 'Compartir Seleccionados'}
+                {shareLoading ? 'Generando...' : 'Compartir por enlace'}
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger btn-sm"
+                onClick={handlePapeleraLote}
+                disabled={selectedIds.length === 0}
+                style={{ minHeight: '36px' }}
+                title="Mueve los archivos seleccionados a la papelera"
+              >
+                <Trash2 size={14} />
+                Papelera ({selectedIds.length})
               </button>
             </div>
 

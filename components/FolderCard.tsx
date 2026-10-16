@@ -132,7 +132,7 @@ export default function FolderCard({
     ...(editable
       ? [{
           icono: <UserPlus size={16} />,
-          texto: 'Compartir',
+          texto: 'Compartir con un miembro',
           onClick: () => setCompartirAbierto(true),
         }]
       : []),

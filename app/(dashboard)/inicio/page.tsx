@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Files, Users, Clock, HardDrive, Folder, ArrowRight, ShieldCheck } from 'lucide-react'
 import RecordatoriosPortada from '@/components/RecordatoriosPortada'
+import { formatoCorto } from '@/lib/formatos'
 import { listarRecordatorios } from '@/actions/recordatorios'
 import { listarActividadReciente } from '@/actions/storage'
 import type { HistorialConPerfil } from '@/types/database'
@@ -179,7 +180,7 @@ export default async function InicioPage() {
             <HardDrive size={16} /> Almacenamiento
           </p>
           <p style={{ fontSize: '1.6rem', fontWeight: 700 }}>
-            {(usoBytes / 1024 ** 3).toFixed(1)}<span style={{ fontSize: '0.9rem', fontWeight: 400, color: 'var(--color-text-muted)' }}> GB</span>
+            {formatoCorto(usoBytes)}
           </p>
           <div className="storage-bar-track" style={{ marginTop: '8px' }}>
             <div className="storage-bar-fill" style={{ width: `${Math.min(100, Math.round((usoBytes / LIMITE_BYTES) * 100))}%` }} />

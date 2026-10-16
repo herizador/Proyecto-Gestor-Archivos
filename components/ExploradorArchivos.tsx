@@ -24,6 +24,7 @@ export default function ExploradorArchivos({
   vacio,
   favoritosIniciales = [],
   ubicaciones = {},
+  seccionCarpetas = null,
 }: {
   archivos: ArchivoConAutor[]
   carpetas: CarpetaConAutor[]
@@ -33,10 +34,12 @@ export default function ExploradorArchivos({
   vacio: ReactNode
   favoritosIniciales?: string[]
   ubicaciones?: Record<string, string>
+  seccionCarpetas?: ReactNode
 }) {
   const [orden, setOrden] = useState<Orden>('recientes')
   const [vista, setVista] = useState<Vista>('cuadricula')
-  const hayContenido = archivos.length > 0 || carpetas.length > 0 || accesos.length > 0
+  const hayArchivos = archivos.length > 0 || accesos.length > 0
+  const hayContenido = hayArchivos || carpetas.length > 0 || seccionCarpetas !== null
 
   return (
     <DocumentSearchBar
@@ -63,20 +66,25 @@ export default function ExploradorArchivos({
       {!hayContenido ? (
         vacio
       ) : (
-        <FileListWrapper
-          archivos={archivos}
-          carpetas={carpetas}
-          accesos={accesos}
-          isAdmin={isAdmin}
-          userId={userId}
-          ordenExterno={orden}
-          vistaExterna={vista}
-          alCambiarOrden={setOrden}
-          alCambiarVista={setVista}
-          ocultarBarra
-          favoritosIniciales={favoritosIniciales}
-          ubicaciones={ubicaciones}
-        />
+        <>
+          {seccionCarpetas}
+          {(hayArchivos || !seccionCarpetas) && (
+            <FileListWrapper
+              archivos={archivos}
+              carpetas={carpetas}
+              accesos={accesos}
+              isAdmin={isAdmin}
+              userId={userId}
+              ordenExterno={orden}
+              vistaExterna={vista}
+              alCambiarOrden={setOrden}
+              alCambiarVista={setVista}
+              ocultarBarra
+              favoritosIniciales={favoritosIniciales}
+              ubicaciones={ubicaciones}
+            />
+          )}
+        </>
       )}
     </DocumentSearchBar>
   )

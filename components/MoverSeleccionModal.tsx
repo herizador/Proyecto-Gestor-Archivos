@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { FolderInput, X, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
 import { moverElementosBatch } from '@/actions/mover'
 import { listarRaicesAcceso, type ObjetivoEnlace } from '@/actions/accesos'
+import { resolverSeleccion } from '@/actions/seleccion'
 import ExploradorDestino, { type DestinoElegido } from '@/components/ExploradorDestino'
 import { avisar } from '@/components/Avisos'
 import type { Carpeta } from '@/types/database'
@@ -17,21 +18,23 @@ type Resultado = {
   total: number
 }
 
-// Botón "Mover" del modo selección + modal: traslada N archivos/carpetas al
-// destino elegido. Entre ámbitos también mueve los bytes en R2; las carpetas
-// solo se mueven dentro de su ámbito. La raíz es un destino válido.
+// Botón "Mover" del modo selección + modal: traslada N archivos/carpetas (de
+// cualquier carpeta: la selección global se rehidrata al abrir) al destino
+// elegido. Entre ámbitos también mueve los bytes en R2; las carpetas solo se
+// mueven dentro de su ámbito. La raíz es un destino válido.
 export default function MoverSeleccionModal({
-  objetivos,
+  ids,
   basePath = '/',
   onMovidos,
 }: {
-  objetivos: ObjetivoEnlace[]
+  ids: string[]
   basePath?: string
   onMovidos: () => void
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [raices, setRaices] = useState<{ comun: Carpeta[]; privadas: Carpeta[] } | null>(null)
-  const [cargandoRaices, setCargandoRaices] = useState(false)
+  const [cargando, setCargando] = useState(false)
+  const [objetivos, setObjetivos] = useState<ObjetivoEnlace[]>([])
   const [userId, setUserId] = useState('')
   const [isAdmin, setIsAdmin] = useState(false)
   const [resultado, setResultado] = useState<Resultado | null>(null)
@@ -56,14 +59,27 @@ export default function MoverSeleccionModal({
   }, [isOpen])
 
   async function abrir() {
-    if (objetivos.length === 0) return
-    setCargandoRaices(true)
+    if (ids.length === 0) return
+    setCargando(true)
     try {
-      const res = await listarRaicesAcceso()
+      const [res, sel] = await Promise.all([listarRaicesAcceso(), resolverSeleccion(ids)])
       if ('error' in res) {
         avisar('error', res.error ?? 'No se pudieron cargar las carpetas.')
         return
       }
+      if ('error' in sel) {
+        avisar('error', sel.error ?? 'No se pudo leer la selección.')
+        return
+      }
+      const objs: ObjetivoEnlace[] = [
+        ...sel.archivos.map((a) => ({ tipo: 'archivo' as const, id: a.id, nombre: a.nombre_original })),
+        ...sel.carpetas.map((c) => ({ tipo: 'carpeta' as const, id: c.id, nombre: c.nombre })),
+      ]
+      if (objs.length === 0) {
+        avisar('error', 'Lo seleccionado ya no está disponible.')
+        return
+      }
+      setObjetivos(objs)
       setRaices({ comun: res.comun, privadas: res.privadas })
       setUserId(res.userId)
       setIsAdmin(res.isAdmin)
@@ -71,9 +87,9 @@ export default function MoverSeleccionModal({
       setDestinoHref(null)
       setIsOpen(true)
     } catch {
-      avisar('error', 'No se pudieron cargar las carpetas. Revisa tu conexión.')
+      avisar('error', 'No se pudo preparar. Revisa tu conexión.')
     } finally {
-      setCargandoRaices(false)
+      setCargando(false)
     }
   }
 
@@ -111,12 +127,12 @@ export default function MoverSeleccionModal({
         type="button"
         className="btn btn-primary btn-sm"
         onClick={abrir}
-        disabled={cargandoRaices || objetivos.length === 0}
+        disabled={cargando || ids.length === 0}
         style={{ minHeight: '36px' }}
         title="Mover lo seleccionado a otra carpeta"
       >
-        {cargandoRaices ? <Loader2 size={14} className="animate-spin" /> : <FolderInput size={14} />}
-        {cargandoRaices ? 'Cargando…' : `Mover (${objetivos.length})`}
+        {cargando ? <Loader2 size={14} className="animate-spin" /> : <FolderInput size={14} />}
+        {cargando ? 'Cargando…' : `Mover (${ids.length})`}
       </button>
 
       {isOpen && raices && typeof document !== 'undefined'

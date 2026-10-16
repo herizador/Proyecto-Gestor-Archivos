@@ -169,7 +169,7 @@ export function FilaArchivo({
     ...(puedeEnlazar
       ? [{
           icono: <UserPlus size={16} />,
-          texto: 'Compartir',
+          texto: 'Compartir con un miembro',
           onClick: () => setCompartirAbierto(true),
           deshabilitado: loading,
         }]
@@ -367,7 +367,7 @@ export function FilaCarpeta({
     ...(editable
       ? [{
           icono: <UserPlus size={16} />,
-          texto: 'Compartir',
+          texto: 'Compartir con un miembro',
           onClick: () => setCompartirAbierto(true),
         }]
       : []),
