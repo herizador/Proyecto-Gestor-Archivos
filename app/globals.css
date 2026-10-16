@@ -1383,6 +1383,7 @@ tbody tr:hover td { background: var(--color-surface-2); }
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
+  width: 100%;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -1390,6 +1391,7 @@ tbody tr:hover td { background: var(--color-surface-2); }
   min-width: 0;
   overflow: hidden; /* el desplegable ⋯ vive en portal: recortar aquí es seguro */
 }
+.fila-lista > * { min-width: 0; }
 .fila-lista:hover { border-color: var(--color-border-hover); }
 .lista-archivos > * { min-width: 0; }
 .btn-ghost.vista-activa {
