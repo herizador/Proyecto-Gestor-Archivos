@@ -68,6 +68,10 @@
 
 html { font-size: 16px; -webkit-font-smoothing: antialiased; }
 
+html, body {
+  overflow-x: clip; /* cortafuegos: ningún contenido puede ensanchar la página */
+}
+
 body {
   font-family: 'Inter', system-ui, sans-serif;
   background-color: var(--color-bg);
@@ -819,6 +823,7 @@ input, textarea, select { font-family: inherit; }
   font-size: 0.9rem;
   font-weight: 600;
   word-break: break-word;
+  max-width: 100%; /* en columna centrada, sin esto el nombre manda en el ancho */
 }
 .folder-card-meta {
   font-size: 0.75rem;
