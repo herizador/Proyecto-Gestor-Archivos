@@ -699,6 +699,22 @@ input, textarea, select { font-family: inherit; }
   margin-bottom: 0;
   min-width: 0;
 }
+
+/* En móvil la fila se parte: búsqueda + vista arriba, seleccionar y orden abajo */
+@media (max-width: 768px) {
+  .fila-busqueda .search-bar-wrap {
+    flex: 1 1 calc(100% - 108px);
+    order: 1;
+  }
+  .fila-busqueda .grupo-vista { order: 2; }
+  .fila-busqueda .btn-seleccionar {
+    order: 3;
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+  .fila-busqueda .orden-select { order: 4; flex: 1 1 100%; width: 100%; }
+  .fila-busqueda .btn-cmdk { display: none; }
+}
 .search-bar-wrap {
   position: relative;
   display: flex;

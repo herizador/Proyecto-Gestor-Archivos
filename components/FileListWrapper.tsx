@@ -87,6 +87,8 @@ export default function FileListWrapper({
   modoSeleccionExterno,
   alCambiarModo,
   ocultarSeleccion = false,
+  tituloArchivos = null,
+  limiteInicial = 0,
 }: {
   archivos: ArchivoConAutor[]
   carpetas: CarpetaConAutor[]
@@ -105,6 +107,8 @@ export default function FileListWrapper({
   modoSeleccionExterno?: boolean
   alCambiarModo?: (v: boolean) => void
   ocultarSeleccion?: boolean
+  tituloArchivos?: string | null
+  limiteInicial?: number
 }) {
   const router = useRouter()
   // Modo compartible con la fila de búsqueda (ExploradorArchivos): si hay
@@ -310,6 +314,13 @@ export default function FileListWrapper({
     [accesosCarpetas, orden]
   )
 
+  // Vista previa con "Mostrar todos": recorta los archivos (los accesos, pocos,
+  // van siempre enteros). Sin límite no recorta nada.
+  const [expandido, setExpandido] = useState(false)
+  const recortado = limiteInicial > 0 && !expandido && archivosOrdenados.length > limiteInicial
+  const archivosVisibles = recortado ? archivosOrdenados.slice(0, limiteInicial) : archivosOrdenados
+  const tituloArchivosFinal = tituloArchivos ?? ((carpetas.length > 0 || accesosCarpetas.length > 0) ? 'Archivos' : null)
+
   const enLista = vista === 'lista'
   const sel = (id: string) => isSelectionMode && selectedIds.includes(id)
   const alAlternar = isSelectionMode ? toggleSelect : undefined
@@ -425,10 +436,10 @@ export default function FileListWrapper({
 
       {(archivos.length > 0 || accesosArchivos.length > 0) && (
         <section>
-          {(carpetas.length > 0 || accesosCarpetas.length > 0) && <h2 className="section-title">Archivos</h2>}
+          {tituloArchivosFinal && <h2 className="section-title">{tituloArchivosFinal}</h2>}
           {enLista ? (
             <div className="lista-archivos">
-              {archivosOrdenados.map((archivo) => (
+              {archivosVisibles.map((archivo) => (
                 <FilaArchivo
                   key={archivo.id}
                   file={archivo}
@@ -458,7 +469,7 @@ export default function FileListWrapper({
             </div>
           ) : (
           <div className="grid-files">
-            {archivosOrdenados.map((archivo) => (
+            {archivosVisibles.map((archivo) => (
               <FileCard
                 key={archivo.id}
                 file={archivo}
@@ -486,6 +497,18 @@ export default function FileListWrapper({
               )
             })}
           </div>
+          )}
+          {recortado && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '4px' }}>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setExpandido(true)}
+                style={{ minHeight: '40px' }}
+              >
+                Mostrar todos ({archivosOrdenados.length})
+              </button>
+            </div>
           )}
         </section>
       )}

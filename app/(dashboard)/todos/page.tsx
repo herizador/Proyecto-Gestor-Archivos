@@ -85,6 +85,8 @@ export default async function TodosPage() {
         userId={user.id}
         favoritosIniciales={favIds}
         ubicaciones={ubicaciones}
+        tituloArchivos="Archivos"
+        limiteInicial={8}
         seccionCarpetas={
           (comunes.length > 0 || privadas.length > 0) ? (
             <section style={{ marginBottom: '24px' }}>

@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react'
 import { List } from 'lucide-react'
 import DocumentSearchBar from '@/components/DocumentSearchBar'
 import FileListWrapper from '@/components/FileListWrapper'
-import BarraOrdenVista, { type Orden, type Vista } from '@/components/BarraOrdenVista'
+import { SelectorOrden, ToggleVista, type Orden, type Vista } from '@/components/BarraOrdenVista'
 import { abrirPaleta } from '@/components/PaletaComandos'
 import { obtenerSeleccion } from '@/lib/seleccion'
 import { Command } from 'lucide-react'
@@ -27,6 +27,8 @@ export default function ExploradorArchivos({
   favoritosIniciales = [],
   ubicaciones = {},
   seccionCarpetas = null,
+  tituloArchivos,
+  limiteInicial = 0,
 }: {
   archivos: ArchivoConAutor[]
   carpetas: CarpetaConAutor[]
@@ -37,6 +39,8 @@ export default function ExploradorArchivos({
   favoritosIniciales?: string[]
   ubicaciones?: Record<string, string>
   seccionCarpetas?: ReactNode
+  tituloArchivos?: string | null
+  limiteInicial?: number
 }) {
   const [orden, setOrden] = useState<Orden>('recientes')
   const [vista, setVista] = useState<Vista>('cuadricula')
@@ -55,7 +59,7 @@ export default function ExploradorArchivos({
             {!modo && (
               <button
                 type="button"
-                className="btn btn-ghost btn-sm"
+                className="btn btn-ghost btn-sm btn-seleccionar"
                 onClick={() => setModo(true)}
                 style={{ minHeight: '44px', flexShrink: 0 }}
                 title="Seleccionar varios para actuar en lote"
@@ -63,10 +67,11 @@ export default function ExploradorArchivos({
                 <List size={16} /> Seleccionar
               </button>
             )}
-            <BarraOrdenVista orden={orden} vista={vista} onOrden={setOrden} onVista={setVista} compacta />
+            <SelectorOrden orden={orden} onOrden={setOrden} id="orden-busqueda" />
+            <ToggleVista vista={vista} onVista={setVista} />
             <button
               type="button"
-              className="btn-ghost btn-icon"
+              className="btn-ghost btn-icon btn-cmdk"
               onClick={abrirPaleta}
               title="Búsqueda rápida (Ctrl+K)"
               aria-label="Búsqueda rápida (Ctrl+K)"
@@ -100,6 +105,8 @@ export default function ExploradorArchivos({
               ocultarSeleccion
               favoritosIniciales={favoritosIniciales}
               ubicaciones={ubicaciones}
+              tituloArchivos={tituloArchivos}
+              limiteInicial={limiteInicial}
             />
           )}
         </>
