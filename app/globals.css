@@ -1298,6 +1298,14 @@ tbody tr:hover td { background: var(--color-surface-2); }
     box-shadow: var(--shadow-md);
   }
 
+  /* Ritmo vertical en móvil: más aire entre secciones y filas */
+  .lista-archivos { gap: 12px; }
+  .grid-folders { gap: 14px; }
+  .grid-files { gap: 14px; }
+  .section-title { margin-bottom: 14px; }
+  .page-header { margin-bottom: 28px; }
+  .search-section { margin-bottom: 20px; }
+
   /* Tablas apiladas (historial, usuarios): cada fila pasa a tarjeta con etiquetas */
   .table-stack thead {
     position: absolute; width: 1px; height: 1px;
@@ -1379,8 +1387,11 @@ tbody tr:hover td { background: var(--color-surface-2); }
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   transition: border-color var(--transition-base);
+  min-width: 0;
+  overflow: hidden; /* el desplegable ⋯ vive en portal: recortar aquí es seguro */
 }
 .fila-lista:hover { border-color: var(--color-border-hover); }
+.lista-archivos > * { min-width: 0; }
 .btn-ghost.vista-activa {
   border-color: var(--color-accent);
   color: var(--color-accent);
