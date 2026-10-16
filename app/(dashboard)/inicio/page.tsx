@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Files, Users, Clock, HardDrive, Folder, ArrowRight, ShieldCheck } from 'lucide-react'
 import RecordatoriosPortada from '@/components/RecordatoriosPortada'
+import AnilloProgreso from '@/components/AnilloProgreso'
 import { formatoCorto } from '@/lib/formatos'
 import { listarRecordatorios } from '@/actions/recordatorios'
 import { listarActividadReciente } from '@/actions/storage'
@@ -175,16 +176,15 @@ export default async function InicioPage() {
             {vencidos > 0 ? `${vencidos} vencidos` : 'ninguno vencido'}
           </p>
         </div>
-        <div className="card" style={{ padding: '20px' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '6px' }}>
-            <HardDrive size={16} /> Almacenamiento
-          </p>
-          <p style={{ fontSize: '1.6rem', fontWeight: 700 }}>
-            {formatoCorto(usoBytes)}
-          </p>
-          <div className="storage-bar-track" style={{ marginTop: '8px' }}>
-            <div className="storage-bar-fill" style={{ width: `${Math.min(100, Math.round((usoBytes / LIMITE_BYTES) * 100))}%` }} />
+        <div className="card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '6px' }}>
+              <HardDrive size={16} /> Almacenamiento
+            </p>
+            <p style={{ fontSize: '1.6rem', fontWeight: 700 }}>{formatoCorto(usoBytes)}</p>
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>de 9 GB utilizados</p>
           </div>
+          <AnilloProgreso pct={(usoBytes / LIMITE_BYTES) * 100} />
         </div>
       </div>
 

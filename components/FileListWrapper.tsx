@@ -8,7 +8,7 @@ import { eliminarAcceso } from '@/actions/accesos'
 import { alternarFavorito } from '@/actions/favoritos'
 import { moverAPapeleraBatch } from '@/actions/files'
 import { resolverSeleccion } from '@/actions/seleccion'
-import { useSeleccion, fijarSeleccion } from '@/lib/seleccion'
+import { useSeleccion, fijarSeleccion, obtenerSeleccion } from '@/lib/seleccion'
 import FileCard from '@/components/FileCard'
 import FolderCard from '@/components/FolderCard'
 import NuevoAccesoModal from '@/components/NuevoAccesoModal'
@@ -83,6 +83,9 @@ export default function FileListWrapper({
   alCambiarVista,
   favoritosIniciales = [],
   ubicaciones = {},
+  modoSeleccionExterno,
+  alCambiarModo,
+  ocultarSeleccion = false,
 }: {
   archivos: ArchivoConAutor[]
   carpetas: CarpetaConAutor[]
@@ -98,9 +101,20 @@ export default function FileListWrapper({
   alCambiarVista?: (v: Vista) => void
   favoritosIniciales?: string[]
   ubicaciones?: Record<string, string>
+  modoSeleccionExterno?: boolean
+  alCambiarModo?: (v: boolean) => void
+  ocultarSeleccion?: boolean
 }) {
   const router = useRouter()
-  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  // Modo compartible con la fila de búsqueda (ExploradorArchivos): si hay
+  // selección global al montar (venimos de otra carpeta), arranca activo para
+  // no confundir. En SSR el store está vacío en ambos lados: sin mismatch.
+  const [modoInt, setModoInt] = useState(() => modoSeleccionExterno ?? obtenerSeleccion().length > 0)
+  const isSelectionMode = modoSeleccionExterno ?? modoInt
+  function setModo(v: boolean) {
+    if (alCambiarModo) alCambiarModo(v)
+    else setModoInt(v)
+  }
   // Selección GLOBAL de la sesión (lib/seleccion.ts): sobrevive a navegar
   // entre carpetas; al actuar se rehidrata con resolverSeleccion().
   const selectedIds = useSeleccion()
@@ -144,7 +158,7 @@ export default function FileListWrapper({
   }
 
   function exitSelectionMode() {
-    setIsSelectionMode(false)
+    setModo(false)
     fijarSeleccion([])
     setShareResult(null)
   }
@@ -331,11 +345,11 @@ export default function FileListWrapper({
         }}
       >
         {!isSelectionMode ? (
-          hasItems && (
+          hasItems && !ocultarSeleccion && (
             <button
               type="button"
               className="btn btn-ghost btn-sm"
-              onClick={() => setIsSelectionMode(true)}
+              onClick={() => setModo(true)}
               style={{ minHeight: '36px' }}
             >
               <List size={16} />
