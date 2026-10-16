@@ -378,7 +378,7 @@ input, textarea, select { font-family: inherit; }
   z-index: 50;
 }
 
-.page-content { padding: 32px; flex: 1; max-width: 1200px; }
+.page-content { padding: 32px; flex: 1; max-width: min(1440px, 100%); }
 
 .page-header { margin-bottom: 32px; }
 .eyebrow {
