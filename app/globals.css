@@ -1041,7 +1041,10 @@ tbody tr:hover td { background: var(--color-surface-2); }
    En móvil el panel izquierdo se reduce a la marca.
    ============================================================ */
 .login-split {
+  /* dvh y no vh: en móvil 100vh es el viewport GRANDE (con la barra de URL
+     desplegada), así que siempre sobraba trozo por deslizar hacia abajo. */
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: stretch;
   background: var(--color-bg);
@@ -1261,9 +1264,15 @@ tbody tr:hover td { background: var(--color-surface-2); }
 
 .login-hecho { font-size: 0.7rem; color: var(--color-text-muted); }
 
-/* En móvil el panel izquierdo se reduce a la marca */
+/* En móvil el panel izquierdo se reduce a la marca. El resplandor pasa al
+   contenedor para que no haya escalón entre la marca y el formulario. */
 @media (max-width: 900px) {
-  .login-split { flex-direction: column; }
+  .login-split {
+    flex-direction: column;
+    background:
+      radial-gradient(700px 400px at 50% 0%, rgba(79,142,247,0.07), transparent 70%),
+      var(--color-bg);
+  }
   .login-aside {
     width: auto;
     gap: 0;
@@ -1277,6 +1286,7 @@ tbody tr:hover td { background: var(--color-surface-2); }
   .login-relato,
   .login-pie { display: none; }
   .login-principal {
+    background: transparent; /* el resplandor ya lo pone .login-split */
     justify-content: safe center; /* centrado vertical, sin recortar en pantallas cortas */
     padding: 24px 20px 32px;
   }
