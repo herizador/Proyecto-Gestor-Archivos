@@ -9,12 +9,15 @@ import { logLogin } from './storage' // Usamos logLogin que ya creamos
 export async function login(formData: FormData) {
   const email = formData.get('email') as string
   const password = formData.get('password') as string
+  const recordar = formData.get('recordar') === 'on'
 
   if (!email || !password) {
     return { error: 'Email y contraseña son obligatorios.' }
   }
 
-  const supabase = await createClient()
+  // Sin "Recordar este dispositivo" la sesión se emite como cookie de sesión:
+  // desaparece al cerrar el navegador.
+  const supabase = await createClient({ sesionTemporal: !recordar })
 
   const { error } = await supabase.auth.signInWithPassword({
     email,
@@ -23,6 +26,19 @@ export async function login(formData: FormData) {
 
   if (error) {
     return { error: error.message }
+  }
+
+  // Marca de preferencia (sin secretos). El middleware la lee para no devolver
+  // la caducidad larga a las cookies de sesión cuando refresca el token.
+  const jar = await cookies()
+  if (recordar) {
+    jar.set('recordar_equipo', '', { path: '/', maxAge: 0 })
+  } else {
+    jar.set('recordar_equipo', 'no', {
+      path: '/',
+      sameSite: 'lax',
+      maxAge: 400 * 24 * 60 * 60,
+    })
   }
 
   // Registramos el login en el historial de forma asíncrona
@@ -34,6 +50,8 @@ export async function login(formData: FormData) {
 export async function logout() {
   const supabase = await createClient()
   await supabase.auth.signOut()
+  const jar = await cookies()
+  jar.set('recordar_equipo', '', { path: '/', maxAge: 0 })
   redirect('/login')
 }
 

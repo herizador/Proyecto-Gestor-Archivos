@@ -5,6 +5,10 @@ import type { Database } from '@/types/database'
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
+  // Si el usuario no marcó "Recordar este dispositivo" al entrar, el refresco
+  // de token mantiene las cookies de sesión sin caducidad (cookie de sesión).
+  const sinRecordar = request.cookies.get('recordar_equipo')?.value === 'no'
+
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -17,7 +21,11 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(
+              name,
+              value,
+              sinRecordar ? { ...options, maxAge: undefined, expires: undefined } : options
+            )
           )
         },
       },
