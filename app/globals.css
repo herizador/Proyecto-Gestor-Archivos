@@ -361,6 +361,10 @@ input, textarea, select { font-family: inherit; }
 
 .main-content {
   flex: 1;
+  /* CLAVE: como hijo flex, sin min-width:0 su mínimo es el "min-content" de todo
+     su contenido. Un nombre de archivo sin cortar (nowrap) en la vista de lista
+     empujaba el layout entero más ancho que la pantalla. */
+  min-width: 0;
   margin-left: var(--sidebar-width);
   min-height: 100vh;
   display: flex;
@@ -382,7 +386,7 @@ input, textarea, select { font-family: inherit; }
   z-index: 50;
 }
 
-.page-content { padding: 32px; flex: 1; max-width: min(1440px, 100%); }
+.page-content { padding: 32px; flex: 1; width: 100%; min-width: 0; max-width: min(1440px, 100%); }
 
 .page-header { margin-bottom: 32px; }
 .eyebrow {
@@ -1090,6 +1094,7 @@ tbody tr:hover td { background: var(--color-surface-2); }
 .file-card-meta {
   font-size: 0.75rem;
   color: var(--color-text-muted);
+  overflow-wrap: anywhere; /* rutas/ubicaciones largas no ensanchan la página */
 }
 
 .file-card-author {
@@ -1379,6 +1384,8 @@ tbody tr:hover td { background: var(--color-surface-2); }
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 .lista-archivos > * {
   animation: riseIn 0.4s var(--ease-spring) backwards;
@@ -1386,9 +1393,11 @@ tbody tr:hover td { background: var(--color-surface-2); }
 .fila-lista {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 12px;
   padding: 10px 12px;
   width: 100%;
+  max-width: 100%;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
