@@ -202,16 +202,17 @@ export default function LoginPage() {
               </p>
             )}
 
-            <label className="fila-check" htmlFor="recordar">
-              <input
-                id="recordar"
-                name="recordar"
-                type="checkbox"
-                className="checkbox-input"
-                checked={recordar}
-                onChange={(e) => setRecordar(e.target.checked)}
-              />
-              <span>Recordar este dispositivo</span>
+            <label className="fila-switch">
+              <span className="switch">
+                <input
+                  type="checkbox"
+                  name="recordar"
+                  checked={recordar}
+                  onChange={(e) => setRecordar(e.target.checked)}
+                />
+                <span className="switch-slider" />
+              </span>
+              <span className="fila-switch-texto">Recordar este dispositivo</span>
             </label>
 
             <button
