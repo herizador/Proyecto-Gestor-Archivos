@@ -1,7 +1,7 @@
 # Diseño: puente WebDAV con escritura (fase futura)
 
 Estado: **especificación** (2026-10-08). No implementar hasta que la lectura
-ruede unas semanas. Base: `docs/diseno-webdav.md` (solo-lectura, en producción).
+ruede unas semanas. Base: `docs/diseno/webdav.md` (solo-lectura, en producción).
 
 ## 1. Objetivo y fases
 

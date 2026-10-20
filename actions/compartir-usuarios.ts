@@ -12,7 +12,7 @@ type CarpetaConAutor = Carpeta & {
 type Recurso = 'archivo' | 'carpeta'
 
 // ---------------------------------------------------------------------------
-// Cesiones nominales entre miembros (ver docs/diseno-compartidos.md).
+// Cesiones nominales entre miembros (ver docs/diseno/compartidos.md).
 // Solo el dueño o el admin ceden; el destinatario debe ser otro miembro.
 // ---------------------------------------------------------------------------
 async function soyDuenoOAdmin(
@@ -124,7 +124,7 @@ export async function listarMiembros() {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.', data: [] as Array<{ id: string; nombre: string }> }
 
-  // Requiere la policy de directorio (ver supabase/migracion-directorio.sql):
+  // Requiere la policy de directorio (ver supabase/migraciones/directorio.sql):
   // todo autenticado ve id + nombre del resto.
   const { data, error } = await supabase
     .from('perfiles')

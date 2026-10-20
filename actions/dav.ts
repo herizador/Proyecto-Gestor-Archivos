@@ -14,7 +14,7 @@ export type TokenDavVisible = {
 }
 
 // ---------------------------------------------------------------------------
-// Tokens de Explorador para el puente WebDAV (ver docs/diseno-webdav.md).
+// Tokens de Explorador para el puente WebDAV (ver docs/diseno/webdav.md).
 // El token en claro se devuelve SOLO al crearlo; en BD solo vive su SHA-256.
 // RLS: cada usuario gestiona los suyos; el admin ve/revoca los de todos.
 // ---------------------------------------------------------------------------

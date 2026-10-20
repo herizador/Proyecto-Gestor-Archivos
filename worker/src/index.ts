@@ -1,6 +1,6 @@
 // Puente WebDAV solo-lectura: Explorador de Windows / Finder → R2 vía Supabase.
 // Solo lectura: OPTIONS, PROPFIND (depth 0/1), GET (+Range), HEAD. El resto → 501.
-// Diseño completo en docs/diseno-webdav.md. Sin dependencias: solo fetch + binding R2.
+// Diseño completo en docs/diseno/webdav.md. Sin dependencias: solo fetch + binding R2.
 
 interface Env {
   BUCKET: R2Bucket

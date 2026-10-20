@@ -1,4 +1,4 @@
-# Puente WebDAV solo-lectura del Gestor Familiar (ver docs/diseno-webdav.md).
+# Puente WebDAV solo-lectura del Gestor Familiar (ver docs/diseno/webdav.md).
 # Deploy: `npx wrangler deploy` desde esta carpeta (sustituye el worker actual).
 # Secretos (nunca en este fichero): `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY`
 

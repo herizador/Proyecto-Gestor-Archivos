@@ -8,7 +8,7 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20 MB, igual que la subida normal
 
 // Subida directa para automatizaciones (Atajo de iOS, scripts): la PWA no puede
 // recibir shares en iPhone, así que el Atajo envía el archivo aquí con un token
-// de Explorador (los mismos de /ajustes). Ver docs/atajo-ios.md.
+// de Explorador (los mismos de /ajustes). Ver docs/guias/atajo-ios.md.
 // Auth: `Authorization: Bearer <token>`. Sin sesión de navegador (ruta pública
 // en middleware.ts); la autorización se valida por token + reglas manuales.
 export async function POST(request: Request) {

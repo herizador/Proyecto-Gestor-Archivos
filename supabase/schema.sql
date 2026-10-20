@@ -340,7 +340,7 @@ CREATE POLICY "favoritos_propio" ON public.favoritos
 
 -- =============================================================================
 -- TABLA: compartidos (cesiones nominales entre miembros)
--- Ver docs/diseno-compartidos.md. La visibilidad con herencia vive en
+-- Ver docs/diseno/compartidos.md. La visibilidad con herencia vive en
 -- carpeta_visible_para(), usada por carpetas_select y archivos_select.
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS public.compartidos (
@@ -565,7 +565,7 @@ CREATE POLICY "accesos_delete_propio_admin" ON public.accesos_directos
 -- El token en claro solo existe al crearlo; en BD solo vive su hash SHA-256.
 -- La PWA gestiona tokens propios vía RLS; el Worker usa service-role.
 -- Sin UPDATE salvo revocar: los tokens no se editan.
--- Ver docs/diseno-webdav.md
+-- Ver docs/diseno/webdav.md
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS public.tokens_dav (
   id             UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -601,7 +601,7 @@ CREATE POLICY "tokens_dav_delete" ON public.tokens_dav
 
 -- =============================================================================
 -- TABLA: recordatorios (avisos de vencimiento por usuario; nunca borran nada)
--- Ver supabase/migracion-recordatorios.sql
+-- Ver supabase/migraciones/recordatorios.sql
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS public.recordatorios (
   id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -636,7 +636,7 @@ CREATE POLICY "recordatorios_propio" ON public.recordatorios
 -- Reclamos de invitación de un solo uso (30 min): el enlace del email autoriza
 -- ÚNICAMENTE a definir la contraseña, nunca a navegar con sesión. Solo la usa
 -- el servidor con service-role (RLS activado sin policies = denegado a resto).
--- Ver docs/invitaciones.md
+-- Ver docs/guias/invitaciones.md
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS public.invitaciones_pendientes (
   id             UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),

@@ -157,7 +157,7 @@ La policy `historial_insert_sistema` ya permite INSERT.
   (30/min por IP sin auth, 300/min por token; `429` + `Retry-After`), `Cache-Control:
   no-store` en todo, tope de 25 segmentos, `Allow` en el `501`, `ultimo_uso` +
   auditoría `ACCESO_WEBDAV` en cada GET, script `worker/test/smoke.mjs` y guía
-  `docs/alta-explorador.md`.
+  `docs/guias/alta-explorador.md`.
 - **Futuro (no diseñado)**: escritura PUT (locks, subidas parciales, cupo 9 GB).
 
 ## 11. Decisiones (cerradas 2026-10-04)

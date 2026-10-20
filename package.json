@@ -2,6 +2,16 @@
   "name": "gestor-archivos-familia",
   "version": "0.1.0",
   "private": true,
+  "license": "UNLICENSED",
+  "author": "Ismael Mateo Díaz Gutiérrez <ismel386827@gmail.com>",
+  "homepage": "https://proyecto-gestor-archivos.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/herizador/Proyecto-Gestor-Archivos.git"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",

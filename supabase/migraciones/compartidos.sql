@@ -3,7 +3,7 @@
 -- Pegar TODO este fichero en Supabase → SQL Editor → Run, UNA sola vez y
 -- entero (si falla una sentencia, el editor aborta el resto: no pegues trozos).
 -- Todo es re-ejecutable: IF NOT EXISTS / OR REPLACE / DROP ... IF EXISTS.
--- Detalle en docs/diseno-compartidos.md
+-- Detalle en docs/diseno/compartidos.md
 -- =============================================================================
 
 -- 1) Tabla + índices + policies propias --------------------------------------
