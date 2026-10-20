@@ -226,7 +226,7 @@ export async function descargarArchivo(archivoId: string) {
 // A diferencia de descargar, registra COMPARTIR_EXTERNO para distinguir en el
 // historial "lo mandé fuera" de "lo bajé a este dispositivo". Resuelve accesos.
 // ---------------------------------------------------------------------------
-export async function enviarArchivo(archivoId: string) {
+export async function enviarArchivo(archivoId: string, auditar = true) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
@@ -237,6 +237,37 @@ export async function enviarArchivo(archivoId: string) {
   try {
     const url = await getPresignedDownloadUrl(resuelto.ruta_r2, resuelto.nombre_original)
 
+    // auditar=false en el flujo en dos pasos: se registra al compartir de
+    // verdad, no al preparar (si el usuario cancela no debe quedar rastro).
+    if (auditar) {
+      await logActivity({
+        accion: 'COMPARTIR_EXTERNO',
+        detalles: {
+          archivo_id: resuelto.originalId,
+          nombre_original: resuelto.nombre_original,
+          ...(resuelto.accesoId ? { acceso_id: resuelto.accesoId } : {}),
+        },
+      })
+    }
+
+    return { url, nombreOriginal: resuelto.nombre_original, tipoMime: resuelto.tipo_mime }
+  } catch {
+    return { error: 'Error al preparar el archivo para enviar.' }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Auditoría diferida del envío externo: se llama solo cuando el menú del
+// sistema confirma que el envío se completó (no en cancelaciones).
+// ---------------------------------------------------------------------------
+export async function registrarEnvioExterno(archivoIds: string[]) {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'No autenticado.' }
+
+  for (const id of archivoIds) {
+    const resuelto = await resolverObjetivo(supabase, id)
+    if ('error' in resuelto) continue
     await logActivity({
       accion: 'COMPARTIR_EXTERNO',
       detalles: {
@@ -245,11 +276,9 @@ export async function enviarArchivo(archivoId: string) {
         ...(resuelto.accesoId ? { acceso_id: resuelto.accesoId } : {}),
       },
     })
-
-    return { url, nombreOriginal: resuelto.nombre_original, tipoMime: resuelto.tipo_mime }
-  } catch {
-    return { error: 'Error al preparar el archivo para enviar.' }
   }
+
+  return { ok: true }
 }
 
 // ---------------------------------------------------------------------------
