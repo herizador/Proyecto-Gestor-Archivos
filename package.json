@@ -16,7 +16,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "r2:diagnostico": "node --env-file=.env.local scripts/r2.mjs diagnostico",
+    "r2:cors": "node --env-file=.env.local scripts/r2.mjs cors"
   },
   "dependencies": {
     "next": "16.2.6",

@@ -22,38 +22,48 @@ export default function UploadModal({
   if (!isOpen) return null
 
   async function handleUpload() {
-    if (!file) return
+    if (!file || loading) return
     setLoading(true)
     setError(null)
 
     const contentType = file.type || 'application/octet-stream'
 
-    // 1. Pedir URL pre-firmada al servidor
-    const { uploadUrl, key, error: urlError } = await getUploadUrl({
-      fileName: file.name,
-      contentType,
-      fileSize: file.size,
-      carpetaId,
-      scope,
-    })
-
-    if (urlError || !uploadUrl || !key) {
-      setError(urlError || 'Error al solicitar subida')
-      setLoading(false)
-      return
-    }
-
     try {
-      // 2. Subir directamente a Cloudflare R2 (solo headers incluidos en la firma)
-      const r2Response = await fetch(uploadUrl, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': contentType },
-        credentials: 'omit',
+      // 1. Pedir URL pre-firmada al servidor
+      const { uploadUrl, key, error: urlError } = await getUploadUrl({
+        fileName: file.name,
+        contentType,
+        fileSize: file.size,
+        carpetaId,
+        scope,
       })
 
+      if (urlError || !uploadUrl || !key) {
+        setError(urlError || 'No se pudo preparar la subida. Inténtalo otra vez.')
+        return
+      }
+
+      // 2. Subir directamente a Cloudflare R2 (solo headers incluidos en la firma)
+      let r2Response: Response
+      try {
+        r2Response = await fetch(uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': contentType },
+          credentials: 'omit',
+        })
+      } catch {
+        // TypeError "Failed to fetch": red caída, CORS o un proxy que corta la conexión.
+        setError(
+          'No se pudo conectar con el almacenamiento. Prueba con otra red (datos móviles) o espera un rato: en España, algunos operadores bloquean Cloudflare durante los partidos de LaLiga. El archivo no se ha subido.'
+        )
+        return
+      }
+
       if (!r2Response.ok) {
-        throw new Error('Error al subir a R2')
+        const pista = r2Response.status === 403 ? ' Vuelve a iniciar sesión y reinténtalo.' : ''
+        setError(`El almacenamiento rechazó la subida (HTTP ${r2Response.status}).${pista}`)
+        return
       }
 
       // 3. Registrar en BD y crear Audit Log
@@ -67,17 +77,17 @@ export default function UploadModal({
 
       if (dbError) {
         setError(dbError)
-        setLoading(false)
         return
       }
 
       // Éxito
       setFile(null)
       onClose()
-    } catch (e: any) {
-      setError(e.message || 'Error de conexión')
+    } catch {
+      setError('No se pudo completar la subida. Comprueba tu conexión e inténtalo otra vez.')
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (

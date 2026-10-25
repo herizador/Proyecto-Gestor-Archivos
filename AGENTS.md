@@ -29,6 +29,7 @@ npm run lint     # ESLint (sin prettier/biome)
 - `S3Client` lleva `forcePathStyle: true` y `requestChecksumCalculation / responseChecksumValidation: 'WHEN_REQUIRED'` (`lib/r2/client.ts`). No quitar: R2 no soporta los checksums automáticos del SDK AWS.
 - Toda URL firmada pasa por `toBrowserSafePresignedUrl()` (codifica path sin tocar el query de firma). No normalizar ni reescribir la URL a mano.
 - Expiraciones: subida 300 s, vista/descarga 900 s. Vista = `inline` (`getPresignedViewUrl`), descarga = `attachment; filename="..."` (`getPresignedDownloadUrl`).
+- **Bloqueo de LaLiga a IPs de Cloudflare**: durante las ventanas de partidos, algunos operadores españoles bloquean un conjunto de IPs de Cloudflare y R2 deja de responder. Síntomas: `ERR_CERT_AUTHORITY_INVALID`, `Failed to fetch` al subir, `No 'Access-Control-Allow-Origin'` (la respuesta es la página de bloqueo, no R2) y la nota del Juzgado Mercantil nº 6 al abrir un archivo. **No es un fallo de CORS ni de la app**: comprobar con `npm run r2:diagnostico` (`Server: nginx` + HTML = bloqueo; R2 real = `Server: cloudflare` + XML). Detalle y salidas en `docs/guias/incidencias-r2.md`. El endpoint EU no sirve para buckets de jurisdicción normal (`AccessDenied`).
 
 ## Visualizar vs descargar
 - `FileCard.tsx`: visualizar abre `<a target="_blank">` con URL `inline`; descargar usa atributo `download`. No unificar: `/compartir` reutiliza el motor de vista.

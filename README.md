@@ -102,6 +102,10 @@ npm install
    ]
    ```
 
+   Comprueba el bucket y la política aplicada con `npm run r2:diagnostico` y `npm run r2:cors` (sin `--aplicar` solo muestra lo que hay).
+
+   Si al subir o abrir archivos aparece `Failed to fetch`, un error de certificado o la nota de LaLiga, **no es CORS**: consulta [`docs/guias/incidencias-r2.md`](docs/guias/incidencias-r2.md).
+
 4. **Arranque**:
 
    ```bash
@@ -134,6 +138,9 @@ npm run dev      # servidor de desarrollo
 npm run build    # build de producción (verificación principal)
 npm run start    # servidor de producción
 npm run lint     # ESLint
+
+npm run r2:diagnostico  # ¿R2 responde? ¿es un bloqueo de red? ¿qué CORS hay?
+npm run r2:cors         # muestra la política CORS (-- --aplicar para escribirla)
 ```
 
 El proyecto no tiene framework de tests: cada cambio se verifica con `npm run lint` y `npm run build`.
