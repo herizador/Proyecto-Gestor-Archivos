@@ -516,7 +516,7 @@ export default function FileListWrapper({
       {/* Píldora flotante de selección (estilo Figma): siempre visible en modo
           selección, con todas las acciones en lote */}
       {isSelectionMode && typeof document !== 'undefined' && createPortal(
-        <>
+        <div className="pill-zona">
           {shareResult && ('url' in shareResult || 'error' in shareResult) && (
             <div className="pill-resultado" role="status">
               {'url' in shareResult ? (
@@ -556,7 +556,7 @@ export default function FileListWrapper({
               <Check size={14} />
               {isAllSelected ? 'Ninguno' : 'Todos'}
             </button>
-            <EnviarSeleccionButton ids={selectedIds} />
+            <EnviarSeleccionButton key={selectedIds.join(',')} ids={selectedIds} />
             <MoverSeleccionModal
               ids={selectedIds}
               basePath={basePath}
@@ -594,7 +594,7 @@ export default function FileListWrapper({
               Cerrar
             </button>
           </div>
-        </>,
+        </div>,
         document.body
       )}
     </div>

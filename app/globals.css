@@ -611,17 +611,29 @@ input, textarea, select { font-family: inherit; }
 /* ============================================================
    PÍLDORA FLOTANTE de selección en lote (estilo Figma)
    ============================================================ */
-.pill-seleccion {
+.pill-zona {
   position: fixed;
   left: 50%;
-  transform: translateX(-50%);
   bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
   z-index: 320;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  pointer-events: none;
+}
+.pill-zona > * { pointer-events: auto; }
+
+.pill-seleccion {
   display: flex;
   align-items: center;
   gap: 4px;
-  max-width: calc(100vw - 24px);
+  max-width: 100%;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   background: rgba(13, 18, 32, 0.96);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -639,16 +651,31 @@ input, textarea, select { font-family: inherit; }
   padding: 0 8px;
 }
 .pill-seleccion .btn { white-space: nowrap; flex-shrink: 0; }
+
+/* Escritorio (ratón): la barra se envuelve en varias filas en vez de cortarse.
+   En táctil se mantiene una fila con scroll horizontal, que sí se desliza. */
+@media (hover: hover) and (pointer: fine) {
+  .pill-seleccion {
+    flex-wrap: wrap;
+    justify-content: center;
+    width: max-content;
+    max-width: min(1180px, calc(100vw - 32px));
+    overflow: visible;
+    border-radius: 22px;
+    row-gap: 6px;
+  }
+}
+
+@media (hover: none) {
+  .pill-seleccion { scrollbar-width: none; }
+  .pill-seleccion::-webkit-scrollbar { display: none; }
+}
 .pill-resultado {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
-  z-index: 320;
   display: flex;
   align-items: center;
   gap: 8px;
   width: min(480px, calc(100vw - 24px));
+  max-width: 100%;
   background: var(--color-surface-2);
   border: 1px solid var(--color-border-hover);
   border-radius: var(--radius-md);
