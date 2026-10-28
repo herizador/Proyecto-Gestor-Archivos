@@ -1,9 +1,11 @@
-# Diseño: puente WebDAV solo-lectura (ver R2 en el Explorador)
+# Diseño: puente WebDAV (ver R2 en el Explorador)
 
-Estado: **diseño aprobado pendiente de prototipo** (2026-10-04).
+Estado: **lectura en producción**; Fase A de escritura implementada y apagada
+por defecto (2026-10-28). Este documento describe el diseño base de lectura.
 Objetivo: ver y abrir los archivos del gestor desde el Explorador de Windows /
 Finder / apps Android con WebDAV, sin descargar antes y sin salir del modelo de
-permisos de la app. **Solo lectura en v1** (sin subir, renombrar ni borrar).
+permisos de la app. La escritura (`PUT`/`MKCOL`/`DELETE`) se detalla en
+`docs/diseno/webdav-escritura.md`.
 
 ## 1. Por qué no vive en la app Next.js (restricción verificada)
 
@@ -35,15 +37,16 @@ Cloudflare Worker `dav` (carpeta worker/, deploy con wrangler, separado de Verce
   ligeras; los GET hacen streaming sin apenas CPU). R2: lecturas de volumen
   familiar, despreciables.
 
-## 3. Alcance v1 (solo lectura) y fuera de alcance
+## 3. Alcance de lectura y escritura
 
-| Método   | v1              | Notas                                            |
-|----------|-----------------|--------------------------------------------------|
-| OPTIONS  | Sí              | Anuncia `DAV: 1`, `Allow: OPTIONS, PROPFIND, GET, HEAD` |
-| PROPFIND | Sí (depth 0/1)  | `infinity` se trata como `1`                     |
+| Método   | Estado              | Notas                                            |
+|----------|---------------------|--------------------------------------------------|
+| OPTIONS  | Sí              | `DAV: 1`; `Allow` añade `PUT, MKCOL, DELETE` si `DAV_WRITE` está activo |
+| PROPFIND | Sí (depth 0/1)  | `infinity` se trata como `1`; incluye `getetag`  |
 | GET      | Sí (+ `Range`)  | Streaming desde el binding R2                    |
 | HEAD     | Sí              | Mismas cabeceras que GET, sin cuerpo             |
-| PUT/DELETE/MKCOL/COPY/MOVE/LOCK/PROPPATCH | No → `501` | Escritura = fase futura, fuera de este diseño |
+| PUT/DELETE/MKCOL | Fase A (tras `DAV_WRITE`) | Archivos a papelera; carpetas no se borran |
+| COPY/MOVE/LOCK/PROPPATCH | No → `501` | Fases B/C en `docs/diseno/webdav-escritura.md` |
 
 ## 4. Autenticación (Basic + tokens de Explorador)
 
@@ -117,19 +120,22 @@ El Worker usa service-role (bypasea RLS), así que **replica las reglas**:
 
 - `207 Multi-Status` con `resourcetype` (`<collection/>` o vacío),
   `displayname`, `getcontentlength` (solo ficheros), `getcontenttype`,
-  `getlastmodified` (formato RFC 1123), `creationdate` (ISO 8601),
-  `supportedlock` vacío (anuncia Class 1 sin locks).
-- `GET`: `Content-Type` del `tipo_mime`, `Content-Length`,
+  `getetag` (ficheros), `getlastmodified` (formato RFC 1123), `creationdate`
+  (ISO 8601), `supportedlock` vacío (anuncia Class 1 sin locks).
+- `GET`: `Content-Type` del `tipo_mime`, `Content-Length`, `ETag`,
   `Accept-Ranges: bytes` (+ `206` si hay `Range`, que Office/pdfs piden).
 - Errores: `401` sin auth, `404` si el id no existe o no es visible
-  (**nunca distinguir "no existe" de "sin permiso"**), `501` a escritura.
+  (**nunca distinguir "no existe" de "sin permiso"**), `501` a las escrituras
+  no implementadas o si `DAV_WRITE="0"`.
 
 ## 7. Auditoría
 
 Nueva acción `ACCESO_WEBDAV` (union TS en `types/database.ts`; la columna es
 `TEXT`, no requiere migración): el Worker inserta en `historial_actividad`
 vía service-role en cada `GET` (`{archivo_id, via: 'webdav'}`).
-La policy `historial_insert_sistema` ya permite INSERT.
+La policy `historial_insert_sistema` ya permite INSERT. La escritura añade
+`ACTUALIZAR_WEBDAV` en las sobrescrituras; el alta y la papelera los auditan
+los triggers existentes (`SUBIR_ARCHIVO`, `MOVER_A_PAPELERA`).
 
 ## 8. Quirks de cliente (verificados)
 
@@ -158,9 +164,9 @@ La policy `historial_insert_sistema` ya permite INSERT.
   no-store` en todo, tope de 25 segmentos, `Allow` en el `501`, `ultimo_uso` +
   auditoría `ACCESO_WEBDAV` en cada GET, script `worker/test/smoke.mjs` y guía
   `docs/guias/alta-explorador.md`.
-- **Futuro (plan listo, sin implementar)**: escritura `PUT`/`MKCOL`/`DELETE`/
-  `MOVE`/`PROPPATCH`/`LOCK`; plan concreto en
-  `docs/diseno/webdav-escritura.md` (2026-10-28). Office necesita Clase 2.
+- **Fase A de escritura implementada** (2026-10-28): `PUT`, `MKCOL` y
+  `DELETE` de archivo, apagados por defecto con `DAV_WRITE="0"`. Plan y
+  fases B/C en `docs/diseno/webdav-escritura.md` (Office necesita Clase 2).
 
 ## 11. Decisiones (cerradas 2026-10-04)
 

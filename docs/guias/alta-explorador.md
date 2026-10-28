@@ -1,8 +1,9 @@
 # Ver tus archivos en el Explorador (unidad de red)
 
 Tus archivos viven en la nube familiar, pero puedes verlos y abrirlos como una
-carpeta más de tu ordenador, **sin descargarlos antes**. Es de **solo lectura**:
-desde ahí no se puede borrar, renombrar ni subir nada (para eso está la app).
+carpeta más de tu ordenador, **sin descargarlos antes**. Por defecto es de
+**solo lectura**; el administrador puede activar la escritura para subir,
+crear carpetas y borrar archivos (ver §3).
 
 ## 1. Crea tu contraseña de Explorador (una vez por dispositivo)
 
@@ -25,12 +26,26 @@ desde ahí no se puede borrar, renombrar ni subir nada (para eso está la app).
 > contraseña mal escrita: Panel de control → *Administrador de credenciales* →
 > *Credenciales de Windows* → borra la de `*.workers.dev` y reintenta.
 
-## 3. Conectar en macOS
+## 3. Escribir desde el Explorador (opcional)
+
+El administrador puede activar la escritura en el Worker (`DAV_WRITE`). Cuando
+está activa:
+
+- **Subir**: arrastra archivos a una carpeta o usa *Copiar/Pegar*. Máximo
+  **20 MB por archivo**.
+- **Crear carpetas**: botón derecho → *Nueva carpeta*.
+- **Borrar archivos**: tecla **Supr**. Van a la **papelera** de la app y se
+  pueden recuperar.
+- **Todavía no**: renombrar (F2), mover/copiar entre carpetas, borrar carpetas
+  completas ni editar Word/Excel en el sitio. Para eso usa la app (o espera a
+  las siguientes fases).
+
+## 4. Conectar en macOS
 
 Finder → *Ir* → *Conectar al servidor* → `https://gestor-familiar.id386827.workers.dev`
 → usuario tu email, contraseña el código `gf_...`.
 
-## 4. En Android
+## 5. En Android
 
 Apps como *Solid Explorer*, *Material Files* o *CX Explorador* permiten añadir
 una cuenta **WebDAV** con la misma dirección, email y código.
@@ -38,8 +53,10 @@ una cuenta **WebDAV** con la misma dirección, email y código.
 ## Preguntas frecuentes
 
 - **¿Ocupa espacio en mi disco?** No: los archivos se abren en streaming.
-- **¿Puedo editar o borrar desde ahí?** No, abre en solo lectura. Los cambios se
-  hacen en la app.
+- **¿Puedo editar o borrar desde ahí?** Por defecto es solo lectura. Si el
+  administrador activó la escritura, puedes subir, crear carpetas y borrar
+  archivos (van a la papelera), pero todavía no renombrar, mover ni editar
+  Word/Excel en el sitio.
 - **¿Qué significa "Sistema de archivos: FAT"?** Nada: Windows etiqueta así
   todas las unidades de red. Ignóralo.
 - **¿Hasta qué tamaño puedo abrir?** Hasta 20 MB por archivo (límite de la app).

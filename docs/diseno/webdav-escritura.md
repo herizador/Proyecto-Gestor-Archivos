@@ -1,8 +1,9 @@
-# Diseño: puente WebDAV con escritura (fase futura)
+# Diseño: puente WebDAV con escritura
 
-Estado: **plan de implementación** (2026-10-28). La lectura está en producción;
-la escritura **no está implementada**. Base: `docs/diseno/webdav.md`
-(solo-lectura, en producción).
+Estado: **Fase A implementada** (2026-10-28). La lectura está en producción y
+la escritura `PUT`/`MKCOL`/`DELETE` está en el Worker, apagada por defecto con
+`DAV_WRITE="0"`. Fases B (`MOVE`/`COPY`/`PROPPATCH`) y C (`LOCK`/`UNLOCK`)
+pendientes. Base: `docs/diseno/webdav.md`.
 
 ## 0. Respuesta corta
 
@@ -36,7 +37,11 @@ archivos y la auditoría.
 | Copiar y pegar | `COPY` | Archivos; carpetas en fase posterior. |
 | Supr | `DELETE` | Archivo → papelera; carpeta → `403` en v1. |
 | Abrir / editar Office | `GET`, `HEAD`, `LOCK`, `PUT`, `UNLOCK` | Sin Clase 2, Word/Excel abren en solo lectura. |
-| Propiedades / nombre | `PROPFIND`, `PROPPATCH` | Solo `displayname` está soportado. |
+| Propiedades / nombre | `PROPFIND`, `PROPPATCH` | `PROPPATCH[displayname]` llega en Fase B. |
+
+En Fase A, `MOVE`, `COPY`, `PROPPATCH`, `LOCK` y `UNLOCK` responden `501`:
+renombrar, mover/copiar y editar Office desde el Explorador todavía no
+funcionan. Subir, crear carpetas y borrar archivos sí.
 
 
 ## 1. Objetivo y fases
@@ -44,19 +49,33 @@ archivos y la auditoría.
 Permitir guardar, crear carpetas, mover/renombrar y borrar (a papelera) desde el
 Explorador/Finder directamente en R2, con las mismas reglas del negocio que la PWA.
 
-- **Fase A (útil sola):** `PUT` + `MKCOL` + `DELETE` (a papelera). Ya permite
-  "guardar desde el PC".
+- **Fase A (útil sola, implementada):** `PUT` + `MKCOL` + `DELETE` (a
+  papelera). Ya permite "guardar desde el PC".
 - **Fase B:** `COPY` / `MOVE` + `PROPPATCH[displayname]` (arrastrar y renombrar).
 - **Fase C:** `LOCK` / `UNLOCK` (Clase 2: lo que exige Office para editar sin
   abrir en solo-lectura).
+
+### Estado de implementación (2026-10-28)
+
+- Router y flag en `worker/src/index.ts`: `DAV_WRITE="0"` (por defecto),
+  `"admin"` (solo administradores) o `"all"`.
+- Módulos: `env.ts`, `util.ts`, `supabase.ts`, `arbol.ts`, `props.ts`,
+  `lectura.ts` y `escritura.ts`. Sin dependencias nuevas.
+- `PUT`, `MKCOL` y `DELETE` de archivo implementados con cupo, límite de 20 MB,
+  papelera, ETag/`If-None-Match`/`If-Match` y auditoría (`ACTUALIZAR_WEBDAV`).
+- `MOVE`, `COPY`, `PROPPATCH`, `LOCK` y `UNLOCK` responden `501` hasta las
+  fases B/C.
+- Pruebas: `npx tsc -p worker/tsconfig.json`,
+  `npx wrangler deploy --dry-run`, prueba local con Supabase/R2 simulados y
+  `worker/test/escritura.mjs` para el Worker desplegado.
 
 ## 2. Métodos y códigos
 
 | Método | Comportamiento | Códigos |
 |---|---|---|
-| `PUT` nuevo | Sube bytes a R2 (streaming) + `INSERT` en `archivos` | `201`, `413` (>20 MB), `507` (sin cupo), `415`/`403` (basura Office, §5) |
-| `PUT` existente | Sube a una **key nueva**, actualiza la fila y borra la anterior (swap; evita bytes nuevos con metadatos viejos) | `204`, `412` (con `If-None-Match: *`), `507` |
-| `MKCOL` | `INSERT` en `carpetas` (nombre 1–100 car.) | `201`, `405` (ya existe), `409` (padre inexistente/invisible) |
+| `PUT` nuevo | Sube bytes a R2 (streaming) + `INSERT` en `archivos` | `201`, `400` (nombre/basura), `409` (padre), `413` (>20 MB), `507` (sin cupo) |
+| `PUT` existente | Sube a una **key nueva**, actualiza la fila y borra la anterior (swap; evita bytes nuevos con metadatos viejos) | `204`, `412` (`If-None-Match: *` o `If-Match`), `507` |
+| `MKCOL` | `INSERT` en `carpetas` (nombre 1–100 car.) | `201`, `400` (nombre), `405` (ya existe), `409` (padre inexistente/invisible), `415` (con cuerpo) |
 | `DELETE` archivo | Papelera: `UPDATE estado='papelera'` (nunca físico) | `204` |
 | `DELETE` carpeta | **Prohibido** → `403` (la app no tiene papelera de carpetas; se borra desde la PWA) | `403` |
 | `COPY`/`MOVE` | `UPDATE carpeta_id` y/o `nombre` (+ key R2 intacta: la key no codifica carpeta) | `201`/`204`, `412` (ciclo en carpetas) |
@@ -160,7 +179,7 @@ del token se actualiza también al escribir.
 de calendario contando pruebas con Windows/Office/macOS. La Fase A ya aporta
 valor sola: guardar archivos y crear carpetas desde el PC.
 
-## 11. Decisiones propuestas (para aprobar antes de codificar)
+## 11. Decisiones confirmadas (2026-10-28)
 
 1. **Sobrescritura simple**, sin versionado (no existe tabla de versiones);
    `fecha_subida` y `tamano_bytes` se actualizan. Si el bucket tiene versionado
@@ -174,9 +193,11 @@ valor sola: guardar archivos y crear carpetas desde el PC.
    `COPY` de archivos sí.
 5. **Tamaño máximo 20 MB**, igual que la PWA. No subir el límite para WebDAV:
    el cupo de 9 GB y el trigger son la fuente de verdad.
-6. **Nombres duplicados**: el árbol resuelve el más antiguo (`fecha_creacion`
-   ASC), como ya hace la lectura. `PUT` sobre una ruta existente sobrescribe
-   ese archivo; los duplicados ocultos no se tocan.
+6. **Nombres duplicados**: las carpetas resuelven la más antigua
+   (`fecha_creacion` ASC) y los archivos el más reciente (`fecha_subida` DESC),
+   como ya hace la lectura. `PUT` sobre una ruta existente sobrescribe ese
+   archivo; los duplicados ocultos no se tocan. Si una carpeta ocupa el nombre,
+   `PUT` devuelve `409` para no escribir en un archivo oculto.
 7. **Locks solo sobre recursos existentes** en v1. El *lock-null* (bloquear
    una ruta que aún no existe para crearla) se pospone: Office suele hacer
    `PUT` directo al guardar un archivo nuevo. Si en las pruebas resulta
@@ -191,27 +212,25 @@ valor sola: guardar archivos y crear carpetas desde el PC.
 
 ## 12. Plan de implementación en el Worker
 
-### 12.1 Estructura del código
+### 12.1 Estructura del código (implementada en F0)
 
-El Worker actual (`worker/src/index.ts`, ~470 líneas) puede crecer hasta ~1.000
-con escritura. Antes de la Fase A, dividir sin cambiar comportamiento:
+El Worker pasó de ~470 líneas en un archivo a módulos:
 
 ```
 worker/src/
   index.ts        # router de métodos, OPTIONS, rate-limit, flag DAV_WRITE
-  supabase.ts     # sb()/sbVoid(), autenticar(), tokens y ultimo_uso
+  env.ts          # tipos, constantes y selects
+  supabase.ts     # sb()/sbVoid(), autenticar(), tokens, cuota y auditoría
   arbol.ts        # resolver(), hijasDe(), archivosDe(), scope y visibilidad
   props.ts        # xmlPropfind(), ETag, cuota, fechas
-  lectura.ts      # GET/HEAD/Range (código actual)
-  escritura.ts    # PUT, MKCOL, DELETE
-  mover.ts        # MOVE, COPY, PROPPATCH
-  locks.ts        # LOCK/UNLOCK y comprobación de locks
+  lectura.ts      # GET/HEAD/Range
+  escritura.ts    # PUT, MKCOL, DELETE (Fase A)
   util.ts         # segmentos, nombres, keys R2, MIME, XML, errores
 ```
 
-Sin dependencias nuevas: solo `fetch`, binding `BUCKET` y `crypto.subtle`.
-`worker/tsconfig.json` ya incluye `src/**/*.ts`; `npm run build` no toca el
-Worker.
+`mover.ts` y `locks.ts` llegarán con las fases B/C. Sin dependencias nuevas:
+solo `fetch`, binding `BUCKET` y `crypto.subtle`. `worker/tsconfig.json` ya
+incluye `src/**/*.ts`; `npm run build` no toca el Worker.
 
 ### 12.2 Utilidades nuevas (antes de los handlers)
 
@@ -222,7 +241,7 @@ Worker.
   `request.body` funciona con longitud fija; para chunked, buffer de ≤20 MB
   (cabe de sobra en memoria del Worker).
 - `keyNueva(userId, scope, nombre)`: copia de `buildR2Key()` con **sufijo
-  aleatorio** (`crypto.randomUUID().slice(0, 8)`) para que dos subidas con el
+  aleatorio** (`crypto.getRandomValues`, 8 hex) para que dos subidas con el
   mismo nombre en el mismo milisegundo no se pisen.
 - `nombreValido()`: 1–200 caracteres para archivo, 1–100 para carpeta; sin
   `/`, `\`, NUL ni nombres reservados de Windows (`CON`, `PRN`, `AUX`, `NUL`,
@@ -273,7 +292,7 @@ Worker.
 1. Resolver el padre (carpeta o ámbito); si no existe → `409`.
 2. Si el nombre ya existe como carpeta o archivo → `405`.
 3. `INSERT` en `carpetas` (`nombre`, `creado_por`, `es_privada` según el padre,
-   `carpeta_padre_id`, `color` por defecto `indigo`).
+   `carpeta_padre_id`; el color por defecto lo pone la BD).
 4. Auditar `CREAR_CARPETA` con `via: 'webdav'`; `201`.
 
 **`DELETE` archivo**
@@ -341,19 +360,30 @@ filas, perdiendo la papelera.
 
 ### 12.6 Rollout y seguridad
 
-- **Flag `DAV_WRITE`** en `wrangler.toml` (`"0"` por defecto). Con `"0"`,
-  `OPTIONS`/`Allow` siguen en solo lectura y los métodos de escritura
+- **Flag `DAV_WRITE`** en `wrangler.toml` (`"0"` por defecto, ya presente). Con
+  `"0"`, `OPTIONS`/`Allow` siguen en solo lectura y los métodos de escritura
   devuelven `501`; permite desplegar el código sin abrir la puerta.
-- **Beta por rol**: opción `DAV_WRITE="admin"` para probar con la cuenta admin
-  antes de `"all"`.
-- **Rate-limit de escritura**: añadir un contador por token (p. ej. 60/min)
-  además del global de 300/min.
-- **Auditoría**: todas las acciones con `via: 'webdav'`; `ultimo_uso` se
-  actualiza también al escribir.
+- **Beta por rol**: `DAV_WRITE="admin"` para probar con la cuenta admin antes de
+  `"all"`.
+- **Rate-limit de escritura**: contador por token de 60/min, además del global
+  de 300/min (implementado).
+- **Auditoría**: las escrituras nuevas usan `via: 'webdav'`; la sobrescritura
+  registra `ACTUALIZAR_WEBDAV`; el alta y la papelera los auditan los triggers.
+  `ultimo_uso` se actualiza también al escribir (implementado).
 - **Rollback**: si algo falla, poner `DAV_WRITE="0"` y redesplegar; los datos
   ya escritos siguen siendo válidos para la PWA.
-- **Backup**: activar versionado de R2 (o probar con copias) antes de permitir
+- **Backup**: activar versionado de R2 (o probar con copias) antes de habilitar
   sobrescrituras, porque un `PUT` destructivo no pasa por la papelera.
+
+Despliegue y activación:
+
+```sh
+cd worker
+npx wrangler deploy                 # DAV_WRITE="0": solo lectura
+# Para probar con el admin, cambiar DAV_WRITE="admin" y volver a desplegar.
+# Para toda la familia, DAV_WRITE="all".
+node test/escritura.mjs <base> <email> <token> "/Área común/Documentos"
+```
 
 ### 12.7 Matriz de aceptación
 
@@ -375,15 +405,18 @@ filas, perdiendo la papelera.
     privadas ajenas en el árbol (asimetría documentada).
 12. `rclone copy/move/delete` contra el Worker; `wrangler tail` sin errores.
 
+En Fase A ya se pueden validar 1, 2, 5, 9 (solo `PUT`), 10 y 11. Los puntos
+3, 4, 6, 7 y 8 necesitan las fases B/C.
+
 ### 12.8 Orden de trabajo
 
-| Fase | Entregable | Estimación |
+| Fase | Entregable | Estado |
 |---|---|---|
-| F0 | Refactor en módulos + flag `DAV_WRITE` + `sbVoid`/utilidades | 1–2 días |
-| A | `PUT`, `MKCOL`, `DELETE` archivo + pruebas Windows/`curl` | 4–5 días |
-| B | `MOVE`, `COPY` archivo, `PROPPATCH`, ETag/condicionales | 4–5 días |
-| C | `LOCK`/`UNLOCK`, `lockdiscovery`, Office | 4–5 días |
-| D | Endurecer, auditoría, rate-limit, documentación y guía familiar | 2–3 días |
+| F0 | Refactor en módulos + flag `DAV_WRITE` + `sbVoid`/utilidades | Hecho (2026-10-28) |
+| A | `PUT`, `MKCOL`, `DELETE` archivo + pruebas locales | Hecho (2026-10-28); falta prueba en Windows real |
+| B | `MOVE`, `COPY` archivo, `PROPPATCH`, condicionales completos | Pendiente |
+| C | `LOCK`/`UNLOCK`, `lockdiscovery`, Office | Pendiente |
+| D | Endurecer, auditoría, rate-limit, documentación y guía familiar | Parcial (rate-limit y auditoría hechos) |
 
 Total: ~3 semanas efectivas. Se puede parar después de A y seguir usando la
 PWA para lo demás.

@@ -1,4 +1,4 @@
-# Puente WebDAV solo-lectura del Gestor Familiar (ver docs/diseno/webdav.md).
+# Puente WebDAV del Gestor Familiar (ver docs/diseno/webdav.md).
 # Deploy: `npx wrangler deploy` desde esta carpeta (sustituye el worker actual).
 # Secretos (nunca en este fichero): `npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY`
 
@@ -14,3 +14,6 @@ bucket_name = "proyecto-gestor-archivos"
 [vars]
 # URL del proyecto Supabase (misma que NEXT_PUBLIC_SUPABASE_URL en Vercel)
 SUPABASE_URL = "https://khivwiabrozdqpiuadfi.supabase.co"
+# Escritura desde el Explorador: "0" (apagada), "admin" (solo admin) o "all".
+# Con "0" los métodos PUT/MKCOL/DELETE responden 501 y el Worker es solo-lectura.
+DAV_WRITE = "0"

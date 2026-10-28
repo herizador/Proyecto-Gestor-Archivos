@@ -12,6 +12,7 @@ if (!base || !email || !token) {
 
 const auth = `Basic ${Buffer.from(`${email}:${token}`).toString('base64')}`
 let fallos = 0
+let allow = ''
 
 async function caso(nombre, fn) {
   try {
@@ -31,6 +32,8 @@ await caso('OPTIONS anuncia DAV', async () => {
   const r = await fetch(base, { method: 'OPTIONS' })
   afirma(r.status === 200, `status ${r.status}`)
   afirma((r.headers.get('dav') ?? '') === '1', 'sin cabecera DAV: 1')
+  allow = r.headers.get('allow') ?? ''
+  afirma(allow.includes('PROPFIND'), 'Allow sin PROPFIND')
 })
 
 await caso('PROPFIND sin auth → 401 con reto Basic', async () => {
@@ -54,14 +57,22 @@ await caso('PROPFIND con tildes/UTF-8 → 207', async () => {
   afirma(r.status === 207, `status ${r.status}`)
 })
 
-await caso('PUT → 501 (solo lectura)', async () => {
+await caso('PUT en la raíz: rechazado', async () => {
   const r = await fetch(`${base}/prueba.txt`, {
     method: 'PUT',
     headers: { Authorization: auth },
     body: 'hola',
   })
-  afirma(r.status === 501, `status ${r.status}`)
+  // Con escritura apagada → 501; con escritura activa la raíz no es escribible → 409.
+  const esperado = allow.includes('PUT') ? 409 : 501
+  afirma(r.status === esperado, `status ${r.status} (esperado ${esperado})`)
 })
+
+if (allow.includes('PUT')) {
+  console.log('INFO  escritura activa: usa worker/test/escritura.mjs <base> <email> <token> <carpeta>')
+} else {
+  console.log('INFO  escritura desactivada (DAV_WRITE=0)')
+}
 
 if (rutaArchivo) {
   const url = base + rutaArchivo.split('/').map((s) => encodeURIComponent(s)).join('/')

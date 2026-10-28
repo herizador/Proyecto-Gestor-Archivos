@@ -65,6 +65,8 @@ function describir(a: HistorialConPerfil, miId: string): { titulo: string; detal
       return { titulo: `${autor} ${conj('enviaste', 'envió')} fuera`, detalle: d.nombre_original }
     case 'ACCESO_WEBDAV':
       return { titulo: `${autor} ${conj('abriste', 'abrió')} desde el Explorador`, detalle: d.nombre_original }
+    case 'ACTUALIZAR_WEBDAV':
+      return { titulo: `${autor} ${conj('guardaste', 'guardó')} desde el Explorador`, detalle: d.nombre_original }
     case 'CREAR_ACCESO':
       return { titulo: `${autor} ${conj('creaste', 'creó')} un enlace` }
     case 'ELIMINAR_ACCESO':
