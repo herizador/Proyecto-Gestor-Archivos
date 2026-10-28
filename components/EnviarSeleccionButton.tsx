@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Share2, Loader2 } from 'lucide-react'
 import { enviarArchivo, registrarEnvioExterno } from '@/actions/files'
-import { resolverSeleccion } from '@/actions/seleccion'
+import { resolverSeleccionParaCompartir } from '@/actions/seleccion'
 import { avisar } from '@/components/Avisos'
 
 const MAX_ENVIO = 10 // tope por envío: los blobs viven en memoria del móvil
@@ -65,14 +65,16 @@ export default function EnviarSeleccionButton({ ids }: { ids: string[] }) {
       setError(null)
 
       try {
-        const sel = await resolverSeleccion(idsActuales)
+        // Incluye los archivos de las carpetas seleccionadas (recursivo). Se
+        // pide uno más del tope para saber si hay que avisar de que se recorta.
+        const sel = await resolverSeleccionParaCompartir(idsActuales, MAX_ENVIO + 1)
         if ('error' in sel) throw new Error(sel.error ?? 'No se pudo leer la selección.')
         if (control.signal.aborted) return
 
         const archivos = sel.archivos.slice(0, MAX_ENVIO)
         setNumArchivos(archivos.length)
         setAvisoCarpetas(sel.carpetas.length > 0)
-        setAvisoLimite(sel.archivos.length > MAX_ENVIO)
+        setAvisoLimite(sel.truncado || sel.archivos.length > MAX_ENVIO)
 
         if (archivos.length === 0) {
           setEstado('solo-carpetas')
@@ -162,7 +164,7 @@ export default function EnviarSeleccionButton({ ids }: { ids: string[] }) {
           if (e instanceof DOMException && e.name === 'AbortError') return // menú cerrado: silencio
           avisar('error', 'No se pudo abrir el menú de compartir. Inténtalo otra vez.')
         })
-      if (avisoCarpetas) avisar('info', 'Las carpetas no se envían: solo viajan los archivos.')
+      if (avisoCarpetas) avisar('info', 'Se incluyen los archivos de las carpetas seleccionadas.')
       if (avisoLimite) avisar('info', `Solo se envían los primeros ${MAX_ENVIO} archivos.`)
     } catch {
       avisar('error', 'No se pudo abrir el menú de compartir. Inténtalo otra vez.')
@@ -187,16 +189,21 @@ export default function EnviarSeleccionButton({ ids }: { ids: string[] }) {
   }
 
   if (estado === 'solo-carpetas') {
+    const hayCarpetas = avisoCarpetas
     return (
       <button
         type="button"
         className="btn btn-ghost btn-sm"
         disabled
         style={{ minHeight: '36px' }}
-        title="Las carpetas no se envían: selecciona algún archivo"
+        title={
+          hayCarpetas
+            ? 'Las carpetas seleccionadas no tienen archivos visibles'
+            : 'Selecciona algún archivo para enviarlo'
+        }
       >
         <Share2 size={14} />
-        Solo archivos
+        {hayCarpetas ? 'Carpetas vacías' : 'Solo archivos'}
       </button>
     )
   }

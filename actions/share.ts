@@ -2,8 +2,13 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { logActivity } from '@/actions/storage'
+import { archivosDeCarpetas } from '@/actions/seleccion'
 import { getPresignedViewUrl } from '@/lib/r2/client'
 import { revalidatePath } from 'next/cache'
+
+// Tope de archivos dentro de un enlace: más allá, la página tendría que firmar
+// cientos de URLs en cada visita. Los archivos elegidos a mano van primero.
+const MAX_ARCHIVOS_ENLACE = 200
 
 export async function generarEnlaceCompartido(params: {
   archivoIds: string[]
@@ -17,18 +22,45 @@ export async function generarEnlaceCompartido(params: {
     return { error: 'Selecciona al menos un archivo o carpeta para compartir.' }
   }
 
+  // Las carpetas aportan los archivos que contienen (incluidas subcarpetas).
+  // Se guardan ya expandidas en archivos_ids: /compartir solo resuelve esa
+  // lista y así los enlaces antiguos y nuevos funcionan igual.
+  const seleccionados = [...new Set(params.archivoIds)]
+  let dentroDeCarpetas: string[] = []
+  let truncado = false
+  if (params.carpetaIds.length > 0) {
+    const contenido = await archivosDeCarpetas(params.carpetaIds, MAX_ARCHIVOS_ENLACE)
+    if ('error' in contenido) return { error: contenido.error }
+    dentroDeCarpetas = contenido.archivos.map((a) => a.id)
+    truncado = contenido.truncado
+  }
+
+  let archivosIds = [...new Set([...seleccionados, ...dentroDeCarpetas])]
+  if (archivosIds.length > MAX_ARCHIVOS_ENLACE) {
+    archivosIds = archivosIds.slice(0, MAX_ARCHIVOS_ENLACE)
+    truncado = true
+  }
+
+  if (archivosIds.length === 0) {
+    return {
+      error: params.carpetaIds.length > 0
+        ? 'Las carpetas seleccionadas no contienen archivos.'
+        : 'Selecciona al menos un archivo para compartir.',
+    }
+  }
+
   const token = crypto.randomUUID()
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
   const shareUrl = `${baseUrl}/compartir?token=${token}`
 
   let tipoRecurso = 'multiple'
-  if (params.archivoIds.length === 1 && params.carpetaIds.length === 0) tipoRecurso = 'archivo'
-  else if (params.carpetaIds.length === 1 && params.archivoIds.length === 0) tipoRecurso = 'carpeta'
+  if (seleccionados.length === 1 && params.carpetaIds.length === 0) tipoRecurso = 'archivo'
+  else if (params.carpetaIds.length === 1 && seleccionados.length === 0) tipoRecurso = 'carpeta'
 
   const { error: insertError } = await supabase.from('enlaces_compartidos').insert({
     creado_por: user.id,
     tipo_recurso: tipoRecurso,
-    archivos_ids: JSON.stringify(params.archivoIds),
+    archivos_ids: JSON.stringify(archivosIds),
     carpetas_ids: JSON.stringify(params.carpetaIds),
     token_acceso: token,
     expiracion: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -41,13 +73,21 @@ export async function generarEnlaceCompartido(params: {
     detalles: {
       token,
       tipo_recurso: tipoRecurso,
-      archivos_ids: params.archivoIds,
+      archivos_ids: archivosIds,
+      archivos_seleccionados: seleccionados,
       carpetas_ids: params.carpetaIds,
     },
   })
 
   revalidatePath('/')
-  return { url: shareUrl, token }
+  return {
+    url: shareUrl,
+    token,
+    totalArchivos: archivosIds.length,
+    aviso: truncado
+      ? `El enlace incluye los primeros ${MAX_ARCHIVOS_ENLACE} archivos de las carpetas seleccionadas.`
+      : undefined,
+  }
 }
 
 export async function obtenerEnlaceCompartido(token: string) {
@@ -72,6 +112,25 @@ export async function obtenerEnlaceCompartido(token: string) {
       : (enlace.archivos_ids as string[])
   } catch {
     archivoIds = []
+  }
+
+  // Enlaces antiguos: solo guardaban carpetas_ids. Se expanden al leer para
+  // que sigan mostrando el contenido de la carpeta.
+  if (archivoIds.length === 0) {
+    let carpetaIds: string[] = []
+    try {
+      carpetaIds = typeof enlace.carpetas_ids === 'string'
+        ? JSON.parse(enlace.carpetas_ids)
+        : (enlace.carpetas_ids as string[])
+    } catch {
+      carpetaIds = []
+    }
+    if (carpetaIds.length > 0) {
+      const contenido = await archivosDeCarpetas(carpetaIds, MAX_ARCHIVOS_ENLACE)
+      if (!('error' in contenido)) {
+        archivoIds = contenido.archivos.map((a) => a.id)
+      }
+    }
   }
 
   if (archivoIds.length === 0) return { error: 'No hay archivos en este enlace.', enlace }

@@ -183,6 +183,7 @@ export default function FileListWrapper({
       })
       if ('url' in result && result.url) {
         setShareResult({ url: result.url })
+        if ('aviso' in result && result.aviso) avisar('info', result.aviso)
         if (typeof navigator !== 'undefined' && 'share' in navigator) {
           try {
             await navigator.share({ title: 'Compartir documentos', url: result.url })
