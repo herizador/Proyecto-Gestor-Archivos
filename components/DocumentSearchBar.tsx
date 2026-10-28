@@ -23,10 +23,11 @@ export default function DocumentSearchBar({
 }) {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [results, setResults] = useState<ArchivoConAutor[]>([])
-  const [accesos, setAccesos] = useState<AccesoConObjetivo[]>([])
-  const [loading, setLoading] = useState(false)
-  const [searched, setSearched] = useState(false)
+  const [resultado, setResultado] = useState<{
+    query: string
+    archivos: ArchivoConAutor[]
+    accesos: AccesoConObjetivo[]
+  } | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -35,23 +36,16 @@ export default function DocumentSearchBar({
   }, [query])
 
   useEffect(() => {
-    if (!debouncedQuery) {
-      setResults([])
-      setAccesos([])
-      setSearched(false)
-      setLoading(false)
-      return
-    }
+    if (!debouncedQuery) return
 
     let cancelled = false
-    setLoading(true)
-
     Promise.all([buscarArchivos(debouncedQuery), buscarAccesos(debouncedQuery)]).then(([resArchivos, resAccesos]) => {
       if (cancelled) return
-      setResults(resArchivos.data ?? [])
-      setAccesos(resAccesos.data ?? [])
-      setSearched(true)
-      setLoading(false)
+      setResultado({
+        query: debouncedQuery,
+        archivos: resArchivos.data ?? [],
+        accesos: resAccesos.data ?? [],
+      })
     })
 
     return () => {
@@ -64,13 +58,20 @@ export default function DocumentSearchBar({
     if (res.error) avisar('error', res.error)
     else {
       avisar('exito', 'Enlace eliminado.')
-      setAccesos((prev) => prev.filter((a) => a.id !== accesoId))
+      setResultado((prev) =>
+        prev ? { ...prev, accesos: prev.accesos.filter((a) => a.id !== accesoId) } : prev
+      )
       router.refresh()
     }
   }
 
   const isSearching = debouncedQuery.length > 0
-  const totalResultados = results.length + accesos.length
+  const resultadoActual = resultado?.query === debouncedQuery ? resultado : null
+  const resultadosVisibles = isSearching ? resultadoActual?.archivos ?? [] : []
+  const accesosVisibles = isSearching ? resultadoActual?.accesos ?? [] : []
+  const cargando = isSearching && !resultadoActual
+  const buscado = isSearching && !!resultadoActual
+  const totalResultados = resultadosVisibles.length + accesosVisibles.length
 
   return (
     <div className="search-section">
@@ -95,7 +96,7 @@ export default function DocumentSearchBar({
               <X size={16} />
             </button>
           )}
-          {loading && <Loader2 size={18} className="animate-spin search-bar-spinner" />}
+          {cargando && <Loader2 size={18} className="animate-spin search-bar-spinner" />}
         </div>
         {controles}
       </div>
@@ -105,18 +106,18 @@ export default function DocumentSearchBar({
       {isSearching && (
         <div className="search-results">
           <p className="search-results-label">
-            {loading
+            {cargando
               ? 'Buscando...'
               : `${totalResultados} resultado${totalResultados === 1 ? '' : 's'} para «${debouncedQuery}»`}
           </p>
-          {!loading && searched && totalResultados === 0 && (
+          {!cargando && buscado && totalResultados === 0 && (
             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9rem' }}>
               No se encontraron archivos activos con ese nombre.
             </p>
           )}
-          {results.length > 0 && (
+          {resultadosVisibles.length > 0 && (
             <div className="grid-files">
-              {results.map((file) => (
+              {resultadosVisibles.map((file) => (
                 <FileCard
                   key={file.id}
                   file={file}
@@ -126,13 +127,13 @@ export default function DocumentSearchBar({
               ))}
             </div>
           )}
-          {accesos.length > 0 && (
+          {accesosVisibles.length > 0 && (
             <>
               <p className="search-results-label" style={{ marginTop: '16px' }}>
-                Enlaces ({accesos.length})
+                Enlaces ({accesosVisibles.length})
               </p>
               <div className="grid-files">
-                {accesos.filter((a) => a.carpeta_objetivo_id === null).map((acceso) => {
+                {accesosVisibles.filter((a) => a.carpeta_objetivo_id === null).map((acceso) => {
                   const objetivo = acceso.archivo_objetivo
                   const huerfano = !objetivo || objetivo.estado !== 'activo'
                   return (
@@ -161,7 +162,7 @@ export default function DocumentSearchBar({
                 })}
               </div>
               <div className="grid-folders" style={{ marginTop: '12px' }}>
-                {accesos.filter((a) => a.carpeta_objetivo_id !== null).map((acceso) => {
+                {accesosVisibles.filter((a) => a.carpeta_objetivo_id !== null).map((acceso) => {
                   const objetivo = acceso.carpeta_objetivo
                   const huerfano = !objetivo
                   return (
