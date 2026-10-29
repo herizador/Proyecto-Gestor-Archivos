@@ -62,8 +62,9 @@ npm run lint     # ESLint (sin prettier/biome)
 
 ## BD y RLS
 - `supabase/schema.sql` es el ejecutable de verdad: triggers `handle_new_user`, `trg_registrar_subida`, `trg_cambio_estado_archivo`, `trg_validar_limite` (9 GB). `historial_actividad` es inmutable (UPDATE/DELETE revocados + sin policies de escritura salvo triggers/`logActivity`).
-- **RLS es la capa de autorización**: no bypasearla con service-role en código servidor. Borrado normal = `estado='papelera'`; borrado físico solo admin (`eliminarArchivoPermanente`: primero R2, luego BD).
-- **Papelera con selección múltiple**: `PapeleraLista.tsx` + checkbox en `TrashFileCard`; el admin selecciona varios y `eliminarArchivosPermanentes()` los borra de R2 en tandas de 10 y luego de la BD (máx. 100 por lote, auditoría `ELIMINAR_PERMANENTE` resumida). El borrado individual sigue disponible en el menú de cada tarjeta.
+- **RLS es la capa de autorización**: no bypasearla con service-role en código servidor. Borrado normal = `estado='papelera'`; borrado físico del dueño o admin (`eliminarArchivoPermanente`: primero R2, luego BD).
+- **La Caja fuerte es privada incluso para el admin**: `carpetas_select`/`archivos_select` no tienen bypass de admin; solo ve lo público, lo suyo, lo compartido o lo que tenga enlace. El historial de auditoría sí es global. SQL en `supabase/migraciones/privacidad-caja-fuerte.sql`.
+- **Papelera con selección múltiple**: `PapeleraLista.tsx` + checkbox en `TrashFileCard`; cada usuario selecciona sus archivos (el admin, además, los públicos visibles) y `eliminarArchivosPermanentes()` los borra de R2 en tandas de 10 y luego de la BD (máx. 100 por lote, auditoría `ELIMINAR_PERMANENTE` resumida). El borrado individual sigue disponible en el menú de cada tarjeta.
 - `buscarArchivos()` escapa `\`, `%`, `_` y limita a 50 resultados; mantener ese escape al tocar la búsqueda.
 
 ## Convenciones UI

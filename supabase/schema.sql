@@ -284,12 +284,11 @@ CREATE POLICY "perfiles_update_propio" ON public.perfiles
 -- ─── RLS: carpetas ────────────────────────────────────────────────────────────
 ALTER TABLE public.carpetas ENABLE ROW LEVEL SECURITY;
 
--- Ver: pública, propia, compartida conmigo o con un ancestro visible (herencia),
--- o admin. La herencia vive en carpeta_visible_para (abajo, junto a compartidos).
+-- Ver: pública, propia, compartida conmigo o con un ancestro visible (herencia).
+-- Sin bypass de admin: «Mi caja fuerte» es privada también para el administrador.
 CREATE POLICY "carpetas_select" ON public.carpetas
   FOR SELECT USING (
-    public.get_user_role() = 'admin'
-    OR public.carpeta_visible_para(auth.uid(), carpetas.id)
+    public.carpeta_visible_para(auth.uid(), carpetas.id)
   );
 
 -- Crear: cualquier usuario autenticado
@@ -409,11 +408,11 @@ $$;
 -- ─── RLS: archivos ────────────────────────────────────────────────────────────
 ALTER TABLE public.archivos ENABLE ROW LEVEL SECURITY;
 
--- Ver: archivo en carpeta pública ó propio ó admin
+-- Ver: propio, compartido, en carpeta visible (pública/propia/compartida) o en
+-- la raíz del Área común. Sin bypass de admin: la Caja fuerte es privada.
 CREATE POLICY "archivos_select" ON public.archivos
   FOR SELECT USING (
     subido_por = auth.uid()
-    OR public.get_user_role() = 'admin'
     OR EXISTS (
       SELECT 1 FROM public.compartidos co
        WHERE co.archivo_id = archivos.id
@@ -422,6 +421,10 @@ CREATE POLICY "archivos_select" ON public.archivos
     OR (
       archivos.carpeta_id IS NOT NULL
       AND public.carpeta_visible_para(auth.uid(), archivos.carpeta_id)
+    )
+    OR (
+      archivos.carpeta_id IS NULL
+      AND archivos.ruta_r2 NOT LIKE '%/privado/%'
     )
   );
 

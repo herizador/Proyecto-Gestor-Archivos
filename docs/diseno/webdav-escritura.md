@@ -93,11 +93,14 @@ Explorador/Finder directamente en R2, con las mismas reglas del negocio que la P
 
 - **Quién puede escribir dónde:** igual que `registrarArchivo()`/`crearCarpeta()`:
   carpeta visible + concordancia de ámbito (común↔pública, privado↔privada).
-  El admin puede escribir en privadas ajenas si son visibles (como en la PWA;
-  en listado de lectura siguen sin salirle: asimetría conocida y documentada).
+  La Caja fuerte es privada también para el admin: el ámbito privado solo
+  resuelve archivos con `subido_por = user.id`.
 - **Keys R2** con el mismo esquema (`comun/...`, `usuarios/<id>/privado/...`)
   según la carpeta destino; el nombre visible (`nombre_original`) se guarda tal
   cual y la key se sanea igual que `buildR2Key()`.
+- **Raíces de ámbito:** `carpeta_id = null` es ambiguo entre la raíz del Área
+  común y la de Mi caja fuerte. El Worker distingue por la key (`/privado/`) y
+  nunca lista una raíz privada dentro del Área común.
 - **Tope 20 MB** por archivo (`413`). Con `Content-Length` se rechaza antes de
   leer; con chunked se cuenta en streaming y se aborta al pasarlo (intentando
   borrar el parcial en R2).
@@ -213,10 +216,9 @@ valor sola: guardar archivos y crear carpetas desde el PC.
    una ruta que aún no existe para crearla) se pospone: Office suele hacer
    `PUT` directo al guardar un archivo nuevo. Si en las pruebas resulta
    imprescindible, se añade en C.2 con una columna de ruta en `locks_dav`.
-8. **Mover un archivo ajeno a una caja privada**: se rechaza con `403`. El
-   listado privado filtra por `subido_por`, así que un admin que moviera un
-   archivo de otro usuario a su caja lo dejaría invisible. Si se quiere
-   permitir, hay que decidir si se cambia `subido_por` o el filtro de lectura.
+8. **Mover un archivo a una caja privada**: solo el dueño puede hacerlo
+   (`403` en el resto). El listado privado filtra por `subido_por`, así que
+   mover el archivo de otro usuario a una caja lo dejaría invisible.
 9. **Sin versionado en R2**: el servicio no lo ofrece. La papelera de la app
    no cubre los bytes reemplazados por un `PUT`, así que la única protección
    real es no abrir la escritura a todos o conservar copias propias de las
@@ -419,9 +421,17 @@ node test/escritura.mjs <base> <email> <token> "/Área común/Documentos"
 Desplegado el **2026-10-28** con `DAV_WRITE="0"` (solo lectura) y el
 **2026-10-29** con `"admin"` para la prueba real: smoke y escritura completos en
 verde. Tras implementar la Fase B y pasar el banco local, se abrió
-`DAV_WRITE="all"` para el PC, los móviles y el portátil de Marina. R2 **no
-ofrece versionado de objetos**: una sobrescritura es definitiva; la copia de
-seguridad local periódica queda pendiente.
+`DAV_WRITE="all"` para el PC, los móviles y el portátil de Marina. La prueba
+real de Fase B contra producción (token admin temporal) pasó **17/17**: `PUT`,
+`GET`, `COPY`, `MOVE` con `Overwrite` y cruce de ámbitos,
+`PROPPATCH[displayname]`, `DELETE` y controles de carpeta/raíz. Esa prueba
+destapó que la raíz privada (`carpeta_id = null`) se listaba en el Área común;
+`archivosDe()` ahora separa ambos ámbitos por el prefijo `/privado/` de la key.
+La Caja fuerte queda privada también para el admin con
+`supabase/migraciones/privacidad-caja-fuerte.sql` (sin bypass de admin en
+`carpetas_select`/`archivos_select`). R2 **no ofrece versionado de objetos**:
+una sobrescritura es definitiva; la copia de seguridad local periódica queda
+pendiente.
 
 ### 12.7 Matriz de aceptación
 
@@ -439,8 +449,8 @@ seguridad local periódica queda pendiente.
 9. `If-None-Match: *`, `If-Match`, `Overwrite: F` → `412` cuando toca.
 10. Nombres con tildes, `#`, `&`, `%`, espacios y >100 caracteres; sin
     traversal (`..`) ni nombres reservados.
-11. Token revocado → `401`; carpeta privada ajena → `404`; admin no ve cajas
-    privadas ajenas en el árbol (asimetría documentada).
+11. Token revocado → `401`; carpeta privada ajena → `404`; el admin tampoco
+    ve las cajas privadas ajenas en el árbol ni en la PWA.
 12. `rclone copy/move/delete` contra el Worker; `wrangler tail` sin errores.
 
 En Fase B se pueden validar 1–5 y 7–11. El punto 6 (Office) necesita la Fase C;

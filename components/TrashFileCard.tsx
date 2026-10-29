@@ -82,10 +82,11 @@ export default function TrashFileCard({
   }
 
   const canManage = isAdmin || isOwner
+  const puedeSeleccionar = seleccionable && canManage
 
   const itemsMenu: ItemMenu[] = [
     { icono: <RefreshCw size={16} />, texto: 'Restaurar', onClick: handleRestore, deshabilitado: loading },
-    ...(isAdmin
+    ...(canManage
       ? [{
           icono: <Trash2 size={16} />,
           texto: 'Eliminar permanentemente',
@@ -104,11 +105,11 @@ export default function TrashFileCard({
         flexDirection: 'column',
         padding: '16px',
         position: 'relative',
-        cursor: seleccionable ? 'pointer' : undefined,
+        cursor: puedeSeleccionar ? 'pointer' : undefined,
       }}
-      onClick={seleccionable ? onToggle : undefined}
+      onClick={puedeSeleccionar ? onToggle : undefined}
     >
-      {seleccionable && (
+      {puedeSeleccionar && (
         <div
           style={{
             position: 'absolute',

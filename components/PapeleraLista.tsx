@@ -26,7 +26,10 @@ export default function PapeleraLista({
   const [procesando, setProcesando] = useState(false)
   const router = useRouter()
 
-  const todos = archivos.length > 0 && seleccionados.length === archivos.length
+  // El admin ya no ve la Caja fuerte ajena; cada usuario vacía lo suyo. Los
+  // archivos públicos de otros se ven, pero no se pueden borrar desde aquí.
+  const gestionables = archivos.filter((a) => isAdmin || a.subido_por === userId)
+  const todos = gestionables.length > 0 && seleccionados.length === gestionables.length
 
   function alternar(id: string) {
     setSeleccionados((prev) =>
@@ -39,12 +42,12 @@ export default function PapeleraLista({
       setSeleccionados([])
       return
     }
-    if (archivos.length > MAX_LOTE) {
+    if (gestionables.length > MAX_LOTE) {
       avisar('info', `Se seleccionan los primeros ${MAX_LOTE}. Elimina el resto en otro lote.`)
-      setSeleccionados(archivos.slice(0, MAX_LOTE).map((a) => a.id))
+      setSeleccionados(gestionables.slice(0, MAX_LOTE).map((a) => a.id))
       return
     }
-    setSeleccionados(archivos.map((a) => a.id))
+    setSeleccionados(gestionables.map((a) => a.id))
   }
 
   function salir() {
@@ -82,7 +85,7 @@ export default function PapeleraLista({
 
   return (
     <div>
-      {isAdmin && (
+      {gestionables.length > 0 && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
           {!modo ? (
             <button

@@ -440,7 +440,7 @@ export async function restaurarArchivo(archivoId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Eliminar archivo permanentemente (solo admin)
+// Eliminar archivo permanentemente (dueño o admin)
 // ---------------------------------------------------------------------------
 export async function eliminarArchivoPermanente(archivoId: string) {
   const supabase = await createClient()
@@ -448,15 +448,19 @@ export async function eliminarArchivoPermanente(archivoId: string) {
   if (authError || !user) return { error: 'No autenticado.' }
 
   const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single()
-  if (perfil?.rol !== 'admin') return { error: 'Solo el administrador puede eliminar permanentemente.' }
+  const isAdmin = perfil?.rol === 'admin'
 
   const { data: archivo, error: fetchError } = await supabase
     .from('archivos')
-    .select('ruta_r2, nombre_original')
+    .select('ruta_r2, nombre_original, subido_por')
     .eq('id', archivoId)
+    .eq('estado', 'papelera')
     .single()
 
-  if (fetchError || !archivo) return { error: 'Archivo no encontrado.' }
+  if (fetchError || !archivo) return { error: 'Archivo no encontrado en la papelera.' }
+  if (!isAdmin && archivo.subido_por !== user.id) {
+    return { error: 'Solo el dueño o un administrador puede eliminar permanentemente.' }
+  }
 
   // Contar enlaces que quedarán huérfanos (SET NULL) para la auditoría
   const { count: enlacesAfectados } = await supabase
@@ -487,7 +491,7 @@ export async function eliminarArchivoPermanente(archivoId: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Eliminar varios archivos de la papelera definitivamente (solo admin).
+// Eliminar varios archivos de la papelera definitivamente (dueño o admin).
 // Mismo orden que el borrado individual: primero R2 y luego BD. Los objetos se
 // borran en tandas de 10 para no saturar R2 con un lote grande. La auditoría
 // se guarda como una sola entrada con el recuento y los ids.
@@ -498,7 +502,7 @@ export async function eliminarArchivosPermanentes(archivoIds: string[]) {
   if (authError || !user) return { error: 'No autenticado.' }
 
   const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single()
-  if (perfil?.rol !== 'admin') return { error: 'Solo el administrador puede eliminar permanentemente.' }
+  const isAdmin = perfil?.rol === 'admin'
 
   const unicos = [...new Set(archivoIds)]
   if (unicos.length === 0) return { error: 'Selecciona al menos un archivo.' }
@@ -507,15 +511,21 @@ export async function eliminarArchivosPermanentes(archivoIds: string[]) {
   }
 
   // Solo se tocan filas que sigan en la papelera: nunca un archivo activo.
-  const { data: archivos, error: fetchError } = await supabase
+  // Un miembro solo puede vaciar lo suyo; el admin, lo que RLS le deje ver.
+  let consulta = supabase
     .from('archivos')
     .select('id, ruta_r2, nombre_original')
     .in('id', unicos)
     .eq('estado', 'papelera')
+  if (!isAdmin) consulta = consulta.eq('subido_por', user.id)
+  const { data: archivos, error: fetchError } = await consulta
   if (fetchError) return { error: fetchError.message }
 
   const filas = archivos ?? []
   if (filas.length === 0) return { error: 'No hay archivos en la papelera con esos ids.' }
+  if (filas.length !== unicos.length) {
+    return { error: 'Alguno de los archivos ya no está en tu papelera. Actualiza la página.' }
+  }
 
   const borrados: typeof filas = []
   const fallidos: Array<{ id: string; nombre: string; error: string }> = []

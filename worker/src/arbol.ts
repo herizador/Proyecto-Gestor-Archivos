@@ -50,7 +50,10 @@ export async function archivosDe(
     // Igual que /mi-caja-fuerte: la key debe declarar ámbito privado
     return filas.filter((f) => f.ruta_r2.includes('/privado/'))
   }
-  return filas
+  // La raíz de «Área común» y la de «Mi caja fuerte» comparten carpeta_id=null:
+  // el prefijo de la key es lo que distingue el ámbito. Sin este filtro, los
+  // archivos privados de la raíz se listarían y resolverían en el Área común.
+  return filas.filter((f) => !f.ruta_r2.includes('/privado/'))
 }
 
 export type Nodo =
