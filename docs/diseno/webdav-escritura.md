@@ -181,9 +181,13 @@ valor sola: guardar archivos y crear carpetas desde el PC.
 
 ## 11. Decisiones confirmadas (2026-10-28)
 
-1. **Sobrescritura simple**, sin versionado (no existe tabla de versiones);
-   `fecha_subida` y `tamano_bytes` se actualizan. Si el bucket tiene versionado
-   de R2 activo, los bytes viejos quedan recuperables por Cloudflare.
+1. **Sobrescritura simple**, sin versionado en la app (no existe tabla de
+   versiones); `fecha_subida` y `tamano_bytes` se actualizan. **R2 no ofrece
+   versionado de objetos** (comprobado en octubre de 2026: el menú del bucket
+   solo tiene ciclo de vida y bloqueo), así que los bytes anteriores se pierden
+   al sobrescribir. Por eso la escritura se queda en `"admin"` y Windows pide
+   confirmación antes de reemplazar. Si se quiere una red de seguridad, hay que
+   copiar el objeto viejo a un prefijo `versiones/` desde el Worker (ver §12.6).
 2. **`DELETE` de carpeta prohibido en v1** → `403`. La PWA tampoco tiene
    papelera de carpetas; añadirla es una funcionalidad aparte.
 3. **Locks de archivo** con timeout por defecto de 1 h y tope de 24 h.
@@ -206,9 +210,10 @@ valor sola: guardar archivos y crear carpetas desde el PC.
    listado privado filtra por `subido_por`, así que un admin que moviera un
    archivo de otro usuario a su caja lo dejaría invisible. Si se quiere
    permitir, hay que decidir si se cambia `subido_por` o el filtro de lectura.
-9. **Versionado de R2**: recomendable activarlo antes de habilitar
-   sobrescrituras; la papelera de la app no cubre los bytes reemplazados por
-   un `PUT`.
+9. **Sin versionado en R2**: el servicio no lo ofrece. La papelera de la app
+   no cubre los bytes reemplazados por un `PUT`, así que la única protección
+   real es no abrir la escritura a todos o conservar copias propias de las
+   versiones anteriores.
 
 ## 12. Plan de implementación en el Worker
 
@@ -372,8 +377,12 @@ filas, perdiendo la papelera.
   `ultimo_uso` se actualiza también al escribir (implementado).
 - **Rollback**: si algo falla, poner `DAV_WRITE="0"` y redesplegar; los datos
   ya escritos siguen siendo válidos para la PWA.
-- **Backup**: activar versionado de R2 (o probar con copias) antes de habilitar
-  sobrescrituras, porque un `PUT` destructivo no pasa por la papelera.
+- **Backup**: R2 **no tiene versionado de objetos**. Antes de habilitar
+  sobrescrituras para todos hay dos opciones reales: copias periódicas del
+  bucket (rclone u otro script) o versiones propias: copiar la key vieja a
+  `versiones/<archivo_id>/<fecha>_<nombre>` antes de borrarla y añadir una
+  regla de ciclo de vida que expire ese prefijo a los 90 días. Mientras no
+  exista ninguna, `DAV_WRITE="admin"` y sobrescritura deliberada.
 
 Despliegue y activación:
 
@@ -388,10 +397,9 @@ node test/escritura.mjs <base> <email> <token> "/Área común/Documentos"
 Desplegado el **2026-10-28** con `DAV_WRITE="0"` (solo lectura). El
 **2026-10-29** se abrió en `"admin"` para la prueba real con un token de
 administrador: smoke y escritura completos en verde. Para cerrarlo, poner
-`DAV_WRITE="0"` y redesplegar. Antes de pasar a `"all"`, conviene activar el
-**versionado de R2** en el panel de Cloudflare (bucket → Settings → Object
-versioning): es la única red de seguridad para los bytes reemplazados por un
-`PUT`.
+`DAV_WRITE="0"` y redesplegar. R2 **no ofrece versionado de objetos**, así que
+antes de pasar a `"all"` conviene tener copias periódicas o versiones propias
+en `versiones/` (ver §12.6): una sobrescritura es definitiva.
 
 ### 12.7 Matriz de aceptación
 
