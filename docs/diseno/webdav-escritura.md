@@ -385,11 +385,13 @@ npx wrangler deploy                 # DAV_WRITE="0": solo lectura
 node test/escritura.mjs <base> <email> <token> "/Área común/Documentos"
 ```
 
-Desplegado el **2026-10-28** con `DAV_WRITE="0"`: `OPTIONS` sigue anunciando
-`Allow: OPTIONS, PROPFIND, GET, HEAD` y ningún método de escritura está activo.
-Antes de pasar a `"admin"`, conviene activar el **versionado de R2** en el panel
-de Cloudflare (bucket → Settings → Object versioning): es la única red de
-seguridad para los bytes reemplazados por un `PUT`.
+Desplegado el **2026-10-28** con `DAV_WRITE="0"` (solo lectura). El
+**2026-10-29** se abrió en `"admin"` para la prueba real con un token de
+administrador: smoke y escritura completos en verde. Para cerrarlo, poner
+`DAV_WRITE="0"` y redesplegar. Antes de pasar a `"all"`, conviene activar el
+**versionado de R2** en el panel de Cloudflare (bucket → Settings → Object
+versioning): es la única red de seguridad para los bytes reemplazados por un
+`PUT`.
 
 ### 12.7 Matriz de aceptación
 

@@ -16,4 +16,4 @@ bucket_name = "proyecto-gestor-archivos"
 SUPABASE_URL = "https://khivwiabrozdqpiuadfi.supabase.co"
 # Escritura desde el Explorador: "0" (apagada), "admin" (solo admin) o "all".
 # Con "0" los métodos PUT/MKCOL/DELETE responden 501 y el Worker es solo-lectura.
-DAV_WRITE = "0"
+DAV_WRITE = "admin"
