@@ -6,6 +6,7 @@ import {
   type Env,
   type UsuarioDav,
 } from './env'
+import { responderError } from './util'
 
 export class ErrorSupabase extends Error {
   readonly status: number
@@ -43,6 +44,18 @@ export async function sbVoid(env: Env, recurso: string, init?: RequestInit): Pro
   const res = await peticion(env, recurso, init)
   if (!res.ok) throw new ErrorSupabase(res.status, await res.text().catch(() => ''), recurso)
   await res.text().catch(() => '')
+}
+
+// Traduce los errores de PostgREST/trigger a respuestas WebDAV.
+export function errorDeBd(e: unknown): Response {
+  if (e instanceof ErrorSupabase && e.cuerpo.includes('LIMITE_ALMACENAMIENTO')) {
+    return responderError(
+      507,
+      'El almacenamiento familiar ha alcanzado el límite de 9 GB. Libera espacio desde la app.'
+    )
+  }
+  console.error('WebDAV: error de base de datos', e)
+  return responderError(500, 'No se pudo registrar el cambio en la base de datos.')
 }
 
 export async function sha256hex(texto: string): Promise<string> {

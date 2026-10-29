@@ -1,9 +1,9 @@
 # Diseño: puente WebDAV con escritura
 
-Estado: **Fase A implementada** (2026-10-28). La lectura está en producción y
-la escritura `PUT`/`MKCOL`/`DELETE` está en el Worker, apagada por defecto con
-`DAV_WRITE="0"`. Fases B (`MOVE`/`COPY`/`PROPPATCH`) y C (`LOCK`/`UNLOCK`)
-pendientes. Base: `docs/diseno/webdav.md`.
+Estado: **Fases A y B implementadas** (2026-10-29). La lectura está en producción
+y la escritura `PUT`/`MKCOL`/`DELETE`/`MOVE`/`COPY`/`PROPPATCH` está en el
+Worker, abierta con `DAV_WRITE="all"`. La Fase C (`LOCK`/`UNLOCK`) sigue
+pendiente. Base: `docs/diseno/webdav.md`.
 
 ## 0. Respuesta corta
 
@@ -39,9 +39,9 @@ archivos y la auditoría.
 | Abrir / editar Office | `GET`, `HEAD`, `LOCK`, `PUT`, `UNLOCK` | Sin Clase 2, Word/Excel abren en solo lectura. |
 | Propiedades / nombre | `PROPFIND`, `PROPPATCH` | `PROPPATCH[displayname]` llega en Fase B. |
 
-En Fase A, `MOVE`, `COPY`, `PROPPATCH`, `LOCK` y `UNLOCK` responden `501`:
-renombrar, mover/copiar y editar Office desde el Explorador todavía no
-funcionan. Subir, crear carpetas y borrar archivos sí.
+`MOVE`, `COPY` y `PROPPATCH[displayname]` ya funcionan desde la Fase B
+(2026-10-29). `LOCK` y `UNLOCK` siguen respondiendo `501`: Word/Excel abren en
+solo lectura hasta la Fase C.
 
 
 ## 1. Objetivo y fases
@@ -51,23 +51,29 @@ Explorador/Finder directamente en R2, con las mismas reglas del negocio que la P
 
 - **Fase A (útil sola, implementada):** `PUT` + `MKCOL` + `DELETE` (a
   papelera). Ya permite "guardar desde el PC".
-- **Fase B:** `COPY` / `MOVE` + `PROPPATCH[displayname]` (arrastrar y renombrar).
-- **Fase C:** `LOCK` / `UNLOCK` (Clase 2: lo que exige Office para editar sin
-  abrir en solo-lectura).
+- **Fase B (implementada, 2026-10-29):** `COPY` / `MOVE` +
+  `PROPPATCH[displayname]` (arrastrar, renombrar y copiar archivos).
+- **Fase C (pendiente):** `LOCK` / `UNLOCK` (Clase 2: lo que exige Office para
+  editar sin abrir en solo-lectura).
 
-### Estado de implementación (2026-10-28)
+### Estado de implementación (2026-10-29)
 
 - Router y flag en `worker/src/index.ts`: `DAV_WRITE="0"` (por defecto),
   `"admin"` (solo administradores) o `"all"`.
 - Módulos: `env.ts`, `util.ts`, `supabase.ts`, `arbol.ts`, `props.ts`,
-  `lectura.ts` y `escritura.ts`. Sin dependencias nuevas.
+  `lectura.ts`, `escritura.ts` (Fase A), `mover.ts` y `proppatch.ts` (Fase B).
+  Sin dependencias nuevas.
 - `PUT`, `MKCOL` y `DELETE` de archivo implementados con cupo, límite de 20 MB,
   papelera, ETag/`If-None-Match`/`If-Match` y auditoría (`ACTUALIZAR_WEBDAV`).
-- `MOVE`, `COPY`, `PROPPATCH`, `LOCK` y `UNLOCK` responden `501` hasta las
-  fases B/C.
+- `MOVE` (archivo y carpeta), `COPY` de archivo y `PROPPATCH[displayname]`
+  implementados con `Overwrite`, anti-ciclo de 50 niveles, reubicación de bytes
+  al cambiar de ámbito, cupo en copias y auditoría (`MOVER`,
+  `RENOMBRAR_ARCHIVO`, `RENOMBRAR_CARPETA`, `COPIAR_WEBDAV`).
+- `LOCK` y `UNLOCK` responden `501` hasta la Fase C.
 - Pruebas: `npx tsc -p worker/tsconfig.json`,
-  `npx wrangler deploy --dry-run`, prueba local con Supabase/R2 simulados y
-  `worker/test/escritura.mjs` para el Worker desplegado.
+  `npx wrangler deploy --dry-run`, banco local con Supabase/R2 simulados
+  (MOVE/COPY/PROPPATCH incluidos) y `worker/test/escritura.mjs` para el Worker
+  desplegado.
 
 ## 2. Métodos y códigos
 
@@ -78,8 +84,9 @@ Explorador/Finder directamente en R2, con las mismas reglas del negocio que la P
 | `MKCOL` | `INSERT` en `carpetas` (nombre 1–100 car.) | `201`, `400` (nombre), `405` (ya existe), `409` (padre inexistente/invisible), `415` (con cuerpo) |
 | `DELETE` archivo | Papelera: `UPDATE estado='papelera'` (nunca físico) | `204` |
 | `DELETE` carpeta | **Prohibido** → `403` (la app no tiene papelera de carpetas; se borra desde la PWA) | `403` |
-| `COPY`/`MOVE` | `UPDATE carpeta_id` y/o `nombre` (+ key R2 intacta: la key no codifica carpeta) | `201`/`204`, `412` (ciclo en carpetas) |
-| `PROPPATCH` | Solo `displayname` → renombra (`UPDATE nombre`) | `207`, resto de props → `403` |
+| `MOVE` archivo/carpeta | Cambia `carpeta_id` y/o nombre; si cambia de ámbito, reubica los bytes en R2 | `201`/`204`, `403` (permiso/ámbito), `409` (carpeta destino/ciclo), `412` (`Overwrite: F`), `502` (otro host) |
+| `COPY` archivo | Nuevo registro y bytes; dueño = quien copia; carpetas → `501` | `201`/`204`, `403`, `409`, `412`, `501`, `507` (sin cupo) |
+| `PROPPATCH` | Solo `displayname` → renombra (`UPDATE nombre`) | `207`; `403` para el resto de props; `400`/`409` en el `propstat` de `displayname` |
 | `LOCK`/`UNLOCK` | Ver §6 | `200`, `423`, `409`, `412` |
 
 ## 3. Reglas de negocio (réplica exacta de la PWA)
@@ -230,12 +237,14 @@ worker/src/
   props.ts        # xmlPropfind(), ETag, cuota, fechas
   lectura.ts      # GET/HEAD/Range
   escritura.ts    # PUT, MKCOL, DELETE (Fase A)
+  mover.ts        # MOVE y COPY (Fase B)
+  proppatch.ts    # PROPPATCH[displayname] (Fase B)
   util.ts         # segmentos, nombres, keys R2, MIME, XML, errores
 ```
 
-`mover.ts` y `locks.ts` llegarán con las fases B/C. Sin dependencias nuevas:
-solo `fetch`, binding `BUCKET` y `crypto.subtle`. `worker/tsconfig.json` ya
-incluye `src/**/*.ts`; `npm run build` no toca el Worker.
+`locks.ts` llegará con la Fase C. Sin dependencias nuevas: solo `fetch`,
+binding `BUCKET` y `crypto.subtle`. `worker/tsconfig.json` ya incluye
+`src/**/*.ts`; `npm run build` no toca el Worker.
 
 ### 12.2 Utilidades nuevas (antes de los handlers)
 
@@ -310,41 +319,54 @@ incluye `src/**/*.ts`; `npm run build` no toca el Worker.
 cascada: la FK `ON DELETE CASCADE` de `carpetas` arrastraría archivos y sus
 filas, perdiendo la papelera.
 
-### 12.4 Fase B — `MOVE` + `COPY` + `PROPPATCH` (1 semana)
+### 12.4 Fase B — `MOVE` + `COPY` + `PROPPATCH` (implementada 2026-10-29)
+
+Implementada en `worker/src/mover.ts` y `worker/src/proppatch.ts`. `OPTIONS`
+anuncia `MOVE, COPY, PROPPATCH` cuando `DAV_WRITE` está activo.
 
 **`MOVE` archivo / carpeta**
 
-1. Resolver origen (`404` si no es visible); exigir dueño o admin.
-2. Parsear `Destination` (absoluto o path), validar **mismo host** y decodificar
-   cada segmento; resolver el padre destino. Si no existe → `409`.
-3. Si destino existe: `Overwrite: F` → `412`; `Overwrite: T` → archivo destino
-   a papelera y seguir; carpeta destino → `409`.
-4. Archivo: si el ámbito no cambia, `UPDATE nombre_original, carpeta_id`.
-   Si cambia, `get` + `put` en la key nueva (mismo `subido_por` en la ruta
-   privada) + `UPDATE ruta_r2, carpeta_id, nombre_original`; si la BD falla,
-   borrar la key nueva. El `delete` de la key vieja es best-effort. Si el
-   destino es una caja privada y el archivo no es del usuario → `403` (evita
-   el archivo invisible por el filtro `subido_por` del listado privado).
-5. Carpeta: solo mismo ámbito; `UPDATE nombre, carpeta_padre_id`; anti-ciclo
-   subiendo 50 niveles desde el destino. No mover dentro de sí misma/hijas.
-6. Auditar `MOVER`/`RENOMBRAR_ARCHIVO`/`RENOMBRAR_CARPETA` con
-   `via: 'webdav'`; `201` si el destino no existía, `204` si se reemplazó.
+1. Resolver origen (`404` si no es visible); exigir dueño o admin. La raíz y
+   los ámbitos no se mueven (`403`).
+2. Parsear `Destination` (absoluto o path), validar **mismo host** (`502` si no)
+   y decodificar cada segmento; resolver el padre destino (`409` si no existe).
+3. Si el destino existe: `Overwrite: F` → `412`; con `T`, un archivo destino va
+   a la papelera y se sigue; una carpeta destino → `409`.
+4. Archivo: si el ámbito no cambia, `UPDATE nombre_original, carpeta_id` (la key
+   de R2 no cambia). Si cambia, `get` + `put` en la key nueva (la privada usa el
+   `subido_por` del archivo) + `UPDATE ruta_r2, carpeta_id, nombre_original`; si
+   la BD falla, se borra la key nueva. El `delete` de la key vieja es
+   best-effort. Si el destino es una caja privada y el archivo no es del
+   usuario → `403` (evita el archivo invisible por el filtro `subido_por`).
+5. Carpeta: solo mismo ámbito (`409` si cambia); `UPDATE nombre,
+   carpeta_padre_id`; anti-ciclo subiendo 50 niveles desde el destino. No se
+   puede mover dentro de sí misma ni de sus hijas.
+6. Auditar `MOVER` si cambia el padre y `RENOMBRAR_ARCHIVO`/`RENOMBRAR_CARPETA`
+   si cambia el nombre, con `via: 'webdav'`; `201` si el destino no existía,
+   `204` si se reemplazó.
 
 **`COPY` archivo**
 
-1. Mismo origen/permisos; resolver destino.
-2. `get` del objeto + `put` en key nueva + `INSERT` en `archivos` con
-   `subido_por = user.id` y `carpeta_id` destino.
-3. Cupo: el duplicado **suma** bytes; comprobar antes y borrar la key nueva si
-   la BD falla → `507`.
-4. `201`/`204`. Carpetas → `501` en v1.
+1. Resolver origen; exigir dueño o admin; las carpetas → `501`.
+2. `Destination` como en `MOVE`; mismo host, nombre válido. Origen y destino
+   iguales → `403`; carpeta destino → `409`; `Overwrite: F` → `412`.
+3. `get` del objeto + `put` en `keyNueva` + `INSERT` en `archivos` con
+   `subido_por = user.id` y `carpeta_id` destino. Si el destino existía, se manda
+   antes a la papelera.
+4. Cupo: se descuentan los bytes del destino reemplazado y se suma el duplicado;
+   si no cabe → `507` antes de tocar R2. Si el `INSERT` falla, se borra la key
+   nueva. Auditoría `COPIAR_WEBDAV` (el trigger audita además `SUBIR_ARCHIVO`).
+5. `201`/`204`.
 
 **`PROPPATCH`**
 
-1. Parsear XML y aceptar solo `displayname`.
-2. Actualizar `nombre_original`/`nombre` con las mismas reglas que `MOVE`.
-3. Responder `207 Multi-Status`: `200` para `displayname`; `403` para el resto
-   (`Win32LastModifiedTime`, etc.) sin romper la operación.
+1. Cuerpo máximo 64 KB; se acepta solo `displayname` (con cualquier prefijo de
+   namespace). El resto de propiedades (`Win32LastModifiedTime`, etc.) → `403`.
+2. Se aplican las mismas reglas de nombre que `MOVE` (trim, 200/100 caracteres,
+   reservados de Windows y duplicados). El recurso debe ser del usuario o admin.
+3. Responder `207 Multi-Status`: `200` para `displayname`; `400`/`409` en su
+   `propstat` si el nombre no vale o ya existe; `403` para el resto sin romper la
+   operación. Auditoría `RENOMBRAR_ARCHIVO`/`RENOMBRAR_CARPETA`.
 
 ### 12.5 Fase C — `LOCK` / `UNLOCK` (1 semana)
 
@@ -394,12 +416,12 @@ npx wrangler deploy                 # DAV_WRITE="0": solo lectura
 node test/escritura.mjs <base> <email> <token> "/Área común/Documentos"
 ```
 
-Desplegado el **2026-10-28** con `DAV_WRITE="0"` (solo lectura). El
-**2026-10-29** se abrió en `"admin"` para la prueba real con un token de
-administrador: smoke y escritura completos en verde. Para cerrarlo, poner
-`DAV_WRITE="0"` y redesplegar. R2 **no ofrece versionado de objetos**, así que
-antes de pasar a `"all"` conviene tener copias periódicas o versiones propias
-en `versiones/` (ver §12.6): una sobrescritura es definitiva.
+Desplegado el **2026-10-28** con `DAV_WRITE="0"` (solo lectura) y el
+**2026-10-29** con `"admin"` para la prueba real: smoke y escritura completos en
+verde. Tras implementar la Fase B y pasar el banco local, se abrió
+`DAV_WRITE="all"` para el PC, los móviles y el portátil de Marina. R2 **no
+ofrece versionado de objetos**: una sobrescritura es definitiva; la copia de
+seguridad local periódica queda pendiente.
 
 ### 12.7 Matriz de aceptación
 
@@ -421,8 +443,8 @@ en `versiones/` (ver §12.6): una sobrescritura es definitiva.
     privadas ajenas en el árbol (asimetría documentada).
 12. `rclone copy/move/delete` contra el Worker; `wrangler tail` sin errores.
 
-En Fase A ya se pueden validar 1, 2, 5, 9 (solo `PUT`), 10 y 11. Los puntos
-3, 4, 6, 7 y 8 necesitan las fases B/C.
+En Fase B se pueden validar 1–5 y 7–11. El punto 6 (Office) necesita la Fase C;
+el 12 (rclone) depende del cliente que se use.
 
 ### 12.8 Orden de trabajo
 
@@ -430,9 +452,9 @@ En Fase A ya se pueden validar 1, 2, 5, 9 (solo `PUT`), 10 y 11. Los puntos
 |---|---|---|
 | F0 | Refactor en módulos + flag `DAV_WRITE` + `sbVoid`/utilidades | Hecho (2026-10-28) |
 | A | `PUT`, `MKCOL`, `DELETE` archivo + pruebas locales | Hecho (2026-10-28); falta prueba en Windows real |
-| B | `MOVE`, `COPY` archivo, `PROPPATCH`, condicionales completos | Pendiente |
+| B | `MOVE`, `COPY` archivo, `PROPPATCH`, condicionales completos | Hecho (2026-10-29); banco local en verde |
 | C | `LOCK`/`UNLOCK`, `lockdiscovery`, Office | Pendiente |
-| D | Endurecer, auditoría, rate-limit, documentación y guía familiar | Parcial (rate-limit y auditoría hechos) |
+| D | Endurecer, auditoría, rate-limit, documentación y guía familiar | Parcial (rate-limit, auditoría y guía hechos) |
 
 Total: ~3 semanas efectivas. Se puede parar después de A y seguir usando la
 PWA para lo demás.

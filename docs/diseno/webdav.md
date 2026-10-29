@@ -1,10 +1,11 @@
 # Diseño: puente WebDAV (ver R2 en el Explorador)
 
-Estado: **lectura en producción**; Fase A de escritura implementada y apagada
-por defecto (2026-10-28). Este documento describe el diseño base de lectura.
-Objetivo: ver y abrir los archivos del gestor desde el Explorador de Windows /
-Finder / apps Android con WebDAV, sin descargar antes y sin salir del modelo de
-permisos de la app. La escritura (`PUT`/`MKCOL`/`DELETE`) se detalla en
+Estado: **lectura en producción**; Fases A y B de escritura implementadas
+(2026-10-29) y abiertas con `DAV_WRITE="all"`. Este documento describe el
+diseño base de lectura. Objetivo: ver, abrir y organizar los archivos del
+gestor desde el Explorador de Windows / Finder / apps Android con WebDAV, sin
+descargar antes y sin salir del modelo de permisos de la app. La escritura
+(`PUT`/`MKCOL`/`DELETE`/`MOVE`/`COPY`/`PROPPATCH`) se detalla en
 `docs/diseno/webdav-escritura.md`.
 
 ## 1. Por qué no vive en la app Next.js (restricción verificada)
@@ -41,12 +42,13 @@ Cloudflare Worker `dav` (carpeta worker/, deploy con wrangler, separado de Verce
 
 | Método   | Estado              | Notas                                            |
 |----------|---------------------|--------------------------------------------------|
-| OPTIONS  | Sí              | `DAV: 1`; `Allow` añade `PUT, MKCOL, DELETE` si `DAV_WRITE` está activo |
+| OPTIONS  | Sí              | `DAV: 1`; `Allow` añade `PUT, MKCOL, DELETE, MOVE, COPY, PROPPATCH` si `DAV_WRITE` está activo |
 | PROPFIND | Sí (depth 0/1)  | `infinity` se trata como `1`; incluye `getetag`  |
 | GET      | Sí (+ `Range`)  | Streaming desde el binding R2                    |
 | HEAD     | Sí              | Mismas cabeceras que GET, sin cuerpo             |
 | PUT/DELETE/MKCOL | Fase A (tras `DAV_WRITE`) | Archivos a papelera; carpetas no se borran |
-| COPY/MOVE/LOCK/PROPPATCH | No → `501` | Fases B/C en `docs/diseno/webdav-escritura.md` |
+| COPY/MOVE/PROPPATCH | Fase B (tras `DAV_WRITE`) | `COPY` solo archivos; `MOVE` de carpeta en su ámbito; `PROPPATCH[displayname]` |
+| LOCK/UNLOCK | No → `501` | Fase C en `docs/diseno/webdav-escritura.md` |
 
 ## 4. Autenticación (Basic + tokens de Explorador)
 
@@ -164,9 +166,11 @@ los triggers existentes (`SUBIR_ARCHIVO`, `MOVER_A_PAPELERA`).
   no-store` en todo, tope de 25 segmentos, `Allow` en el `501`, `ultimo_uso` +
   auditoría `ACCESO_WEBDAV` en cada GET, script `worker/test/smoke.mjs` y guía
   `docs/guias/alta-explorador.md`.
-- **Fase A de escritura implementada** (2026-10-28): `PUT`, `MKCOL` y
-  `DELETE` de archivo, apagados por defecto con `DAV_WRITE="0"`. Plan y
-  fases B/C en `docs/diseno/webdav-escritura.md` (Office necesita Clase 2).
+- **Fases A y B de escritura implementadas** (2026-10-29): `PUT`, `MKCOL`,
+  `DELETE` de archivo, `MOVE` (archivo/carpeta), `COPY` de archivo y
+  `PROPPATCH[displayname]`, abiertas con `DAV_WRITE="all"`. `LOCK`/`UNLOCK`
+  quedan para la Fase C; Office sigue abriendo en solo lectura hasta entonces.
+  Plan y detalle en `docs/diseno/webdav-escritura.md`.
 
 ## 11. Decisiones (cerradas 2026-10-04)
 

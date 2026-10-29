@@ -1,6 +1,6 @@
 // Utilidades sin estado: cabeceras, nombres, rutas, MIME y ETag.
 
-import type { Scope } from './env'
+import type { Env, Scope } from './env'
 
 // Nada del puente se cachea: son listados privados por token
 export function cabecerasPrivadas(extra?: Record<string, string>): Record<string, string> {
@@ -14,6 +14,16 @@ export function escXml(s: string): string {
 export function hrefDe(segs: string[], esCarpeta: boolean): string {
   const base = `/${segs.map((s) => encodeURIComponent(s)).join('/')}`
   return esCarpeta && !base.endsWith('/') ? `${base}/` : base
+}
+
+// Borrado de R2 best-effort: si falla queda un objeto huérfano, pero la BD
+// nunca debe quedar apuntando a bytes ya eliminados.
+export async function borrarKey(env: Env, key: string): Promise<void> {
+  try {
+    await env.BUCKET.delete(key)
+  } catch (e) {
+    console.error('WebDAV: no se pudo borrar la key', key, e)
+  }
 }
 
 export function noAuth(): Response {

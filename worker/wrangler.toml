@@ -15,5 +15,5 @@ bucket_name = "proyecto-gestor-archivos"
 # URL del proyecto Supabase (misma que NEXT_PUBLIC_SUPABASE_URL en Vercel)
 SUPABASE_URL = "https://khivwiabrozdqpiuadfi.supabase.co"
 # Escritura desde el Explorador: "0" (apagada), "admin" (solo admin) o "all".
-# Con "0" los métodos PUT/MKCOL/DELETE responden 501 y el Worker es solo-lectura.
-DAV_WRITE = "admin"
+# Con "0" los métodos de escritura responden 501 y el Worker es solo-lectura.
+DAV_WRITE = "all"

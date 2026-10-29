@@ -1,9 +1,9 @@
 # Ver tus archivos en el Explorador (unidad de red)
 
 Tus archivos viven en la nube familiar, pero puedes verlos y abrirlos como una
-carpeta más de tu ordenador, **sin descargarlos antes**. Por defecto es de
-**solo lectura**; el administrador puede activar la escritura para subir,
-crear carpetas y borrar archivos (ver §3).
+carpeta más de tu ordenador, **sin descargarlos antes**. La escritura está
+activa: puedes subir, crear carpetas, renombrar, mover, copiar archivos y
+mandarlos a la papelera (ver §3).
 
 ## 1. Crea tu contraseña de Explorador (una vez por dispositivo)
 
@@ -26,19 +26,21 @@ crear carpetas y borrar archivos (ver §3).
 > contraseña mal escrita: Panel de control → *Administrador de credenciales* →
 > *Credenciales de Windows* → borra la de `*.workers.dev` y reintenta.
 
-## 3. Escribir desde el Explorador (opcional)
+## 3. Escribir desde el Explorador
 
-El administrador puede activar la escritura en el Worker (`DAV_WRITE`). Cuando
-está activa:
+La escritura está activa en el Worker (`DAV_WRITE="all"`). Puedes:
 
 - **Subir**: arrastra archivos a una carpeta o usa *Copiar/Pegar*. Máximo
   **20 MB por archivo**.
 - **Crear carpetas**: botón derecho → *Nueva carpeta*.
+- **Renombrar**: F2 sobre un archivo o carpeta (o desde el menú contextual).
+- **Mover y copiar**: cortar/pegar o arrastrar. Los archivos pueden pasar entre
+  el Área común y tu Caja fuerte; las carpetas solo dentro de su mismo espacio.
+  Copiar una carpeta completa todavía no está disponible.
 - **Borrar archivos**: tecla **Supr**. Van a la **papelera** de la app y se
   pueden recuperar.
-- **Todavía no**: renombrar (F2), mover/copiar entre carpetas, borrar carpetas
-  completas ni editar Word/Excel en el sitio. Para eso usa la app (o espera a
-  las siguientes fases).
+- **Todavía no**: borrar carpetas completas ni editar Word/Excel en el sitio
+  (Office abre en solo lectura). Para eso usa la app.
 
 ## 4. Conectar en macOS
 
@@ -53,10 +55,9 @@ una cuenta **WebDAV** con la misma dirección, email y código.
 ## Preguntas frecuentes
 
 - **¿Ocupa espacio en mi disco?** No: los archivos se abren en streaming.
-- **¿Puedo editar o borrar desde ahí?** Por defecto es solo lectura. Si el
-  administrador activó la escritura, puedes subir, crear carpetas y borrar
-  archivos (van a la papelera), pero todavía no renombrar, mover ni editar
-  Word/Excel en el sitio.
+- **¿Puedo editar o borrar desde ahí?** Puedes subir, crear carpetas, renombrar,
+  mover, copiar archivos y borrarlos (van a la papelera). Borrar carpetas
+  completas y editar Word/Excel en el sitio todavía no: usa la app para eso.
 - **¿Qué significa "Sistema de archivos: FAT"?** Nada: Windows etiqueta así
   todas las unidades de red. Ignóralo.
 - **¿Hasta qué tamaño puedo abrir?** Hasta 20 MB por archivo (límite de la app).

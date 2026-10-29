@@ -117,6 +117,25 @@ export function archivoHijo(
   )
 }
 
+// Anti-ciclo de MOVE: sube por los padres desde `desdeId` (máximo 50 niveles)
+// y comprueba si `ancestroId` aparece en la cadena.
+export async function esDescendiente(
+  env: Env,
+  desdeId: string,
+  ancestroId: string,
+  limite = 50
+): Promise<boolean> {
+  let cursor: string | null = desdeId
+  for (let i = 0; i < limite && cursor; i++) {
+    if (cursor === ancestroId) return true
+    const padres: Array<{ carpeta_padre_id: string | null }> = await sb<
+      Array<{ carpeta_padre_id: string | null }>
+    >(env, `carpetas?id=eq.${cursor}&select=carpeta_padre_id`)
+    cursor = padres[0]?.carpeta_padre_id ?? null
+  }
+  return false
+}
+
 export type PadreResuelto =
   | { ok: true; scope: Scope; carpetaId: string | null }
   | { ok: false; status: number; error: string }

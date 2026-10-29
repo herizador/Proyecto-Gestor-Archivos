@@ -11,8 +11,9 @@ import {
   type UsuarioDav,
 } from './env'
 import { archivoHijo, carpetaHija, resolver, resolverPadre } from './arbol'
-import { ErrorSupabase, auditar, sb, sbVoid, usoAlmacenamiento } from './supabase'
+import { auditar, errorDeBd, sb, sbVoid, usoAlmacenamiento } from './supabase'
 import {
+  borrarKey,
   cabecerasPrivadas,
   etagDe,
   hrefDe,
@@ -71,26 +72,6 @@ export async function leerCuerpoLimitado(req: Request, maximo: number): Promise<
     offset += trozo.byteLength
   }
   return { ok: true, body: buffer.buffer, tamano: total }
-}
-
-async function borrarKey(env: Env, key: string): Promise<void> {
-  try {
-    await env.BUCKET.delete(key)
-  } catch (e) {
-    // Best-effort: si falla queda un objeto huérfano, pero nunca se pierde la BD
-    console.error('WebDAV: no se pudo borrar la key', key, e)
-  }
-}
-
-function errorDeBd(e: unknown): Response {
-  if (e instanceof ErrorSupabase && e.cuerpo.includes('LIMITE_ALMACENAMIENTO')) {
-    return responderError(
-      507,
-      'El almacenamiento familiar ha alcanzado el límite de 9 GB. Libera espacio desde la app.'
-    )
-  }
-  console.error('WebDAV: error de base de datos', e)
-  return responderError(500, 'No se pudo registrar el cambio en la base de datos.')
 }
 
 function etiquetas(cabecera: string): string[] {

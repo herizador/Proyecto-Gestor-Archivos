@@ -1,7 +1,7 @@
 // Puente WebDAV: Explorador de Windows / Finder → R2 vía Supabase.
 // Lectura: OPTIONS, PROPFIND (depth 0/1), GET (+Range), HEAD.
-// Escritura (Fase A, tras DAV_WRITE): PUT, MKCOL y DELETE de archivos.
-// Diseño completo en docs/diseno/webdav.md y docs/diseno/webdav-escritura.md.
+// Escritura (Fases A y B, tras DAV_WRITE): PUT, MKCOL, DELETE, MOVE, COPY y
+// PROPPATCH[displayname]. Diseño en docs/diseno/webdav.md y webdav-escritura.md.
 // Sin dependencias: solo fetch + binding R2.
 
 import { MAX_SEGMENTOS, type Env, type UsuarioDav } from './env'
@@ -10,6 +10,8 @@ import { resolver } from './arbol'
 import { responderArchivo } from './lectura'
 import { responderPropfind } from './props'
 import { responderDelete, responderMkcol, responderPut } from './escritura'
+import { responderCopy, responderMove } from './mover'
+import { responderProppatch } from './proppatch'
 import { cabecerasPrivadas, noAuth, responderError, segmentos } from './util'
 
 // Rate-limit best-effort en memoria del isolate (sin infra extra). Cada
@@ -17,7 +19,7 @@ import { cabecerasPrivadas, noAuth, responderError, segmentos } from './util'
 const VENTANA_MS = 60_000
 const MAX_POR_IP = 30 // sin autenticar (por IP vista por Cloudflare)
 const MAX_POR_TOKEN = 300 // autenticado (por token)
-const MAX_ESCRITURA_POR_TOKEN = 60 // PUT/MKCOL/DELETE por minuto
+const MAX_ESCRITURA_POR_TOKEN = 60 // PUT/MKCOL/DELETE/MOVE/COPY/PROPPATCH por minuto
 const marcasRitmo = new Map<string, number[]>()
 
 function excesoRitmo(clave: string, maximo: number): boolean {
@@ -45,7 +47,9 @@ function modoEscritura(env: Env): ModoEscritura {
 
 function metodosPermitidos(env: Env): string {
   const lectura = 'OPTIONS, PROPFIND, GET, HEAD'
-  return modoEscritura(env) === 'off' ? lectura : `${lectura}, PUT, MKCOL, DELETE`
+  return modoEscritura(env) === 'off'
+    ? lectura
+    : `${lectura}, PUT, MKCOL, DELETE, MOVE, COPY, PROPPATCH`
 }
 
 const METODOS_ESCRITURA = new Set([
@@ -141,6 +145,15 @@ const worker = {
       }
       if (req.method === 'DELETE') {
         return await trasEscribir(env, user, await responderDelete(env, user, segs))
+      }
+      if (req.method === 'MOVE') {
+        return await trasEscribir(env, user, await responderMove(env, user, req, segs))
+      }
+      if (req.method === 'COPY') {
+        return await trasEscribir(env, user, await responderCopy(env, user, req, segs))
+      }
+      if (req.method === 'PROPPATCH') {
+        return await trasEscribir(env, user, await responderProppatch(env, user, req, segs))
       }
       if (esEscritura) {
         return responderError(501, `${req.method} todavía no está disponible.`, {

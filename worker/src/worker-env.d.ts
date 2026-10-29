@@ -10,6 +10,9 @@ interface R2ObjectBody {
   readonly size: number
   readonly range?: R2RangoLeido
   readonly body: ReadableStream<Uint8Array>
+  readonly httpMetadata?: {
+    contentType?: string
+  }
   arrayBuffer(): Promise<ArrayBuffer>
 }
 
