@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Trash2 } from 'lucide-react'
-import TrashFileCard from '@/components/TrashFileCard'
+import PapeleraLista from '@/components/PapeleraLista'
 
 export default async function PapeleraPage() {
   const supabase = await createClient()
@@ -42,16 +42,7 @@ export default async function PapeleraPage() {
           <p className="empty-state-text">Los archivos que muevas a la papelera aparecerán aquí.</p>
         </div>
       ) : (
-        <div className="grid-files">
-          {archivos.map((file) => (
-            <TrashFileCard
-              key={file.id}
-              file={file}
-              isAdmin={isAdmin}
-              isOwner={file.subido_por === user.id}
-            />
-          ))}
-        </div>
+        <PapeleraLista archivos={archivos} isAdmin={isAdmin} userId={user.id} />
       )}
     </div>
   )

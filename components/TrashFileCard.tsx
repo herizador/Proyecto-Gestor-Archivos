@@ -13,10 +13,16 @@ export default function TrashFileCard({
   file,
   isAdmin,
   isOwner,
+  seleccionable = false,
+  seleccionado = false,
+  onToggle,
 }: {
   file: ArchivoConAutor
   isAdmin: boolean
   isOwner: boolean
+  seleccionable?: boolean
+  seleccionado?: boolean
+  onToggle?: () => void
 }) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -91,8 +97,42 @@ export default function TrashFileCard({
   ]
 
   return (
-    <div className="card card-hover" style={{ display: 'flex', flexDirection: 'column', padding: '16px', position: 'relative' }}>
-      {canManage && (
+    <div
+      className={`card card-hover${seleccionado ? ' card-selected' : ''}`}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        padding: '16px',
+        position: 'relative',
+        cursor: seleccionable ? 'pointer' : undefined,
+      }}
+      onClick={seleccionable ? onToggle : undefined}
+    >
+      {seleccionable && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '8px',
+            left: '8px',
+            zIndex: 6,
+            display: 'flex',
+            padding: '4px',
+            borderRadius: '8px',
+            background: 'rgba(13, 18, 32, 0.9)',
+            border: '1px solid var(--color-border-hover)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <input
+            type="checkbox"
+            className="checkbox-input"
+            checked={seleccionado}
+            onChange={onToggle}
+            aria-label={`Seleccionar ${file.nombre_original}`}
+          />
+        </div>
+      )}
+      {canManage && !seleccionable && (
         <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 5 }}>
           <MenuAcciones items={itemsMenu} etiqueta={`Acciones de ${file.nombre_original}`} />
         </div>
@@ -101,7 +141,7 @@ export default function TrashFileCard({
         <IconoTipo size={30} />
         <span className="file-ext">{extension}</span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', paddingRight: canManage ? '40px' : 0 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', paddingRight: canManage && !seleccionable ? '40px' : 0 }}>
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <h3 style={{ fontSize: '0.9rem', fontWeight: 600, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
             {file.nombre_original}

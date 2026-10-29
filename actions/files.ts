@@ -487,6 +487,76 @@ export async function eliminarArchivoPermanente(archivoId: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Eliminar varios archivos de la papelera definitivamente (solo admin).
+// Mismo orden que el borrado individual: primero R2 y luego BD. Los objetos se
+// borran en tandas de 10 para no saturar R2 con un lote grande. La auditoría
+// se guarda como una sola entrada con el recuento y los ids.
+// ---------------------------------------------------------------------------
+export async function eliminarArchivosPermanentes(archivoIds: string[]) {
+  const supabase = await createClient()
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  if (authError || !user) return { error: 'No autenticado.' }
+
+  const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single()
+  if (perfil?.rol !== 'admin') return { error: 'Solo el administrador puede eliminar permanentemente.' }
+
+  const unicos = [...new Set(archivoIds)]
+  if (unicos.length === 0) return { error: 'Selecciona al menos un archivo.' }
+  if (unicos.length > 100) {
+    return { error: 'Máximo 100 archivos por lote. Elimínalos en varios lotes.' }
+  }
+
+  // Solo se tocan filas que sigan en la papelera: nunca un archivo activo.
+  const { data: archivos, error: fetchError } = await supabase
+    .from('archivos')
+    .select('id, ruta_r2, nombre_original')
+    .in('id', unicos)
+    .eq('estado', 'papelera')
+  if (fetchError) return { error: fetchError.message }
+
+  const filas = archivos ?? []
+  if (filas.length === 0) return { error: 'No hay archivos en la papelera con esos ids.' }
+
+  const borrados: typeof filas = []
+  const fallidos: Array<{ id: string; nombre: string; error: string }> = []
+  for (let i = 0; i < filas.length; i += 10) {
+    const tanda = filas.slice(i, i + 10)
+    const resultados = await Promise.allSettled(tanda.map((a) => deleteFromR2(a.ruta_r2)))
+    resultados.forEach((resultado, j) => {
+      if (resultado.status === 'fulfilled') borrados.push(tanda[j])
+      else fallidos.push({ id: tanda[j].id, nombre: tanda[j].nombre_original, error: 'No se pudo borrar de R2.' })
+    })
+  }
+
+  let eliminados = 0
+  if (borrados.length > 0) {
+    const { error } = await supabase.from('archivos').delete().in('id', borrados.map((a) => a.id))
+    if (error) {
+      for (const a of borrados) fallidos.push({ id: a.id, nombre: a.nombre_original, error: error.message })
+    } else {
+      eliminados = borrados.length
+      await logActivity({
+        accion: 'ELIMINAR_PERMANENTE',
+        detalles: {
+          cantidad: eliminados,
+          archivo_ids: borrados.map((a) => a.id),
+          nombre_original: `${eliminados} archivo${eliminados === 1 ? '' : 's'}`,
+          lote: true,
+        },
+      })
+    }
+  }
+
+  revalidatePath('/')
+  revalidatePath('/papelera')
+  revalidatePath('/mi-caja-fuerte')
+  revalidatePath('/todos')
+  revalidatePath('/recientes')
+  revalidatePath('/favoritos')
+  return { success: true, eliminados, fallidos, total: unicos.length }
+}
+
+// ---------------------------------------------------------------------------
 // Obtener uso total de almacenamiento
 // ---------------------------------------------------------------------------
 export async function getStorageUsage(): Promise<number> {
