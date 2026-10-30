@@ -399,7 +399,7 @@ anuncia `MOVE, COPY, PROPPATCH` cuando `DAV_WRITE` está activo.
 ### 12.5 Fase C — `LOCK` / `UNLOCK` (implementada 2026-10-30)
 
 1. Migración `locks_dav` (§6) con índice único por recurso; RLS sin policies y
-   gestión por service-role. **Pendiente de aplicar a mano en Supabase.**
+   gestión por service-role. **Aplicada en Supabase el 2026-10-30.**
 2. `LOCK` con cuerpo `lockinfo`: crear fila, `Timeout` (defecto 3600 s, tope
    86400), token `opaquelocktoken:<uuid>`, respuesta `200` + `Lock-Token` +
    XML `activelock`. Sin cuerpo: refrescar el lock existente si el `If` trae el
@@ -417,7 +417,8 @@ anuncia `MOVE, COPY, PROPPATCH` cuando `DAV_WRITE` está activo.
    `423` no revela el token del bloqueo.
 7. Banco local con `locks_dav` simulado: creación, refresco, `If`/`Not`,
    `423`, `UNLOCK`, locks de carpeta `0`/`infinity`, caducidad y migración
-   ausente. Prueba real ampliada en `worker/test/escritura.mjs`.
+   ausente. La prueba real `worker/test/escritura.mjs` pasó **23/23** contra
+   producción el 2026-10-30.
 
 ### 12.6 Rollout y seguridad
 
@@ -465,12 +466,15 @@ La Caja fuerte queda privada también para el admin con
 una sobrescritura es definitiva; la copia de seguridad local periódica queda
 pendiente.
 
-La **Fase C** (`LOCK`/`UNLOCK`, Clase 2) está implementada en el Worker y el
-banco local pasa en verde. Para usarla hay que aplicar
-`supabase/migraciones/locks-dav.sql` en Supabase → SQL Editor y desplegar el
-Worker; hasta entonces `LOCK` responde `500` con el aviso de la migración (la
-lectura y el resto de escrituras siguen funcionando). Después hay que probar
-Office en Windows (abrir, editar, guardar, cerrar) y el segundo PC concurrente.
+La **Fase C** (`LOCK`/`UNLOCK`, Clase 2) está implementada en el Worker,
+desplegada y con la migración `supabase/migraciones/locks-dav.sql` aplicada. La
+prueba real contra producción pasó **23/23**: `PUT`, `GET`, `LOCK` exclusivo,
+`PUT` bloqueado sin token (`423`), `PUT` con `If:<token>`, `PROPFIND` con
+`supportedlock`/`lockdiscovery`, `UNLOCK` con token incorrecto (`409`) y
+correcto, `COPY`, `MOVE` con `Overwrite` y cruce de ámbitos,
+`PROPPATCH[displayname]`, `DELETE` y controles de carpeta/raíz. Queda la prueba
+manual con Office en Windows (abrir, editar, guardar, cerrar) y el segundo PC
+concurrente.
 
 ### 12.7 Matriz de aceptación
 
@@ -502,8 +506,8 @@ tras aplicar `locks-dav.sql`; el 12 (rclone) depende del cliente que se use.
 | F0 | Refactor en módulos + flag `DAV_WRITE` + `sbVoid`/utilidades | Hecho (2026-10-28) |
 | A | `PUT`, `MKCOL`, `DELETE` archivo + pruebas locales | Hecho (2026-10-28); falta prueba en Windows real |
 | B | `MOVE`, `COPY` archivo, `PROPPATCH`, condicionales completos | Hecho (2026-10-29); banco local en verde |
-| C | `LOCK`/`UNLOCK`, `lockdiscovery`, Office | Hecho (2026-10-30); pendiente aplicar migración y prueba real |
-| D | Endurecer, auditoría, rate-limit, documentación y guía familiar | Parcial (rate-limit, auditoría y guía hechos) |
+| C | `LOCK`/`UNLOCK`, `lockdiscovery`, Office | Hecho (2026-10-30); migración aplicada y prueba real 23/23 |
+| D | Endurecer, auditoría, rate-limit, documentación y guía familiar | Parcial: rate-limit, auditoría, locks y guía hechos; faltan backup local y prueba con rclone |
 
 Total: ~3 semanas efectivas. Se puede parar después de A y seguir usando la
 PWA para lo demás.
