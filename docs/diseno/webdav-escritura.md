@@ -510,7 +510,9 @@ queda como **idea futura** (§13).
 
 Desplegada el 2026-10-30 (versión `c9da150e-9aef-4958-a93e-7e23f6a79581`);
 `OPTIONS` en producción confirma `DAV: 1, 2`, `Allow` con `LOCK`/`UNLOCK` y
-`X-Content-Type-Options: nosniff`.
+`X-Content-Type-Options: nosniff`. La prueba real `worker/test/escritura.mjs`
+pasó **23/23** tras el despliegue y `worker/test/smoke.mjs` quedó completo en
+verde; solo queda la prueba manual con Office y el segundo PC concurrente.
 
 ### 12.7 Matriz de aceptación
 
