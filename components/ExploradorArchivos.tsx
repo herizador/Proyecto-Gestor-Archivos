@@ -53,8 +53,14 @@ export default function ExploradorArchivos({
     <DocumentSearchBar
       userId={userId}
       isAdmin={isAdmin}
-      controles={
-        hayContenido ? (
+      modoSeleccion={modo}
+      alCambiarModo={setModo}
+      orden={orden}
+      vista={vista}
+      favoritosIniciales={favoritosIniciales}
+      ubicaciones={ubicaciones}
+      controles={(buscando) =>
+        hayContenido || buscando ? (
           <>
             {!modo && (
               <button

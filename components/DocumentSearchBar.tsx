@@ -7,6 +7,8 @@ import { buscarArchivos } from '@/actions/files'
 import { buscarAccesos, eliminarAcceso } from '@/actions/accesos'
 import FileCard from '@/components/FileCard'
 import FolderCard from '@/components/FolderCard'
+import FileListWrapper from '@/components/FileListWrapper'
+import type { Orden, Vista } from '@/components/BarraOrdenVista'
 import { avisar } from '@/components/Avisos'
 import type { AccesoConObjetivo, ArchivoConAutor } from '@/types/database'
 
@@ -15,11 +17,23 @@ export default function DocumentSearchBar({
   isAdmin,
   children,
   controles,
+  modoSeleccion,
+  alCambiarModo,
+  orden,
+  vista,
+  favoritosIniciales,
+  ubicaciones,
 }: {
   userId: string
   isAdmin: boolean
   children?: ReactNode
-  controles?: ReactNode
+  controles?: (buscando: boolean) => ReactNode
+  modoSeleccion?: boolean
+  alCambiarModo?: (v: boolean) => void
+  orden?: Orden
+  vista?: Vista
+  favoritosIniciales?: string[]
+  ubicaciones?: Record<string, string>
 }) {
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
@@ -98,7 +112,7 @@ export default function DocumentSearchBar({
           )}
           {cargando && <Loader2 size={18} className="animate-spin search-bar-spinner" />}
         </div>
-        {controles}
+        {controles?.(isSearching)}
       </div>
 
       {!isSearching && children}
@@ -116,16 +130,24 @@ export default function DocumentSearchBar({
             </p>
           )}
           {resultadosVisibles.length > 0 && (
-            <div className="grid-files">
-              {resultadosVisibles.map((file) => (
-                <FileCard
-                  key={file.id}
-                  file={file}
-                  isAdmin={isAdmin}
-                  isOwner={file.subido_por === userId}
-                />
-              ))}
-            </div>
+            // Los resultados se pintan con el mismo motor que la carpeta:
+            // así heredan el modo selección, los checkboxes y la píldora de
+            // acciones en lote (antes se pintaban con FileCard suelto y el
+            // botón «Seleccionar» no tenía efecto durante la búsqueda).
+            <FileListWrapper
+              archivos={resultadosVisibles}
+              carpetas={[]}
+              isAdmin={isAdmin}
+              userId={userId}
+              ordenExterno={orden}
+              vistaExterna={vista}
+              ocultarBarra
+              ocultarSeleccion
+              modoSeleccionExterno={modoSeleccion}
+              alCambiarModo={alCambiarModo}
+              favoritosIniciales={favoritosIniciales}
+              ubicaciones={ubicaciones}
+            />
           )}
           {accesosVisibles.length > 0 && (
             <>
