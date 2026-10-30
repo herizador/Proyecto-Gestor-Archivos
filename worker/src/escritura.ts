@@ -11,6 +11,7 @@ import {
   type UsuarioDav,
 } from './env'
 import { archivoHijo, carpetaHija, resolver, resolverPadre } from './arbol'
+import { comprobarBloqueo } from './locks'
 import { auditar, errorDeBd, sb, sbVoid, usoAlmacenamiento } from './supabase'
 import {
   borrarKey,
@@ -18,61 +19,11 @@ import {
   etagDe,
   hrefDe,
   keyNueva,
+  leerCuerpoLimitado,
   mimeEfectivo,
   nombreValido,
   responderError,
 } from './util'
-
-type CuerpoLeido =
-  | { ok: true; body: ReadableStream<Uint8Array> | ArrayBuffer; tamano: number }
-  | { ok: false; status: number; error: string }
-
-// Lee el cuerpo sin pasar del tope. Con Content-Length se puede pasar el
-// stream directo a R2; sin él (chunked) se bufferiza como máximo 20 MB.
-export async function leerCuerpoLimitado(req: Request, maximo: number): Promise<CuerpoLeido> {
-  const cab = req.headers.get('content-length')
-  if (cab !== null && cab.trim() !== '') {
-    const tamano = Number(cab)
-    if (!Number.isFinite(tamano) || tamano < 0) {
-      return { ok: false, status: 400, error: 'Content-Length no válido.' }
-    }
-    if (tamano > maximo) {
-      return { ok: false, status: 413, error: 'El archivo supera el límite de 20 MB.' }
-    }
-    if (tamano === 0) return { ok: true, body: new ArrayBuffer(0), tamano: 0 }
-    if (!req.body) return { ok: false, status: 400, error: 'Falta el cuerpo del archivo.' }
-    return { ok: true, body: req.body, tamano }
-  }
-
-  if (!req.body) return { ok: true, body: new ArrayBuffer(0), tamano: 0 }
-
-  const reader = req.body.getReader()
-  const trozos: Uint8Array[] = []
-  let total = 0
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (!value) continue
-      total += value.byteLength
-      if (total > maximo) {
-        await reader.cancel().catch(() => undefined)
-        return { ok: false, status: 413, error: 'El archivo supera el límite de 20 MB.' }
-      }
-      trozos.push(value)
-    }
-  } catch {
-    return { ok: false, status: 400, error: 'No se pudo leer el cuerpo del archivo.' }
-  }
-
-  const buffer = new Uint8Array(total)
-  let offset = 0
-  for (const trozo of trozos) {
-    buffer.set(trozo, offset)
-    offset += trozo.byteLength
-  }
-  return { ok: true, body: buffer.buffer, tamano: total }
-}
 
 function etiquetas(cabecera: string): string[] {
   return cabecera.split(',').map((t) => t.trim()).filter(Boolean)
@@ -123,7 +74,20 @@ export async function responderPut(
     }
   }
 
-  const cuerpo = await leerCuerpoLimitado(req, MAX_FILE_SIZE)
+  // Un bloqueo activo (del propio archivo o de una carpeta superior con
+  // profundidad infinita) exige el token en la cabecera If.
+  const bloqueo = await comprobarBloqueo(env, req, [
+    archivoActual
+      ? { id: archivoActual.id, esCarpeta: false, padreId: archivoActual.carpeta_id }
+      : { id: padre.carpetaId, esCarpeta: true, padreId: null },
+  ])
+  if (bloqueo) return bloqueo
+
+  const cuerpo = await leerCuerpoLimitado(
+    req,
+    MAX_FILE_SIZE,
+    'El archivo supera el límite de 20 MB.'
+  )
   if (!cuerpo.ok) return responderError(cuerpo.status, cuerpo.error)
 
   // El trigger de cupo solo salta en INSERT; en sobrescritura se comprueba el
@@ -246,6 +210,13 @@ export async function responderMkcol(
     return responderError(405, 'Ya existe un elemento con ese nombre.')
   }
 
+  // Crear un hijo modifica la carpeta: un lock de la carpeta (o de un
+  // ancestro con profundidad infinita) debe aportar su token.
+  const bloqueo = await comprobarBloqueo(env, req, [
+    { id: padre.carpetaId, esCarpeta: true, padreId: null },
+  ])
+  if (bloqueo) return bloqueo
+
   let filas: FilaCarpeta[]
   try {
     filas = await sb<FilaCarpeta[]>(env, 'carpetas', {
@@ -285,6 +256,7 @@ export async function responderMkcol(
 export async function responderDelete(
   env: Env,
   user: UsuarioDav,
+  req: Request,
   segs: string[]
 ): Promise<Response> {
   const nodo = await resolver(env, user, segs)
@@ -298,6 +270,16 @@ export async function responderDelete(
   if (nodo.archivo.subido_por !== user.id && user.rol !== 'admin') {
     return responderError(403, 'Solo el dueño o un administrador puede borrar este archivo.')
   }
+
+  const bloqueo = await comprobarBloqueo(env, req, [
+    { id: nodo.archivo.id, esCarpeta: false, padreId: nodo.archivo.carpeta_id },
+    // Borrar el archivo lo quita de su carpeta: un lock Depth: 0 del padre
+    // también protege el conjunto de miembros.
+    ...(nodo.archivo.carpeta_id
+      ? [{ id: nodo.archivo.carpeta_id, esCarpeta: true, padreId: null }]
+      : []),
+  ])
+  if (bloqueo) return bloqueo
 
   try {
     await sbVoid(env, `archivos?id=eq.${nodo.archivo.id}&estado=eq.activo`, {

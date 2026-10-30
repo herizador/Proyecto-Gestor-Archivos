@@ -4,12 +4,14 @@
 
 import { type Env, type FilaArchivo, type FilaCarpeta, type UsuarioDav } from './env'
 import { archivoHijo, carpetaHija, resolver } from './arbol'
+import { comprobarBloqueo } from './locks'
 import { auditar, errorDeBd, sb } from './supabase'
-import { leerCuerpoLimitado } from './escritura'
 import {
   cabecerasPrivadas,
+  desEscXml,
   escXml,
   hrefDe,
+  leerCuerpoLimitado,
   nombreValido,
   responderError,
 } from './util'
@@ -20,27 +22,6 @@ const MAX_PROPPATCH = 64 * 1024
 const ESTRUCTURALES = new Set(['propertyupdate', 'set', 'remove', 'prop', 'displayname'])
 
 type EstadoProp = { status: number; mensaje?: string }
-
-function desEscXml(texto: string): string {
-  return texto
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => {
-      const codigo = Number.parseInt(hex, 16)
-      return Number.isFinite(codigo) && codigo >= 0 && codigo <= 0x10ffff
-        ? String.fromCodePoint(codigo)
-        : ''
-    })
-    .replace(/&#(\d+);/g, (_, dec: string) => {
-      const codigo = Number.parseInt(dec, 10)
-      return Number.isFinite(codigo) && codigo >= 0 && codigo <= 0x10ffff
-        ? String.fromCodePoint(codigo)
-        : ''
-    })
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, '&')
-}
 
 // Devuelve las propiedades enviadas (nombre local) menos las estructurales.
 function propiedadesEnviadas(xml: string): string[] {
@@ -174,7 +155,26 @@ export async function responderProppatch(
     )
   }
 
-  const cuerpo = await leerCuerpoLimitado(req, MAX_PROPPATCH)
+  const bloqueo = await comprobarBloqueo(env, req, [
+    esCarpeta
+      ? { id: nodo.carpeta.id, esCarpeta: true, padreId: null }
+      : { id: nodo.archivo.id, esCarpeta: false, padreId: nodo.archivo.carpeta_id },
+    // Renombrar quita y añade un miembro: el lock Depth: 0 del padre cuenta.
+    ...(esCarpeta
+      ? nodo.carpeta.carpeta_padre_id
+        ? [{ id: nodo.carpeta.carpeta_padre_id, esCarpeta: true, padreId: null }]
+        : []
+      : nodo.archivo.carpeta_id
+        ? [{ id: nodo.archivo.carpeta_id, esCarpeta: true, padreId: null }]
+        : []),
+  ])
+  if (bloqueo) return bloqueo
+
+  const cuerpo = await leerCuerpoLimitado(
+    req,
+    MAX_PROPPATCH,
+    'El PROPPATCH supera el límite de 64 KB.'
+  )
   if (!cuerpo.ok) return responderError(cuerpo.status, cuerpo.error)
   const xml = await new Response(cuerpo.body).text()
   if (!xml.trim()) return responderError(400, 'PROPPATCH necesita un cuerpo XML.')

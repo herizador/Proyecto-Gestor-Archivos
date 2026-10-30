@@ -326,6 +326,50 @@ export type Database = {
           },
         ]
       }
+      locks_dav: {
+        Row: {
+          id: string
+          recurso_id: string
+          es_carpeta: boolean
+          profundidad: '0' | 'infinity'
+          usuario_id: string
+          propietario: string
+          token: string
+          expira: string
+          fecha_creacion: string
+        }
+        Insert: {
+          id?: string
+          recurso_id: string
+          es_carpeta?: boolean
+          profundidad?: '0' | 'infinity'
+          usuario_id: string
+          propietario: string
+          token: string
+          expira: string
+          fecha_creacion?: string
+        }
+        Update: {
+          id?: string
+          recurso_id?: string
+          es_carpeta?: boolean
+          profundidad?: '0' | 'infinity'
+          usuario_id?: string
+          propietario?: string
+          token?: string
+          expira?: string
+          fecha_creacion?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'locks_dav_usuario_id_fkey'
+            columns: ['usuario_id']
+            isOneToOne: false
+            referencedRelation: 'perfiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       favoritos: {
         Row: {
           id: string
@@ -501,6 +545,9 @@ export type Recordatorio = Database['public']['Tables']['recordatorios']['Row']
 
 // Token de Explorador para el puente WebDAV (el claro solo existe al crearlo)
 export type TokenDav = Database['public']['Tables']['tokens_dav']['Row']
+
+// Bloqueo WebDAV (Fase C): solo lo gestiona el Worker con service-role
+export type LockDav = Database['public']['Tables']['locks_dav']['Row']
 
 // Acceso con su objetivo resuelto (LEFT JOIN: el objetivo puede ser NULL = huérfano)
 export type AccesoConObjetivo = AccesoDirecto & {

@@ -603,6 +603,37 @@ CREATE POLICY "tokens_dav_delete" ON public.tokens_dav
 
 
 -- =============================================================================
+-- TABLA: locks_dav (Fase C de escritura WebDAV: LOCK/UNLOCK)
+-- Bloqueos exclusivos de escritura para que Office abra en edición.
+-- Solo la usa el Worker con service-role; RLS sin policies = denegado a la PWA.
+-- Caducan solos y se limpian de forma oportunista en cada LOCK/UNLOCK.
+-- Ver supabase/migraciones/locks-dav.sql y docs/diseno/webdav-escritura.md §6.
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS public.locks_dav (
+  id              UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+  recurso_id      UUID        NOT NULL,
+  es_carpeta      BOOLEAN     NOT NULL DEFAULT FALSE,
+  profundidad     TEXT        NOT NULL DEFAULT 'infinity'
+                              CHECK (profundidad IN ('0', 'infinity')),
+  usuario_id      UUID        NOT NULL REFERENCES public.perfiles(id) ON DELETE CASCADE,
+  propietario     TEXT        NOT NULL,
+  token           TEXT        NOT NULL UNIQUE,
+  expira          TIMESTAMPTZ NOT NULL,
+  fecha_creacion  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_locks_dav_recurso
+  ON public.locks_dav(recurso_id);
+
+CREATE INDEX IF NOT EXISTS idx_locks_dav_expira
+  ON public.locks_dav(expira);
+
+ALTER TABLE public.locks_dav ENABLE ROW LEVEL SECURITY;
+
+-- Sin policies: la PWA no lee ni escribe bloqueos. El Worker usa service-role.
+
+
+-- =============================================================================
 -- TABLA: recordatorios (avisos de vencimiento por usuario; nunca borran nada)
 -- Ver supabase/migraciones/recordatorios.sql
 -- =============================================================================

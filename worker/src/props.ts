@@ -9,10 +9,12 @@ import {
   type UsuarioDav,
 } from './env'
 import { archivosDe, hijasDe, resolver } from './arbol'
+import { locksDeRecursos, xmlActivelock, xmlSupportedLock, type FilaLock } from './locks'
 import { usoAlmacenamiento } from './supabase'
-import { cabecerasPrivadas, escXml, etagDe, hrefDe } from './util'
+import { cabecerasPrivadas, claseDav, escXml, etagDe, hrefDe } from './util'
 
 export type ItemProp = {
+  id?: string
   href: string
   nombre: string
   esCarpeta: boolean
@@ -21,6 +23,7 @@ export type ItemProp = {
   fecha?: string
   etag?: string
   cuota?: { usada: number; libre: number } | null
+  locks?: FilaLock[]
 }
 
 export function xmlPropfind(items: ItemProp[]): string {
@@ -45,7 +48,8 @@ export function xmlPropfind(items: ItemProp[]): string {
           ? `<D:quota-available-bytes>${it.cuota.libre}</D:quota-available-bytes>` +
             `<D:quota-used-bytes>${it.cuota.usada}</D:quota-used-bytes>`
           : '') +
-        '<D:supportedlock/><D:lockdiscovery/>' +
+        `<D:supportedlock>${xmlSupportedLock()}</D:supportedlock>` +
+        `<D:lockdiscovery>${(it.locks ?? []).map((lock) => xmlActivelock(lock, it.href)).join('')}</D:lockdiscovery>` +
         '</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>'
       )
     })
@@ -65,18 +69,25 @@ export async function miembrosDe(
     hijasDe(env, user, nodo.scope, padre),
     archivosDe(env, user, nodo.scope, padre),
   ])
+  const locks = await locksDeRecursos(env, [
+    ...carpetas.map((c) => c.id),
+    ...archivos.map((a) => a.id),
+  ])
   return [
     ...carpetas.map(
       (c): ItemProp => ({
+        id: c.id,
         href: hrefDe([...baseSegs, c.nombre], true),
         nombre: c.nombre,
         esCarpeta: true,
         fecha: c.fecha_creacion,
         cuota,
+        locks: locks.get(c.id) ?? [],
       })
     ),
     ...archivos.map(
       (a): ItemProp => ({
+        id: a.id,
         href: hrefDe([...baseSegs, a.nombre_original], false),
         nombre: a.nombre_original,
         esCarpeta: false,
@@ -84,6 +95,7 @@ export async function miembrosDe(
         tipo: a.tipo_mime,
         fecha: a.fecha_subida,
         etag: etagDe(a),
+        locks: locks.get(a.id) ?? [],
       })
     ),
   ]
@@ -102,7 +114,9 @@ export async function responderPropfind(
 
   if (nodo.kind === 'archivo') {
     const a = nodo.archivo
+    const locks = await locksDeRecursos(env, [a.id])
     const item: ItemProp = {
+      id: a.id,
       href: hrefDe(segs, false),
       nombre: a.nombre_original,
       esCarpeta: false,
@@ -110,12 +124,13 @@ export async function responderPropfind(
       tipo: a.tipo_mime,
       fecha: a.fecha_subida,
       etag: etagDe(a),
+      locks: locks.get(a.id) ?? [],
     }
     return new Response(xmlPropfind([item]), {
       status: 207,
       headers: {
         'Content-Type': 'application/xml; charset=utf-8',
-        DAV: '1',
+        DAV: claseDav(env),
         ...cabecerasPrivadas(),
       },
     })
@@ -123,9 +138,28 @@ export async function responderPropfind(
 
   const esRaiz = nodo.kind === 'raiz'
   const cuota = await usoAlmacenamiento(env)
+  const locksPropio =
+    nodo.kind === 'carpeta'
+      ? await locksDeRecursos(env, [nodo.carpeta.id])
+      : null
   const propio: ItemProp = esRaiz
     ? { href: '/', nombre: '', esCarpeta: true, cuota }
-    : { href: hrefDe(segs, true), nombre: segs[segs.length - 1], esCarpeta: true, cuota }
+    : nodo.kind === 'carpeta'
+      ? {
+          id: nodo.carpeta.id,
+          href: hrefDe(segs, true),
+          nombre: segs[segs.length - 1],
+          esCarpeta: true,
+          fecha: nodo.carpeta.fecha_creacion,
+          cuota,
+          locks: locksPropio?.get(nodo.carpeta.id) ?? [],
+        }
+      : {
+          href: hrefDe(segs, true),
+          nombre: segs[segs.length - 1],
+          esCarpeta: true,
+          cuota,
+        }
   let items = [propio]
   if (prof === 1) {
     if (esRaiz) {
@@ -142,7 +176,7 @@ export async function responderPropfind(
     status: 207,
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',
-      DAV: '1',
+      DAV: claseDav(env),
       ...cabecerasPrivadas(),
     },
   })

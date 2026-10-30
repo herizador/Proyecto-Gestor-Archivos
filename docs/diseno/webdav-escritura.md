@@ -132,30 +132,55 @@ Estos PUT se rechazan con `403` y no tocan ni R2 ni la BD (tampoco se listan):
 
 Sin esto, cada guardado de Word/Excel inundaría el almacenamiento y el historial.
 
-## 6. Locks (Fase C, Clase 2)
+## 6. Locks (Fase C, Clase 2) — implementado (2026-10-30)
 
-Nueva tabla (migración + RLS como `tokens_dav`: gestión vía service-role):
+Tabla `locks_dav` (migración `supabase/migraciones/locks-dav.sql`; RLS activado
+sin policies: solo el Worker con service-role la toca):
 
 ```sql
 create table if not exists public.locks_dav (
-  id          uuid primary key default uuid_generate_v4(),
-  recurso_id  uuid not null,          -- archivo o carpeta objetivo
-  es_carpeta  boolean not null default false,
-  token       text not null unique,    -- opaquelocktoken:<uuid>
-  propietario text not null,          -- Displayname del cliente (PC-usuario)
-  expira      timestamptz not null,   -- Timeout pedido (defecto 3600 s, tope 24 h)
+  id             uuid primary key default uuid_generate_v4(),
+  recurso_id     uuid not null,          -- archivo o carpeta objetivo
+  es_carpeta     boolean not null default false,
+  profundidad    text not null default 'infinity'
+                 check (profundidad in ('0', 'infinity')),
+  usuario_id     uuid not null references public.perfiles(id) on delete cascade,
+  token          text not null unique,    -- opaquelocktoken:<uuid>
+  propietario    text not null,           -- owner del lockinfo (PC-usuario)
+  expira         timestamptz not null,    -- Timeout (defecto 3600 s, tope 24 h)
   fecha_creacion timestamptz not null default now()
 );
+
+-- Un solo lock exclusivo por recurso, incluso con dos LOCK simultáneos.
+create unique index idx_locks_dav_recurso on public.locks_dav(recurso_id);
 ```
 
-- `LOCK` vacío o con `owner`: crea lock exclusivo (`423` si hay otro vigente).
-  `UNLOCK` exige el token (`Lock-Token` header). Caducados se ignoran y se
-  limpian de forma oportunista en cada `LOCK`.
-- Escritura (`PUT`/`MOVE`/`DELETE`/`PROPPATCH`) sobre recurso bloqueado por otro
-  → `423 Locked`. Desbloqueo forzoso: solo por expiración (v1; revocar a mano
-  queda como mejora, reutilizando el patrón de `/ajustes`).
-- PROPFIND añade `getetag` (`"<tamano>-<epoch>"`, útil también a clientes de
-  lectura) y `lockdiscovery` real cuando hay lock.
+- `LOCK` con cuerpo `lockinfo` crea un lock **exclusivo de escritura**. Sin
+  cuerpo (o con cuerpo vacío) refresca el existente si el `If` trae su token.
+  `423` si hay otro lock vigente; el mismo usuario puede reemplazar su propio
+  lock huérfano (Office reiniciado) al reabrir sin token. `Timeout`: defecto
+  3600 s, tope 86400 s (`Infinite` se guarda como 24 h).
+- `UNLOCK` exige `Lock-Token` y dueño/admin del recurso; token ajeno o caducado
+  → `409`; falta la cabecera → `400`. `204` al liberar.
+- Escritura (`PUT`/`MKCOL`/`DELETE`/`MOVE`/`COPY`/`PROPPATCH`) sobre un recurso
+  bloqueado → `423 Locked` salvo que la cabecera `If` aporte el token (los
+  `Not <token>` no autorizan). Un lock de carpeta con `Depth: infinity` protege
+  también a sus descendientes; con `Depth: 0` solo impide crear/quitar hijos,
+  no editar los existentes. Los locks caducados se ignoran (`expira > now()`) y
+  se limpian de forma oportunista en cada `LOCK`/`UNLOCK`.
+- No se anidan bloqueos: si una carpeta superior ya tiene un lock `infinity`,
+  bloquear un hijo devuelve `423`. La respuesta `423` **no incluye el token**,
+  para que nadie pueda saltarse el bloqueo leyéndolo.
+- `PROPFIND` anuncia `supportedlock` (exclusive/write) y `lockdiscovery` real
+  (con `locktoken`, `lockroot`, `timeout` y `owner`) tanto en el recurso como
+  en los hijos listados. `OPTIONS` responde `DAV: 1, 2` y añade `LOCK`/`UNLOCK`
+  a `Allow` cuando `DAV_WRITE` está activo.
+- Desbloqueo forzoso: solo por expiración o `UNLOCK` del dueño/admin (v1).
+- **Sin migración aplicada** la lectura sigue funcionando (los locks se
+  ignoran); `LOCK` devuelve `500` con el aviso de aplicar `locks-dav.sql`.
+- Limitación conocida: un lock de carpeta `Depth: infinity` no se muestra en
+  el `lockdiscovery` de los hijos (sí se aplica al escribir); Office bloquea y
+  libera el archivo concreto que abre, que es el caso real.
 
 ## 7. Auditoría
 
@@ -201,8 +226,8 @@ valor sola: guardar archivos y crear carpetas desde el PC.
 2. **`DELETE` de carpeta prohibido en v1** → `403`. La PWA tampoco tiene
    papelera de carpetas; añadirla es una funcionalidad aparte.
 3. **Locks de archivo** con timeout por defecto de 1 h y tope de 24 h.
-   Desbloqueo forzoso solo por expiración; la revocación manual en `/ajustes`
-   queda como mejora.
+   `UNLOCK` del dueño/admin libera; el desbloqueo forzoso de un lock ajeno
+   solo por expiración. La revocación manual en `/ajustes` queda como mejora.
 4. **Copiar carpetas** no entra en v1 (recursivo, multiplica bytes y cupo).
    `COPY` de archivos sí.
 5. **Tamaño máximo 20 MB**, igual que la PWA. No subir el límite para WebDAV:
@@ -241,12 +266,13 @@ worker/src/
   escritura.ts    # PUT, MKCOL, DELETE (Fase A)
   mover.ts        # MOVE y COPY (Fase B)
   proppatch.ts    # PROPPATCH[displayname] (Fase B)
+  locks.ts        # LOCK/UNLOCK, comprobación de bloqueos y lockdiscovery (Fase C)
   util.ts         # segmentos, nombres, keys R2, MIME, XML, errores
 ```
 
-`locks.ts` llegará con la Fase C. Sin dependencias nuevas: solo `fetch`,
-binding `BUCKET` y `crypto.subtle`. `worker/tsconfig.json` ya incluye
-`src/**/*.ts`; `npm run build` no toca el Worker.
+Sin dependencias nuevas: solo `fetch`, binding `BUCKET` y `crypto.subtle`.
+`worker/tsconfig.json` ya incluye `src/**/*.ts`; `npm run build` no toca el
+Worker.
 
 ### 12.2 Utilidades nuevas (antes de los handlers)
 
@@ -370,22 +396,28 @@ anuncia `MOVE, COPY, PROPPATCH` cuando `DAV_WRITE` está activo.
    `propstat` si el nombre no vale o ya existe; `403` para el resto sin romper la
    operación. Auditoría `RENOMBRAR_ARCHIVO`/`RENOMBRAR_CARPETA`.
 
-### 12.5 Fase C — `LOCK` / `UNLOCK` (1 semana)
+### 12.5 Fase C — `LOCK` / `UNLOCK` (implementada 2026-10-30)
 
-1. Migración `locks_dav` (§6); RLS y gestión por service-role.
+1. Migración `locks_dav` (§6) con índice único por recurso; RLS sin policies y
+   gestión por service-role. **Pendiente de aplicar a mano en Supabase.**
 2. `LOCK` con cuerpo `lockinfo`: crear fila, `Timeout` (defecto 3600 s, tope
    86400), token `opaquelocktoken:<uuid>`, respuesta `200` + `Lock-Token` +
    XML `activelock`. Sin cuerpo: refrescar el lock existente si el `If` trae el
-   token.
-3. `UNLOCK`: validar `Lock-Token`, borrar fila, `204`; token ajeno → `409`.
-4. Comprobar locks en `PUT`/`MOVE`/`COPY`/`DELETE`/`PROPPATCH`: si el recurso
-   (o un ancestro con lock de carpeta) está bloqueado y el `If` no trae el
-   token → `423`. Los locks caducados se ignoran y se limpian de forma
-   oportunista.
+   token; el dueño puede reemplazar su propio lock huérfano.
+3. `UNLOCK`: validar `Lock-Token`, borrar fila, `204`; token ajeno o caducado
+   → `409`; falta la cabecera → `400`.
+4. Comprobar locks en `PUT`/`MKCOL`/`MOVE`/`COPY`/`DELETE`/`PROPPATCH`: si el
+   recurso (o un ancestro con lock de carpeta `infinity`) está bloqueado y el
+   `If` no trae el token → `423`. Los locks caducados se ignoran y se limpian
+   de forma oportunista en `LOCK`/`UNLOCK`.
 5. `PROPFIND`: `supportedlock` real, `lockdiscovery` y `getetag`; `OPTIONS`:
-   `DAV: 1, 2` y `Allow` completo.
+   `DAV: 1, 2` y `Allow` con `LOCK, UNLOCK`.
 6. **Office**: sin esta fase, Word/Excel abren en solo lectura. Con locks,
-   guardar en el sitio funciona; los temporales `~$` se filtran.
+   guardar en el sitio funciona; los temporales `~$` se filtran. La respuesta
+   `423` no revela el token del bloqueo.
+7. Banco local con `locks_dav` simulado: creación, refresco, `If`/`Not`,
+   `423`, `UNLOCK`, locks de carpeta `0`/`infinity`, caducidad y migración
+   ausente. Prueba real ampliada en `worker/test/escritura.mjs`.
 
 ### 12.6 Rollout y seguridad
 
@@ -433,6 +465,13 @@ La Caja fuerte queda privada también para el admin con
 una sobrescritura es definitiva; la copia de seguridad local periódica queda
 pendiente.
 
+La **Fase C** (`LOCK`/`UNLOCK`, Clase 2) está implementada en el Worker y el
+banco local pasa en verde. Para usarla hay que aplicar
+`supabase/migraciones/locks-dav.sql` en Supabase → SQL Editor y desplegar el
+Worker; hasta entonces `LOCK` responde `500` con el aviso de la migración (la
+lectura y el resto de escrituras siguen funcionando). Después hay que probar
+Office en Windows (abrir, editar, guardar, cerrar) y el segundo PC concurrente.
+
 ### 12.7 Matriz de aceptación
 
 1. Windows 11 monta la unidad, crea carpeta, sube `.txt` de 1 KB y de 19 MB;
@@ -443,7 +482,7 @@ pendiente.
    `carpeta_id`; entre Área común y Mi caja fuerte → bytes reubicados.
 5. Supr en archivo → papelera recuperable; Supr en carpeta → `403` claro.
 6. Word/Excel: abrir, editar, guardar y cerrar; `~$` no aparece; segundo PC
-   concurrente → `423`; tras expirar, se puede volver a editar.
+   concurrente → `423`; tras expirar o `UNLOCK`, se puede volver a editar.
 7. `COPY` de archivo → nuevo registro y bytes; `COPY` de carpeta → `501`.
 8. `PROPPATCH displayname` → renombra; otras props → `403` sin romper.
 9. `If-None-Match: *`, `If-Match`, `Overwrite: F` → `412` cuando toca.
@@ -453,8 +492,8 @@ pendiente.
     ve las cajas privadas ajenas en el árbol ni en la PWA.
 12. `rclone copy/move/delete` contra el Worker; `wrangler tail` sin errores.
 
-En Fase B se pueden validar 1–5 y 7–11. El punto 6 (Office) necesita la Fase C;
-el 12 (rclone) depende del cliente que se use.
+En Fase B se validan 1–5 y 7–11. El punto 6 (Office) se valida con la Fase C
+tras aplicar `locks-dav.sql`; el 12 (rclone) depende del cliente que se use.
 
 ### 12.8 Orden de trabajo
 
@@ -463,7 +502,7 @@ el 12 (rclone) depende del cliente que se use.
 | F0 | Refactor en módulos + flag `DAV_WRITE` + `sbVoid`/utilidades | Hecho (2026-10-28) |
 | A | `PUT`, `MKCOL`, `DELETE` archivo + pruebas locales | Hecho (2026-10-28); falta prueba en Windows real |
 | B | `MOVE`, `COPY` archivo, `PROPPATCH`, condicionales completos | Hecho (2026-10-29); banco local en verde |
-| C | `LOCK`/`UNLOCK`, `lockdiscovery`, Office | Pendiente |
+| C | `LOCK`/`UNLOCK`, `lockdiscovery`, Office | Hecho (2026-10-30); pendiente aplicar migración y prueba real |
 | D | Endurecer, auditoría, rate-limit, documentación y guía familiar | Parcial (rate-limit, auditoría y guía hechos) |
 
 Total: ~3 semanas efectivas. Se puede parar después de A y seguir usando la

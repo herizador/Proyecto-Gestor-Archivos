@@ -45,6 +45,16 @@ function xmlProppatch(nuevo, extra = '') {
     '</D:propertyupdate>'
   )
 }
+function xmlLock(owner = 'Prueba Fase C') {
+  return (
+    '<?xml version="1.0" encoding="utf-8"?>' +
+    '<D:lockinfo xmlns:D="DAV:">' +
+    '<D:lockscope><D:exclusive/></D:lockscope>' +
+    '<D:locktype><D:write/></D:locktype>' +
+    `<D:owner>${owner}</D:owner>` +
+    '</D:lockinfo>'
+  )
+}
 
 let fallos = 0
 async function caso(nombreCaso, fn) {
@@ -65,16 +75,18 @@ await caso('OPTIONS anuncia escritura completa', async () => {
   const r = await fetch(base, { method: 'OPTIONS' })
   afirma(r.status === 200, `status ${r.status}`)
   const allow = r.headers.get('allow') ?? ''
-  escrituraActiva = ['PUT', 'MKCOL', 'DELETE', 'MOVE', 'COPY', 'PROPPATCH'].every((m) =>
-    allow.includes(m)
+  escrituraActiva = ['PUT', 'MKCOL', 'DELETE', 'MOVE', 'COPY', 'PROPPATCH', 'LOCK', 'UNLOCK'].every(
+    (m) => allow.includes(m)
   )
   afirma(escrituraActiva, `Allow sin escritura completa: ${allow}`)
+  afirma((r.headers.get('dav') ?? '').includes('2'), `DAV sin Clase 2: ${r.headers.get('dav')}`)
 })
 if (!escrituraActiva) {
   console.log('\nDAV_WRITE está en "0": activa "admin" o "all" en worker/wrangler.toml y redespliega.')
   process.exit(1)
 }
 
+let lockToken = ''
 try {
   await caso('PUT nuevo → 201', async () => {
     const r = await fetch(archivoUrl(nombre), {
@@ -105,6 +117,83 @@ try {
     const r = await fetch(archivoUrl(nombre), { headers: { Authorization: auth } })
     afirma(r.status === 200, `status ${r.status}`)
     afirma((await r.text()) === cuerpoFinal, 'contenido antiguo')
+  })
+
+  let lockToken = ''
+  await caso('LOCK exclusivo → 200, Lock-Token y lockdiscovery', async () => {
+    const r = await fetch(archivoUrl(nombre), {
+      method: 'LOCK',
+      headers: {
+        Authorization: auth,
+        'Content-Type': 'application/xml; charset=utf-8',
+        Depth: '0',
+        Timeout: 'Second-120',
+      },
+      body: xmlLock(),
+    })
+    const xml = await r.text()
+    afirma(r.status === 200, `status ${r.status} ${xml}`)
+    lockToken = (r.headers.get('lock-token') ?? '').replace(/[<>]/g, '')
+    afirma(lockToken.startsWith('opaquelocktoken:'), `Lock-Token «${lockToken}»`)
+    afirma((r.headers.get('timeout') ?? '').startsWith('Second-'), `Timeout ${r.headers.get('timeout')}`)
+    afirma(xml.includes('lockdiscovery') && xml.includes('Prueba Fase C'), xml)
+  })
+
+  await caso('PUT sobre archivo bloqueado sin token → 423', async () => {
+    const r = await fetch(archivoUrl(nombre), {
+      method: 'PUT',
+      headers: { Authorization: auth, 'Content-Type': 'text/plain' },
+      body: 'sin token',
+    })
+    afirma(r.status === 423, `status ${r.status}`)
+  })
+
+  await caso('PUT con If:<token> → 204', async () => {
+    const r = await fetch(archivoUrl(nombre), {
+      method: 'PUT',
+      headers: {
+        Authorization: auth,
+        'Content-Type': 'text/plain',
+        If: `(<${lockToken}>)`,
+      },
+      body: cuerpoFinal,
+    })
+    afirma(r.status === 204, `status ${r.status} ${await r.text()}`)
+  })
+
+  await caso('PROPFIND anuncia supportedlock y el lock activo', async () => {
+    const r = await fetch(archivoUrl(nombre), {
+      method: 'PROPFIND',
+      headers: { Authorization: auth, Depth: '0' },
+    })
+    const xml = await r.text()
+    afirma(r.status === 207, `status ${r.status}`)
+    afirma(xml.includes('supportedlock') && xml.includes(lockToken), xml)
+  })
+
+  await caso('UNLOCK con token incorrecto → 409', async () => {
+    const r = await fetch(archivoUrl(nombre), {
+      method: 'UNLOCK',
+      headers: {
+        Authorization: auth,
+        'Lock-Token': '<opaquelocktoken:00000000-0000-0000-0000-000000000000>',
+      },
+    })
+    afirma(r.status === 409, `status ${r.status}`)
+  })
+
+  await caso('UNLOCK con el token → 204 y PUT libre', async () => {
+    const r = await fetch(archivoUrl(nombre), {
+      method: 'UNLOCK',
+      headers: { Authorization: auth, 'Lock-Token': `<${lockToken}>` },
+    })
+    afirma(r.status === 204, `UNLOCK ${r.status} ${await r.text()}`)
+    const put = await fetch(archivoUrl(nombre), {
+      method: 'PUT',
+      headers: { Authorization: auth, 'Content-Type': 'text/plain' },
+      body: cuerpoFinal,
+    })
+    afirma(put.status === 204, `PUT tras UNLOCK ${put.status}`)
   })
 
   await caso('PROPFIND de la carpeta lo lista', async () => {
@@ -244,7 +333,14 @@ try {
     afirma(r.status === 409, `status ${r.status}`)
   })
 } finally {
-  // Limpieza si algún caso falló antes del DELETE: todos los nombres posibles.
+  // Limpieza si algún caso falló antes del DELETE: libera el lock y borra
+  // todos los nombres posibles.
+  if (lockToken) {
+    await fetch(archivoUrl(nombre), {
+      method: 'UNLOCK',
+      headers: { Authorization: auth, 'Lock-Token': `<${lockToken}>` },
+    }).catch(() => undefined)
+  }
   for (const n of [nombre, nombreCopia, nombreProppatch, nombreFinal]) {
     await fetch(archivoUrl(n), { method: 'DELETE', headers: { Authorization: auth } }).catch(
       () => undefined

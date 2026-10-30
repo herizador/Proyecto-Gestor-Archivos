@@ -11,6 +11,7 @@ import {
   type UsuarioDav,
 } from './env'
 import { archivoHijo, carpetaHija, esDescendiente, resolver, resolverPadre } from './arbol'
+import { comprobarBloqueo } from './locks'
 import { auditar, errorDeBd, sb, sbVoid, usoAlmacenamiento } from './supabase'
 import {
   borrarKey,
@@ -160,6 +161,27 @@ export async function responderMove(
     carpetaHija(env, user, padreDestino.scope, padreDestino.carpetaId, nombre),
     archivoHijo(env, user, padreDestino.scope, padreDestino.carpetaId, nombre),
   ])
+
+  // Mover toca el origen y el destino: ambos deben estar libres (o traer el
+  // token del lock en la cabecera If). El padre del origen también cuenta:
+  // sacar un miembro modifica la colección aunque el lock sea Depth: 0.
+  const bloqueo = await comprobarBloqueo(env, req, [
+    esCarpeta
+      ? { id: nodo.carpeta.id, esCarpeta: true, padreId: null }
+      : { id: nodo.archivo.id, esCarpeta: false, padreId: nodo.archivo.carpeta_id },
+    ...(esCarpeta
+      ? nodo.carpeta.carpeta_padre_id
+        ? [{ id: nodo.carpeta.carpeta_padre_id, esCarpeta: true, padreId: null }]
+        : []
+      : nodo.archivo.carpeta_id
+        ? [{ id: nodo.archivo.carpeta_id, esCarpeta: true, padreId: null }]
+        : []),
+    { id: padreDestino.carpetaId, esCarpeta: true, padreId: null },
+    ...(archivoDestino
+      ? [{ id: archivoDestino.id, esCarpeta: false, padreId: archivoDestino.carpeta_id }]
+      : []),
+  ])
+  if (bloqueo) return bloqueo
 
   if (carpetaDestino) {
     if (!permiteSobrescribir(req)) {
@@ -371,6 +393,15 @@ export async function responderCopy(
   if (archivoDestino && archivoDestino.subido_por !== user.id && user.rol !== 'admin') {
     return responderError(403, 'No puedes reemplazar un archivo de otro miembro.')
   }
+
+  // COPY solo escribe en el destino; el origen se lee sin bloquear.
+  const bloqueo = await comprobarBloqueo(env, req, [
+    { id: padreDestino.carpetaId, esCarpeta: true, padreId: null },
+    ...(archivoDestino
+      ? [{ id: archivoDestino.id, esCarpeta: false, padreId: archivoDestino.carpeta_id }]
+      : []),
+  ])
+  if (bloqueo) return bloqueo
 
   // El cupo cuenta solo archivos activos: si se reemplaza un archivo, sus bytes
   // salen del cómputo al ir a la papelera. Se comprueba antes de destruir nada.

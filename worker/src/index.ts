@@ -1,7 +1,8 @@
 // Puente WebDAV: Explorador de Windows / Finder → R2 vía Supabase.
 // Lectura: OPTIONS, PROPFIND (depth 0/1), GET (+Range), HEAD.
-// Escritura (Fases A y B, tras DAV_WRITE): PUT, MKCOL, DELETE, MOVE, COPY y
-// PROPPATCH[displayname]. Diseño en docs/diseno/webdav.md y webdav-escritura.md.
+// Escritura (Fases A, B y C, tras DAV_WRITE): PUT, MKCOL, DELETE, MOVE, COPY,
+// PROPPATCH[displayname], LOCK y UNLOCK. Diseño en docs/diseno/webdav.md y
+// webdav-escritura.md.
 // Sin dependencias: solo fetch + binding R2.
 
 import { MAX_SEGMENTOS, type Env, type UsuarioDav } from './env'
@@ -10,16 +11,24 @@ import { resolver } from './arbol'
 import { responderArchivo } from './lectura'
 import { responderPropfind } from './props'
 import { responderDelete, responderMkcol, responderPut } from './escritura'
+import { responderLock, responderUnlock } from './locks'
 import { responderCopy, responderMove } from './mover'
 import { responderProppatch } from './proppatch'
-import { cabecerasPrivadas, noAuth, responderError, segmentos } from './util'
+import {
+  cabecerasPrivadas,
+  claseDav,
+  modoEscritura,
+  noAuth,
+  responderError,
+  segmentos,
+} from './util'
 
 // Rate-limit best-effort en memoria del isolate (sin infra extra). Cada
 // isolate lleva su contador; con dominio propio se puede sumar una regla.
 const VENTANA_MS = 60_000
 const MAX_POR_IP = 30 // sin autenticar (por IP vista por Cloudflare)
 const MAX_POR_TOKEN = 300 // autenticado (por token)
-const MAX_ESCRITURA_POR_TOKEN = 60 // PUT/MKCOL/DELETE/MOVE/COPY/PROPPATCH por minuto
+const MAX_ESCRITURA_POR_TOKEN = 60 // métodos de escritura por minuto
 const marcasRitmo = new Map<string, number[]>()
 
 function excesoRitmo(clave: string, maximo: number): boolean {
@@ -36,20 +45,11 @@ function excesoRitmo(clave: string, maximo: number): boolean {
   return marcas.length > maximo
 }
 
-type ModoEscritura = 'off' | 'admin' | 'all'
-
-function modoEscritura(env: Env): ModoEscritura {
-  const valor = (env.DAV_WRITE ?? '0').trim().toLowerCase()
-  if (valor === 'all' || valor === '1' || valor === 'true') return 'all'
-  if (valor === 'admin') return 'admin'
-  return 'off'
-}
-
 function metodosPermitidos(env: Env): string {
   const lectura = 'OPTIONS, PROPFIND, GET, HEAD'
   return modoEscritura(env) === 'off'
     ? lectura
-    : `${lectura}, PUT, MKCOL, DELETE, MOVE, COPY, PROPPATCH`
+    : `${lectura}, PUT, MKCOL, DELETE, MOVE, COPY, PROPPATCH, LOCK, UNLOCK`
 }
 
 const METODOS_ESCRITURA = new Set([
@@ -75,7 +75,7 @@ const worker = {
       return new Response(null, {
         status: 200,
         headers: {
-          DAV: '1',
+          DAV: claseDav(env),
           Allow: metodosPermitidos(env),
           'MS-Author-Via': 'DAV',
           'Content-Length': '0',
@@ -144,7 +144,13 @@ const worker = {
         return await trasEscribir(env, user, await responderMkcol(env, user, req, segs))
       }
       if (req.method === 'DELETE') {
-        return await trasEscribir(env, user, await responderDelete(env, user, segs))
+        return await trasEscribir(env, user, await responderDelete(env, user, req, segs))
+      }
+      if (req.method === 'LOCK') {
+        return await trasEscribir(env, user, await responderLock(env, user, req, segs))
+      }
+      if (req.method === 'UNLOCK') {
+        return await trasEscribir(env, user, await responderUnlock(env, user, req, segs))
       }
       if (req.method === 'MOVE') {
         return await trasEscribir(env, user, await responderMove(env, user, req, segs))

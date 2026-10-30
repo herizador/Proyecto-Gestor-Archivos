@@ -2,6 +2,21 @@
 
 import type { Env, Scope } from './env'
 
+export type ModoEscritura = 'off' | 'admin' | 'all'
+
+// La escritura se controla con DAV_WRITE: "0" (apagada), "admin" o "all".
+export function modoEscritura(env: Env): ModoEscritura {
+  const valor = (env.DAV_WRITE ?? '0').trim().toLowerCase()
+  if (valor === 'all' || valor === '1' || valor === 'true') return 'all'
+  if (valor === 'admin') return 'admin'
+  return 'off'
+}
+
+// Clase DAV anunciada: con escritura, Clase 2 (locks); sin ella, solo Clase 1.
+export function claseDav(env: Env): string {
+  return modoEscritura(env) === 'off' ? '1' : '1, 2'
+}
+
 // Nada del puente se cachea: son listados privados por token
 export function cabecerasPrivadas(extra?: Record<string, string>): Record<string, string> {
   return { 'Cache-Control': 'no-store, no-cache, must-revalidate', ...(extra ?? {}) }
@@ -9,6 +24,82 @@ export function cabecerasPrivadas(extra?: Record<string, string>): Record<string
 
 export function escXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+export function desEscXml(texto: string): string {
+  return texto
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => {
+      const codigo = Number.parseInt(hex, 16)
+      return Number.isFinite(codigo) && codigo >= 0 && codigo <= 0x10ffff
+        ? String.fromCodePoint(codigo)
+        : ''
+    })
+    .replace(/&#(\d+);/g, (_, dec: string) => {
+      const codigo = Number.parseInt(dec, 10)
+      return Number.isFinite(codigo) && codigo >= 0 && codigo <= 0x10ffff
+        ? String.fromCodePoint(codigo)
+        : ''
+    })
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+}
+
+type CuerpoLeido =
+  | { ok: true; body: ReadableStream<Uint8Array> | ArrayBuffer; tamano: number }
+  | { ok: false; status: number; error: string }
+
+// Lee el cuerpo sin pasar del tope. Con Content-Length se puede pasar el
+// stream directo a R2; sin él (chunked) se bufferiza como máximo el tope.
+export async function leerCuerpoLimitado(
+  req: Request,
+  maximo: number,
+  mensaje = `El cuerpo supera el límite de ${maximo} bytes.`
+): Promise<CuerpoLeido> {
+  const cab = req.headers.get('content-length')
+  if (cab !== null && cab.trim() !== '') {
+    const tamano = Number(cab)
+    if (!Number.isFinite(tamano) || tamano < 0) {
+      return { ok: false, status: 400, error: 'Content-Length no válido.' }
+    }
+    if (tamano > maximo) {
+      return { ok: false, status: 413, error: mensaje }
+    }
+    if (tamano === 0) return { ok: true, body: new ArrayBuffer(0), tamano: 0 }
+    if (!req.body) return { ok: false, status: 400, error: 'Falta el cuerpo.' }
+    return { ok: true, body: req.body, tamano }
+  }
+
+  if (!req.body) return { ok: true, body: new ArrayBuffer(0), tamano: 0 }
+
+  const reader = req.body.getReader()
+  const trozos: Uint8Array[] = []
+  let total = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!value) continue
+      total += value.byteLength
+      if (total > maximo) {
+        await reader.cancel().catch(() => undefined)
+        return { ok: false, status: 413, error: mensaje }
+      }
+      trozos.push(value)
+    }
+  } catch {
+    return { ok: false, status: 400, error: 'No se pudo leer el cuerpo.' }
+  }
+
+  const buffer = new Uint8Array(total)
+  let offset = 0
+  for (const trozo of trozos) {
+    buffer.set(trozo, offset)
+    offset += trozo.byteLength
+  }
+  return { ok: true, body: buffer.buffer, tamano: total }
 }
 
 export function hrefDe(segs: string[], esCarpeta: boolean): string {
