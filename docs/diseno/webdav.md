@@ -42,13 +42,13 @@ Cloudflare Worker `dav` (carpeta worker/, deploy con wrangler, separado de Verce
 
 | Método   | Estado              | Notas                                            |
 |----------|---------------------|--------------------------------------------------|
-| OPTIONS  | Sí              | `DAV: 1`; `Allow` añade `PUT, MKCOL, DELETE, MOVE, COPY, PROPPATCH` si `DAV_WRITE` está activo |
+| OPTIONS  | Sí              | `DAV: 1` en solo lectura y `DAV: 1, 2` con escritura; `Allow` añade `PUT, MKCOL, DELETE, MOVE, COPY, PROPPATCH, LOCK, UNLOCK` si `DAV_WRITE` está activo |
 | PROPFIND | Sí (depth 0/1)  | `infinity` se trata como `1`; incluye `getetag`  |
 | GET      | Sí (+ `Range`)  | Streaming desde el binding R2                    |
 | HEAD     | Sí              | Mismas cabeceras que GET, sin cuerpo             |
 | PUT/DELETE/MKCOL | Fase A (tras `DAV_WRITE`) | Archivos a papelera; carpetas no se borran |
 | COPY/MOVE/PROPPATCH | Fase B (tras `DAV_WRITE`) | `COPY` solo archivos; `MOVE` de carpeta en su ámbito; `PROPPATCH[displayname]` |
-| LOCK/UNLOCK | No → `501` | Fase C en `docs/diseno/webdav-escritura.md` |
+| LOCK/UNLOCK | Fase C (tras `DAV_WRITE`) | Clase 2: Office edita en el sitio; token privado del dueño |
 
 ## 4. Autenticación (Basic + tokens de Explorador)
 
@@ -166,10 +166,10 @@ los triggers existentes (`SUBIR_ARCHIVO`, `MOVER_A_PAPELERA`).
   no-store` en todo, tope de 25 segmentos, `Allow` en el `501`, `ultimo_uso` +
   auditoría `ACCESO_WEBDAV` en cada GET, script `worker/test/smoke.mjs` y guía
   `docs/guias/alta-explorador.md`.
-- **Fases A y B de escritura implementadas** (2026-10-29): `PUT`, `MKCOL`,
-  `DELETE` de archivo, `MOVE` (archivo/carpeta), `COPY` de archivo y
-  `PROPPATCH[displayname]`, abiertas con `DAV_WRITE="all"`. `LOCK`/`UNLOCK`
-  quedan para la Fase C; Office sigue abriendo en solo lectura hasta entonces.
+- **Fases A, B, C y D de escritura implementadas** (2026-10-29/30): `PUT`,
+  `MKCOL`, `DELETE` de archivo, `MOVE` (archivo/carpeta), `COPY` de archivo,
+  `PROPPATCH[displayname]`, `LOCK`/`UNLOCK`, abiertas con `DAV_WRITE="all"`.
+  Office edita en el sitio y el segundo dispositivo concurrente recibe `423`.
   Plan y detalle en `docs/diseno/webdav-escritura.md`.
 
 ## 11. Decisiones (cerradas 2026-10-04)

@@ -2,7 +2,7 @@
 
 import type { Env, FilaArchivo, UsuarioDav } from './env'
 import { auditar, tocarToken } from './supabase'
-import { cabecerasPrivadas, etagDe } from './util'
+import { cabecerasPrivadas, etagDe, responderError } from './util'
 
 function parseRange(
   cab: string | null,
@@ -78,7 +78,7 @@ export async function responderArchivo(
     archivo.ruta_r2,
     rango ? { range: { offset: rango.offset, length: rango.length } } : undefined
   )
-  if (!obj) return new Response('Archivo no disponible en almacenamiento.', { status: 404 })
+  if (!obj) return responderError(404, 'Archivo no disponible en almacenamiento.')
 
   let estado = 200
   if (rango) {

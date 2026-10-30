@@ -155,7 +155,7 @@ export async function responderProppatch(
     )
   }
 
-  const bloqueo = await comprobarBloqueo(env, req, [
+  const bloqueo = await comprobarBloqueo(env, user, req, [
     esCarpeta
       ? { id: nodo.carpeta.id, esCarpeta: true, padreId: null }
       : { id: nodo.archivo.id, esCarpeta: false, padreId: nodo.archivo.carpeta_id },

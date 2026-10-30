@@ -69,6 +69,16 @@ function describir(a: HistorialConPerfil, miId: string): { titulo: string; detal
       return { titulo: `${autor} ${conj('guardaste', 'guardó')} desde el Explorador`, detalle: d.nombre_original }
     case 'COPIAR_WEBDAV':
       return { titulo: `${autor} ${conj('copiaste', 'copió')} desde el Explorador`, detalle: d.nombre_original }
+    case 'BLOQUEAR_WEBDAV':
+      return {
+        titulo: `${autor} ${conj('bloqueaste', 'bloqueó')} ${d.tipo === 'carpeta' ? 'una carpeta' : 'un archivo'} desde el Explorador`,
+        detalle: d.nombre,
+      }
+    case 'DESBLOQUEAR_WEBDAV':
+      return {
+        titulo: `${autor} ${conj('liberaste', 'liberó')} ${d.tipo === 'carpeta' ? 'una carpeta' : 'un archivo'} desde el Explorador`,
+        detalle: d.nombre,
+      }
     case 'CREAR_ACCESO':
       return { titulo: `${autor} ${conj('creaste', 'creó')} un enlace` }
     case 'ELIMINAR_ACCESO':

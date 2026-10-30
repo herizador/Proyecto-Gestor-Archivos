@@ -119,7 +119,6 @@ try {
     afirma((await r.text()) === cuerpoFinal, 'contenido antiguo')
   })
 
-  let lockToken = ''
   await caso('LOCK exclusivo → 200, Lock-Token y lockdiscovery', async () => {
     const r = await fetch(archivoUrl(nombre), {
       method: 'LOCK',

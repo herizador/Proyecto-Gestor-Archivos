@@ -19,7 +19,11 @@ export function claseDav(env: Env): string {
 
 // Nada del puente se cachea: son listados privados por token
 export function cabecerasPrivadas(extra?: Record<string, string>): Record<string, string> {
-  return { 'Cache-Control': 'no-store, no-cache, must-revalidate', ...(extra ?? {}) }
+  return {
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    'X-Content-Type-Options': 'nosniff',
+    ...(extra ?? {}),
+  }
 }
 
 export function escXml(s: string): string {

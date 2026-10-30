@@ -11,7 +11,7 @@ import {
 import { archivosDe, hijasDe, resolver } from './arbol'
 import { locksDeRecursos, xmlActivelock, xmlSupportedLock, type FilaLock } from './locks'
 import { usoAlmacenamiento } from './supabase'
-import { cabecerasPrivadas, claseDav, escXml, etagDe, hrefDe } from './util'
+import { cabecerasPrivadas, claseDav, escXml, etagDe, hrefDe, responderError } from './util'
 
 export type ItemProp = {
   id?: string
@@ -26,7 +26,7 @@ export type ItemProp = {
   locks?: FilaLock[]
 }
 
-export function xmlPropfind(items: ItemProp[]): string {
+export function xmlPropfind(items: ItemProp[], user: UsuarioDav): string {
   const respuestas = items
     .map((it) => {
       const fecha = it.fecha ? new Date(it.fecha) : new Date()
@@ -49,7 +49,15 @@ export function xmlPropfind(items: ItemProp[]): string {
             `<D:quota-used-bytes>${it.cuota.usada}</D:quota-used-bytes>`
           : '') +
         `<D:supportedlock>${xmlSupportedLock()}</D:supportedlock>` +
-        `<D:lockdiscovery>${(it.locks ?? []).map((lock) => xmlActivelock(lock, it.href)).join('')}</D:lockdiscovery>` +
+        `<D:lockdiscovery>${(it.locks ?? [])
+          .map((lock) =>
+            xmlActivelock(
+              lock,
+              it.href,
+              lock.usuario_id === user.id || user.rol === 'admin'
+            )
+          )
+          .join('')}</D:lockdiscovery>` +
         '</D:prop><D:status>HTTP/1.1 200 OK</D:status></D:propstat></D:response>'
       )
     })
@@ -110,7 +118,7 @@ export async function responderPropfind(
   const profundidad = (req.headers.get('depth') ?? '1').trim().toLowerCase()
   const prof: 0 | 1 = profundidad === '0' ? 0 : 1 // infinity se trata como 1
   const nodo = await resolver(env, user, segs)
-  if (!nodo) return new Response('No encontrado.', { status: 404 })
+  if (!nodo) return responderError(404, 'No encontrado.')
 
   if (nodo.kind === 'archivo') {
     const a = nodo.archivo
@@ -126,7 +134,7 @@ export async function responderPropfind(
       etag: etagDe(a),
       locks: locks.get(a.id) ?? [],
     }
-    return new Response(xmlPropfind([item]), {
+    return new Response(xmlPropfind([item], user), {
       status: 207,
       headers: {
         'Content-Type': 'application/xml; charset=utf-8',
@@ -172,7 +180,7 @@ export async function responderPropfind(
       items = [propio, ...(await miembrosDe(env, user, nodo, segs, cuota))]
     }
   }
-  return new Response(xmlPropfind(items), {
+  return new Response(xmlPropfind(items, user), {
     status: 207,
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',

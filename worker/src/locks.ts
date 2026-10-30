@@ -5,7 +5,7 @@
 
 import { type Env, type UsuarioDav } from './env'
 import { resolver } from './arbol'
-import { ErrorSupabase, sb, sbVoid, errorDeBd } from './supabase'
+import { ErrorSupabase, auditar, sb, sbVoid, errorDeBd } from './supabase'
 import {
   cabecerasPrivadas,
   claseDav,
@@ -184,8 +184,11 @@ function respuestaBloqueada(lock: FilaLock): Response {
 }
 
 // Devuelve 423 si algún recurso está bloqueado y la petición no trae su token.
+// El token solo vale para su dueño (o un admin): si se filtrara en un listado,
+// otro miembro no podría usarlo para saltarse el bloqueo.
 export async function comprobarBloqueo(
   env: Env,
+  user: UsuarioDav,
   req: Request,
   recursos: RecursoBloqueo[]
 ): Promise<Response | null> {
@@ -205,7 +208,8 @@ export async function comprobarBloqueo(
   for (const { directo, ancestros } of resueltos) {
     for (const lock of locks) {
       if (!aplicaAlRecurso(lock, directo, ancestros)) continue
-      if (!tokens.has(lock.token)) return respuestaBloqueada(lock)
+      const esPropio = lock.usuario_id === user.id || user.rol === 'admin'
+      if (!esPropio || !tokens.has(lock.token)) return respuestaBloqueada(lock)
     }
   }
   return null
@@ -243,7 +247,11 @@ function segundosRestantes(expira: string): number {
   return Number.isFinite(t) ? Math.max(0, Math.ceil((t - Date.now()) / 1000)) : 0
 }
 
-export function xmlActivelock(lock: FilaLock, href: string): string {
+export function xmlActivelock(
+  lock: FilaLock,
+  href: string,
+  incluirToken = true
+): string {
   return (
     '<D:activelock>' +
     '<D:locktype><D:write/></D:locktype>' +
@@ -251,7 +259,9 @@ export function xmlActivelock(lock: FilaLock, href: string): string {
     `<D:depth>${lock.profundidad}</D:depth>` +
     (lock.propietario ? `<D:owner>${escXml(lock.propietario)}</D:owner>` : '') +
     `<D:timeout>Second-${segundosRestantes(lock.expira)}</D:timeout>` +
-    `<D:locktoken><D:href>${escXml(lock.token)}</D:href></D:locktoken>` +
+    (incluirToken
+      ? `<D:locktoken><D:href>${escXml(lock.token)}</D:href></D:locktoken>`
+      : '') +
     `<D:lockroot><D:href>${escXml(href)}</D:href></D:lockroot>` +
     '</D:activelock>'
   )
@@ -447,6 +457,19 @@ export async function responderLock(
       extraerOwner(xml) || user.id,
       expira
     )
+    // Solo se audita la creación/reemplazo; los refrescos de Office cada
+    // pocos minutos llenarían el historial sin aportar nada.
+    await auditar(env, user.id, 'BLOQUEAR_WEBDAV', {
+      recurso_id: recursoId,
+      nombre: esCarpeta ? nodo.carpeta.nombre : nodo.archivo.nombre_original,
+      tipo: esCarpeta ? 'carpeta' : 'archivo',
+      profundidad,
+      segundos: timeout,
+      ...(directo
+        ? { reemplaza: true, usuario_anterior: directo.usuario_id }
+        : {}),
+      via: 'webdav',
+    })
     return respuestaActivelock(env, lock, href)
   } catch (e) {
     if (tablaAusente(e)) return respuestaTablaAusente()
@@ -528,6 +551,15 @@ export async function responderUnlock(
     if (tablaAusente(e)) return respuestaTablaAusente()
     return errorDeBd(e)
   }
+
+  await auditar(env, user.id, 'DESBLOQUEAR_WEBDAV', {
+    recurso_id: recursoId,
+    nombre: esCarpeta ? nodo.carpeta.nombre : nodo.archivo.nombre_original,
+    tipo: esCarpeta ? 'carpeta' : 'archivo',
+    usuario_bloqueo: lock.usuario_id,
+    forzado: lock.usuario_id !== user.id,
+    via: 'webdav',
+  })
 
   return new Response(null, { status: 204, headers: cabecerasPrivadas() })
 }

@@ -1,9 +1,10 @@
 # Diseño: puente WebDAV con escritura
 
-Estado: **Fases A y B implementadas** (2026-10-29). La lectura está en producción
-y la escritura `PUT`/`MKCOL`/`DELETE`/`MOVE`/`COPY`/`PROPPATCH` está en el
-Worker, abierta con `DAV_WRITE="all"`. La Fase C (`LOCK`/`UNLOCK`) sigue
-pendiente. Base: `docs/diseno/webdav.md`.
+Estado: **Fases A, B, C y D implementadas** (2026-10-30). La lectura está en
+producción y la escritura `PUT`/`MKCOL`/`DELETE`/`MOVE`/`COPY`/`PROPPATCH`/
+`LOCK`/`UNLOCK` está en el Worker, abierta con `DAV_WRITE="all"`. La copia de
+seguridad local queda como **idea futura** (§13), no implementada. Base:
+`docs/diseno/webdav.md`.
 
 ## 0. Respuesta corta
 
@@ -39,9 +40,9 @@ archivos y la auditoría.
 | Abrir / editar Office | `GET`, `HEAD`, `LOCK`, `PUT`, `UNLOCK` | Sin Clase 2, Word/Excel abren en solo lectura. |
 | Propiedades / nombre | `PROPFIND`, `PROPPATCH` | `PROPPATCH[displayname]` llega en Fase B. |
 
-`MOVE`, `COPY` y `PROPPATCH[displayname]` ya funcionan desde la Fase B
-(2026-10-29). `LOCK` y `UNLOCK` siguen respondiendo `501`: Word/Excel abren en
-solo lectura hasta la Fase C.
+`MOVE`, `COPY`, `PROPPATCH[displayname]`, `LOCK` y `UNLOCK` funcionan desde
+las Fases B y C (2026-10-29/30). Word/Excel abren en edición; los temporales
+`~$` se filtran y el segundo dispositivo concurrente recibe `423`.
 
 
 ## 1. Objetivo y fases
@@ -53,27 +54,32 @@ Explorador/Finder directamente en R2, con las mismas reglas del negocio que la P
   papelera). Ya permite "guardar desde el PC".
 - **Fase B (implementada, 2026-10-29):** `COPY` / `MOVE` +
   `PROPPATCH[displayname]` (arrastrar, renombrar y copiar archivos).
-- **Fase C (pendiente):** `LOCK` / `UNLOCK` (Clase 2: lo que exige Office para
-  editar sin abrir en solo-lectura).
+- **Fase C (implementada, 2026-10-30):** `LOCK` / `UNLOCK` (Clase 2: lo que
+  exige Office para editar sin abrir en solo-lectura).
+- **Fase D (implementada, 2026-10-30):** endurecimiento, auditoría de locks,
+  privacidad del token, documentación y guía familiar. La copia de seguridad
+  local queda como idea futura (§13), fuera de esta fase.
 
-### Estado de implementación (2026-10-29)
+### Estado de implementación (2026-10-30)
 
 - Router y flag en `worker/src/index.ts`: `DAV_WRITE="0"` (por defecto),
   `"admin"` (solo administradores) o `"all"`.
 - Módulos: `env.ts`, `util.ts`, `supabase.ts`, `arbol.ts`, `props.ts`,
-  `lectura.ts`, `escritura.ts` (Fase A), `mover.ts` y `proppatch.ts` (Fase B).
-  Sin dependencias nuevas.
+  `lectura.ts`, `escritura.ts` (Fase A), `mover.ts` y `proppatch.ts` (Fase B),
+  `locks.ts` (Fase C). Sin dependencias nuevas.
 - `PUT`, `MKCOL` y `DELETE` de archivo implementados con cupo, límite de 20 MB,
   papelera, ETag/`If-None-Match`/`If-Match` y auditoría (`ACTUALIZAR_WEBDAV`).
 - `MOVE` (archivo y carpeta), `COPY` de archivo y `PROPPATCH[displayname]`
   implementados con `Overwrite`, anti-ciclo de 50 niveles, reubicación de bytes
   al cambiar de ámbito, cupo en copias y auditoría (`MOVER`,
   `RENOMBRAR_ARCHIVO`, `RENOMBRAR_CARPETA`, `COPIAR_WEBDAV`).
-- `LOCK` y `UNLOCK` responden `501` hasta la Fase C.
+- `LOCK`/`UNLOCK` implementados (Clase 2) con tabla `locks_dav`, `lockdiscovery`
+  real y auditoría `BLOQUEAR_WEBDAV`/`DESBLOQUEAR_WEBDAV`.
 - Pruebas: `npx tsc -p worker/tsconfig.json`,
   `npx wrangler deploy --dry-run`, banco local con Supabase/R2 simulados
-  (MOVE/COPY/PROPPATCH incluidos) y `worker/test/escritura.mjs` para el Worker
-  desplegado.
+  (MOVE/COPY/PROPPATCH/LOCK incluidos) y `worker/test/escritura.mjs` para el
+  Worker desplegado (23/23 el 2026-10-30). Falta la prueba manual con Office en
+  Windows y el segundo PC concurrente.
 
 ## 2. Métodos y códigos
 
@@ -87,7 +93,7 @@ Explorador/Finder directamente en R2, con las mismas reglas del negocio que la P
 | `MOVE` archivo/carpeta | Cambia `carpeta_id` y/o nombre; si cambia de ámbito, reubica los bytes en R2 | `201`/`204`, `403` (permiso/ámbito), `409` (carpeta destino/ciclo), `412` (`Overwrite: F`), `502` (otro host) |
 | `COPY` archivo | Nuevo registro y bytes; dueño = quien copia; carpetas → `501` | `201`/`204`, `403`, `409`, `412`, `501`, `507` (sin cupo) |
 | `PROPPATCH` | Solo `displayname` → renombra (`UPDATE nombre`) | `207`; `403` para el resto de props; `400`/`409` en el `propstat` de `displayname` |
-| `LOCK`/`UNLOCK` | Ver §6 | `200`, `423`, `409`, `412` |
+| `LOCK`/`UNLOCK` | Ver §6 | `200`, `204`, `403`, `409`, `412`, `423` |
 
 ## 3. Reglas de negocio (réplica exacta de la PWA)
 
@@ -173,9 +179,22 @@ create unique index idx_locks_dav_recurso on public.locks_dav(recurso_id);
   para que nadie pueda saltarse el bloqueo leyéndolo.
 - `PROPFIND` anuncia `supportedlock` (exclusive/write) y `lockdiscovery` real
   (con `locktoken`, `lockroot`, `timeout` y `owner`) tanto en el recurso como
-  en los hijos listados. `OPTIONS` responde `DAV: 1, 2` y añade `LOCK`/`UNLOCK`
-  a `Allow` cuando `DAV_WRITE` está activo.
-- Desbloqueo forzoso: solo por expiración o `UNLOCK` del dueño/admin (v1).
+  en los hijos listados. El `<D:locktoken>` **solo se muestra al dueño del
+  bloqueo o a un admin**; al resto se le muestra el `activelock` sin token.
+  `OPTIONS` responde `DAV: 1, 2` y añade `LOCK`/`UNLOCK` a `Allow` cuando
+  `DAV_WRITE` está activo.
+- **Token y escritura**: una escritura con el token de otro usuario sigue
+  devolviendo `423`; el token solo autoriza a su dueño (o a un admin). Así, un
+  token filtrado en un listado no sirve para saltarse el bloqueo.
+- **Auditoría**: `LOCK` que crea o reemplaza un bloqueo registra
+  `BLOQUEAR_WEBDAV` (recurso, tipo, profundidad, segundos y si reemplazó otro);
+  `UNLOCK` registra `DESBLOQUEAR_WEBDAV` (con `forzado: true` si lo hace un
+  admin sobre un lock ajeno). Los refrescos de Office no se auditan para no
+  llenar el historial.
+- Desbloqueo: `UNLOCK` del dueño/admin con el token; un admin puede reemplazar
+  un lock huérfano de otro usuario abriendo el recurso (su `LOCK` sin token
+  sustituye el bloqueo y queda auditado). La revocación manual desde
+  `/ajustes` sigue como mejora futura.
 - **Sin migración aplicada** la lectura sigue funcionando (los locks se
   ignoran); `LOCK` devuelve `500` con el aviso de aplicar `locks-dav.sql`.
 - Limitación conocida: un lock de carpeta `Depth: infinity` no se muestra en
@@ -188,6 +207,9 @@ create unique index idx_locks_dav_recurso on public.locks_dav(recurso_id);
 - Sobrescritura: nueva acción `ACTUALIZAR_WEBDAV` (union TS; columna TEXT, sin migración).
 - `MKCOL` → `CREAR_CARPETA`; `MOVE`/renombrado → `MOVER`; `DELETE` →
   `MOVER_A_PAPELERA`. Todo con `{via: 'webdav'}` en detalles.
+- `LOCK`/`UNLOCK` → `BLOQUEAR_WEBDAV`/`DESBLOQUEAR_WEBDAV`, solo al crear o
+  reemplazar el bloqueo y al liberarlo (los refrescos no se auditan). Nunca se
+  guarda el token en el historial.
 
 ## 8. Infra y límites (sin cambios)
 
@@ -207,6 +229,10 @@ del token se actualiza también al escribir.
    expira y se libera; segundo PC concurrente → `423`.
 7. `If-None-Match: *` sobre existente → `412`.
 8. Nombres con tildes, `#`, `&` y +100 caracteres.
+9. `LOCK` deja `BLOQUEAR_WEBDAV` y `UNLOCK` deja `DESBLOQUEAR_WEBDAV` en el
+   historial; el token no aparece en la auditoría.
+10. `PROPFIND` de otro miembro muestra el bloqueo pero no su `<D:locktoken>`; un
+    `PUT` con ese token ajeno sigue devolviendo `423`.
 
 ## 10. Estimación
 
@@ -220,14 +246,15 @@ valor sola: guardar archivos y crear carpetas desde el PC.
    versiones); `fecha_subida` y `tamano_bytes` se actualizan. **R2 no ofrece
    versionado de objetos** (comprobado en octubre de 2026: el menú del bucket
    solo tiene ciclo de vida y bloqueo), así que los bytes anteriores se pierden
-   al sobrescribir. Por eso la escritura se queda en `"admin"` y Windows pide
-   confirmación antes de reemplazar. Si se quiere una red de seguridad, hay que
-   copiar el objeto viejo a un prefijo `versiones/` desde el Worker (ver §12.6).
+   al sobrescribir. La escritura se abrió a `"all"` asumiendo que no hay vuelta
+   atrás; la red de seguridad (copias periódicas o prefijo `versiones/`) queda
+   como **idea futura** en §13, no implementada.
 2. **`DELETE` de carpeta prohibido en v1** → `403`. La PWA tampoco tiene
    papelera de carpetas; añadirla es una funcionalidad aparte.
 3. **Locks de archivo** con timeout por defecto de 1 h y tope de 24 h.
-   `UNLOCK` del dueño/admin libera; el desbloqueo forzoso de un lock ajeno
-   solo por expiración. La revocación manual en `/ajustes` queda como mejora.
+   `UNLOCK` del dueño/admin libera; un admin puede reemplazar un lock huérfano
+   de otro usuario abriendo el recurso (queda auditado). La revocación manual
+   en `/ajustes` sigue como mejora futura.
 4. **Copiar carpetas** no entra en v1 (recursivo, multiplica bytes y cupo).
    `COPY` de archivos sí.
 5. **Tamaño máximo 20 MB**, igual que la PWA. No subir el límite para WebDAV:
@@ -245,9 +272,10 @@ valor sola: guardar archivos y crear carpetas desde el PC.
    (`403` en el resto). El listado privado filtra por `subido_por`, así que
    mover el archivo de otro usuario a una caja lo dejaría invisible.
 9. **Sin versionado en R2**: el servicio no lo ofrece. La papelera de la app
-   no cubre los bytes reemplazados por un `PUT`, así que la única protección
-   real es no abrir la escritura a todos o conservar copias propias de las
-   versiones anteriores.
+   no cubre los bytes reemplazados por un `PUT`. La escritura está abierta a
+   todos, así que la copia de seguridad local y las versiones propias quedan
+   como **ideas futuras** (§13); mientras no existan, una sobrescritura es
+   definitiva.
 
 ## 12. Plan de implementación en el Worker
 
@@ -434,12 +462,9 @@ anuncia `MOVE, COPY, PROPPATCH` cuando `DAV_WRITE` está activo.
   `ultimo_uso` se actualiza también al escribir (implementado).
 - **Rollback**: si algo falla, poner `DAV_WRITE="0"` y redesplegar; los datos
   ya escritos siguen siendo válidos para la PWA.
-- **Backup**: R2 **no tiene versionado de objetos**. Antes de habilitar
-  sobrescrituras para todos hay dos opciones reales: copias periódicas del
-  bucket (rclone u otro script) o versiones propias: copiar la key vieja a
-  `versiones/<archivo_id>/<fecha>_<nombre>` antes de borrarla y añadir una
-  regla de ciclo de vida que expire ese prefijo a los 90 días. Mientras no
-  exista ninguna, `DAV_WRITE="admin"` y sobrescritura deliberada.
+- **Backup**: R2 **no tiene versionado de objetos**. La copia de seguridad
+  local y las versiones propias quedan como **ideas futuras** (§13), no
+  implementadas. Mientras no existan, una sobrescritura es definitiva.
 
 Despliegue y activación:
 
@@ -463,8 +488,8 @@ destapó que la raíz privada (`carpeta_id = null`) se listaba en el Área comú
 La Caja fuerte queda privada también para el admin con
 `supabase/migraciones/privacidad-caja-fuerte.sql` (sin bypass de admin en
 `carpetas_select`/`archivos_select`). R2 **no ofrece versionado de objetos**:
-una sobrescritura es definitiva; la copia de seguridad local periódica queda
-pendiente.
+una sobrescritura es definitiva. La copia de seguridad local periódica queda
+como **idea futura** (§13), no implementada.
 
 La **Fase C** (`LOCK`/`UNLOCK`, Clase 2) está implementada en el Worker,
 desplegada y con la migración `supabase/migraciones/locks-dav.sql` aplicada. La
@@ -475,6 +500,13 @@ correcto, `COPY`, `MOVE` con `Overwrite` y cruce de ámbitos,
 `PROPPATCH[displayname]`, `DELETE` y controles de carpeta/raíz. Queda la prueba
 manual con Office en Windows (abrir, editar, guardar, cerrar) y el segundo PC
 concurrente.
+
+La **Fase D** (2026-10-30) añade la auditoría de `LOCK`/`UNLOCK`
+(`BLOQUEAR_WEBDAV`/`DESBLOQUEAR_WEBDAV`, sin tokens), la privacidad del token
+(`lockdiscovery` solo lo muestra al dueño o admin; un token ajeno no autoriza
+la escritura), `X-Content-Type-Options: nosniff` en todas las respuestas y la
+documentación/guía actualizadas. La copia de seguridad local no se implementa:
+queda como **idea futura** (§13).
 
 ### 12.7 Matriz de aceptación
 
@@ -495,9 +527,13 @@ concurrente.
 11. Token revocado → `401`; carpeta privada ajena → `404`; el admin tampoco
     ve las cajas privadas ajenas en el árbol ni en la PWA.
 12. `rclone copy/move/delete` contra el Worker; `wrangler tail` sin errores.
+13. `LOCK`/`UNLOCK` dejan `BLOQUEAR_WEBDAV`/`DESBLOQUEAR_WEBDAV` en el
+    historial; el token no aparece.
+14. `PROPFIND` de otro miembro no revela el `<D:locktoken>` y un `PUT` con ese
+    token ajeno sigue devolviendo `423`.
 
-En Fase B se validan 1–5 y 7–11. El punto 6 (Office) se valida con la Fase C
-tras aplicar `locks-dav.sql`; el 12 (rclone) depende del cliente que se use.
+En Fase B se validan 1–5 y 7–11; la Fase C valida 6, 13 y 14 (salvo la prueba
+manual de Office, pendiente); el 12 (rclone) queda como prueba opcional futura.
 
 ### 12.8 Orden de trabajo
 
@@ -506,9 +542,60 @@ tras aplicar `locks-dav.sql`; el 12 (rclone) depende del cliente que se use.
 | F0 | Refactor en módulos + flag `DAV_WRITE` + `sbVoid`/utilidades | Hecho (2026-10-28) |
 | A | `PUT`, `MKCOL`, `DELETE` archivo + pruebas locales | Hecho (2026-10-28); falta prueba en Windows real |
 | B | `MOVE`, `COPY` archivo, `PROPPATCH`, condicionales completos | Hecho (2026-10-29); banco local en verde |
-| C | `LOCK`/`UNLOCK`, `lockdiscovery`, Office | Hecho (2026-10-30); migración aplicada y prueba real 23/23 |
-| D | Endurecer, auditoría, rate-limit, documentación y guía familiar | Parcial: rate-limit, auditoría, locks y guía hechos; faltan backup local y prueba con rclone |
+| C | `LOCK`/`UNLOCK`, `lockdiscovery`, Office | Hecho (2026-10-30); migración aplicada y prueba real 23/23; falta prueba manual de Office |
+| D | Endurecer, auditoría de locks, privacidad del token, documentación y guía familiar | Hecho (2026-10-30); backup local y rclone quedan como ideas futuras (§13) |
 
 Total: ~3 semanas efectivas. Se puede parar después de A y seguir usando la
 PWA para lo demás.
+
+## 13. Ideas futuras (no implementadas)
+
+Estas ideas no forman parte de la Fase D ni tienen fecha. Se documentan para no
+perderlas y para que nadie asuma que existe una red de seguridad que todavía no
+está construida.
+
+### 13.1 Copia de seguridad local periódica
+
+La opción más simple y la primera que debería hacerse antes de dar por cerrada
+la escritura:
+
+- **rclone desde un PC/NAS** contra el WebDAV del Worker: `rclone copy` o
+  `rclone sync` a un disco externo, NAS o segundo proveedor. No requiere tocar
+  el Worker. Programar con el Programador de tareas de Windows o `cron` en el
+  NAS y revisar el resultado.
+- **Token de solo lectura**: hoy cualquier token de Explorador puede escribir.
+  Para una copia segura conviene añadir `tokens_dav.solo_lectura` y que el
+  Worker rechace los métodos de escritura con ese token; así el PC que hace la
+  copia no puede borrar ni sobrescribir por accidente.
+- **Metadatos**: los bytes de R2 no bastan; hay que copiar también las tablas
+  de Supabase (`archivos`, `carpetas`, `perfiles`, `enlaces_compartidos`,
+  `accesos_directos`, etc.) con `pg_dump` o un export periódico. Sin metadatos,
+  las keys de R2 son difíciles de reconstruir.
+- **Regla 3-2-1**: al menos tres copias, en dos soportes distintos, y una de
+  ellas offline. Una copia en el mismo bucket no protege de un borrado
+  accidental ni de perder la cuenta.
+- **Probar la restauración**: una copia que nunca se ha restaurado no es una
+  copia. Hacer una prueba trimestral restaurando una carpeta de muestra.
+
+### 13.2 Versiones propias en R2
+
+Antes de sobrescribir o borrar un objeto, copiar la key vieja a
+`versiones/<archivo_id>/<fecha>_<nombre>` y añadir una regla de ciclo de vida
+que expire ese prefijo (p. ej. a los 90 días). Ventaja: se puede recuperar una
+versión desde el Explorador o la app. Coste: duplica escrituras y almacenamiento
+temporal, hay que implementarlo en `PUT`/`DELETE`/`MOVE`/`COPY` y no protege de
+un borrado del bucket completo. No está implementado.
+
+### 13.3 Otras mejoras aparcadas
+
+- Revocación manual de locks desde `/ajustes` (hoy solo expiración o `UNLOCK`
+  con token; un admin puede reemplazar el lock abriendo el recurso).
+- `COPY` de carpetas completas (recursivo; multiplica bytes y cupo).
+- *Lock-null* para bloquear una ruta que aún no existe.
+- Papelera de carpetas en la PWA.
+- Historial de versiones visible en la interfaz.
+- Tokens de Explorador de solo lectura (necesario para la copia local segura).
+
+Nada de esto se implementa en la Fase D: la copia de seguridad queda como idea
+futura y la escritura actual asume que una sobrescritura es definitiva.
 

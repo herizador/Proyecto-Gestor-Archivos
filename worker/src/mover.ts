@@ -165,7 +165,7 @@ export async function responderMove(
   // Mover toca el origen y el destino: ambos deben estar libres (o traer el
   // token del lock en la cabecera If). El padre del origen también cuenta:
   // sacar un miembro modifica la colección aunque el lock sea Depth: 0.
-  const bloqueo = await comprobarBloqueo(env, req, [
+  const bloqueo = await comprobarBloqueo(env, user, req, [
     esCarpeta
       ? { id: nodo.carpeta.id, esCarpeta: true, padreId: null }
       : { id: nodo.archivo.id, esCarpeta: false, padreId: nodo.archivo.carpeta_id },
@@ -395,7 +395,7 @@ export async function responderCopy(
   }
 
   // COPY solo escribe en el destino; el origen se lee sin bloquear.
-  const bloqueo = await comprobarBloqueo(env, req, [
+  const bloqueo = await comprobarBloqueo(env, user, req, [
     { id: padreDestino.carpetaId, esCarpeta: true, padreId: null },
     ...(archivoDestino
       ? [{ id: archivoDestino.id, esCarpeta: false, padreId: archivoDestino.carpeta_id }]

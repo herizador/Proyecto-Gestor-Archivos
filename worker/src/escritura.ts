@@ -76,7 +76,7 @@ export async function responderPut(
 
   // Un bloqueo activo (del propio archivo o de una carpeta superior con
   // profundidad infinita) exige el token en la cabecera If.
-  const bloqueo = await comprobarBloqueo(env, req, [
+  const bloqueo = await comprobarBloqueo(env, user, req, [
     archivoActual
       ? { id: archivoActual.id, esCarpeta: false, padreId: archivoActual.carpeta_id }
       : { id: padre.carpetaId, esCarpeta: true, padreId: null },
@@ -212,7 +212,7 @@ export async function responderMkcol(
 
   // Crear un hijo modifica la carpeta: un lock de la carpeta (o de un
   // ancestro con profundidad infinita) debe aportar su token.
-  const bloqueo = await comprobarBloqueo(env, req, [
+  const bloqueo = await comprobarBloqueo(env, user, req, [
     { id: padre.carpetaId, esCarpeta: true, padreId: null },
   ])
   if (bloqueo) return bloqueo
@@ -271,7 +271,7 @@ export async function responderDelete(
     return responderError(403, 'Solo el dueño o un administrador puede borrar este archivo.')
   }
 
-  const bloqueo = await comprobarBloqueo(env, req, [
+  const bloqueo = await comprobarBloqueo(env, user, req, [
     { id: nodo.archivo.id, esCarpeta: false, padreId: nodo.archivo.carpeta_id },
     // Borrar el archivo lo quita de su carpeta: un lock Depth: 0 del padre
     // también protege el conjunto de miembros.

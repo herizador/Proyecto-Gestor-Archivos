@@ -43,7 +43,11 @@ La escritura está activa en el Worker (`DAV_WRITE="all"`). Puedes:
   guarda con **Ctrl+S**. Office ya no abre en solo lectura: el servidor reserva
   el archivo mientras lo tienes abierto y lo libera al cerrarlo. Si otro
   dispositivo lo tiene abierto a la vez, verás un aviso de que está bloqueado
-  (`423`); espera a que lo cierre o a que caduque la reserva (1 hora).
+  (`423`); espera a que lo cierre o a que caduque la reserva (1 hora). Si la app
+  se cerró de golpe, la reserva caduca sola en 1 hora.
+- **No hay versiones anteriores**: si guardas encima de un archivo, la versión
+  anterior se pierde. La papelera solo recupera archivos borrados. Si un
+  documento es importante, guarda una copia con otro nombre antes de editarlo.
 - **Todavía no**: borrar carpetas completas. Para eso usa la app.
 
 ## 4. Conectar en macOS
@@ -65,6 +69,12 @@ una cuenta **WebDAV** con la misma dirección, email y código.
 - **¿Qué pasa si dos personas abren el mismo documento?** El primero que lo
   abre lo reserva; el segundo ve un aviso de bloqueo. Al cerrarlo (o al caducar
   la reserva, 1 hora) queda libre. Nunca se guardan dos versiones a la vez.
+- **¿Puedo recuperar una versión anterior?** No. Al guardar encima, la versión
+  anterior se pierde: el almacenamiento no guarda historial de versiones. La
+  papelera solo recupera archivos borrados. Guarda una copia con otro nombre
+  antes de editar algo importante.
+- **Me quedó un archivo bloqueado y ya cerré Office.** Espera 1 hora a que
+  caduque la reserva. Si sigue bloqueado, avisa al administrador.
 - **¿Qué significa "Sistema de archivos: FAT"?** Nada: Windows etiqueta así
   todas las unidades de red. Ignóralo.
 - **¿Hasta qué tamaño puedo abrir?** Hasta 20 MB por archivo (límite de la app).

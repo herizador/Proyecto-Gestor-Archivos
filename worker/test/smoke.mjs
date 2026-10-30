@@ -31,7 +31,8 @@ function afirma(cond, msg) {
 await caso('OPTIONS anuncia DAV', async () => {
   const r = await fetch(base, { method: 'OPTIONS' })
   afirma(r.status === 200, `status ${r.status}`)
-  afirma((r.headers.get('dav') ?? '') === '1', 'sin cabecera DAV: 1')
+  const dav = r.headers.get('dav') ?? ''
+  afirma(/^1(,\s*2)?$/.test(dav), `cabecera DAV inesperada: «${dav}»`)
   allow = r.headers.get('allow') ?? ''
   afirma(allow.includes('PROPFIND'), 'Allow sin PROPFIND')
 })
