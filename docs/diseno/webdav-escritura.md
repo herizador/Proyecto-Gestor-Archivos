@@ -508,6 +508,10 @@ la escritura), `X-Content-Type-Options: nosniff` en todas las respuestas y la
 documentación/guía actualizadas. La copia de seguridad local no se implementa:
 queda como **idea futura** (§13).
 
+Desplegada el 2026-10-30 (versión `c9da150e-9aef-4958-a93e-7e23f6a79581`);
+`OPTIONS` en producción confirma `DAV: 1, 2`, `Allow` con `LOCK`/`UNLOCK` y
+`X-Content-Type-Options: nosniff`.
+
 ### 12.7 Matriz de aceptación
 
 1. Windows 11 monta la unidad, crea carpeta, sube `.txt` de 1 KB y de 19 MB;
