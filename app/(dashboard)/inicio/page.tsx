@@ -108,7 +108,12 @@ export default async function InicioPage() {
 
   const { data: perfil } = await supabase.from('perfiles').select('rol, nombre_completo').eq('id', user.id).single()
   const isAdmin = perfil?.rol === 'admin'
-  const nombre = perfil?.nombre_completo?.split(' ')[0] ?? 'familia'
+  // Si el perfil no tiene nombre (algunas cuentas guardan el email como
+  // nombre), se usa la parte anterior a la @ para no pintar el correo entero.
+  const nombrePerfil = perfil?.nombre_completo?.trim() ?? ''
+  const nombre = nombrePerfil && !nombrePerfil.includes('@')
+    ? nombrePerfil.split(' ')[0]
+    : (user.email?.split('@')[0] || 'familia')
   // eslint-disable-next-line react-hooks/purity -- server component: se evalúa una vez por petición, sin re-renders
   const hace7d = new Date(Date.now() - 7 * DIA_MS).toISOString()
 

@@ -1850,14 +1850,6 @@ tbody tr:hover td { background: var(--color-surface-2); }
   .safe-actions { margin-left: 0 !important; width: 100%; display: flex; gap: 10px; }
   .safe-actions > * { flex: 1; min-width: 0; }
   .safe-actions .btn { justify-content: center; width: 100%; }
-
-  .hero-inicio { grid-template-columns: 1fr; padding: 26px 20px 0; min-height: 0; }
-  .hero-visual { min-height: 230px; }
-  .hero-titulo { font-size: clamp(1.8rem, 8vw, 2.4rem); }
-  .hero-acciones { flex-direction: column; align-items: stretch; }
-  .hero-acciones .btn { width: 100%; }
-  .hero-mini { gap: 10px; }
-  .hero-mini > span { font-size: 0.7rem; }
 }
 
 /* ============================================================
@@ -2127,3 +2119,27 @@ tbody tr:hover td { background: var(--color-surface-2); }
 }
 .nota-privacidad p { font-size: 0.84rem; color: var(--color-text-muted); }
 .nota-privacidad strong { color: var(--color-text); }
+
+/* Móvil: el hero pasa a una sola columna y la escena va debajo del texto.
+   Va al final del archivo a propósito: las reglas base del hero se definen
+   después del bloque móvil general y, si no, vuelven a imponer 2 columnas. */
+@media (max-width: 768px) {
+  .hero-inicio {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 26px 20px 0;
+    min-height: 0;
+    border-radius: 24px;
+  }
+  .hero-titulo {
+    font-size: clamp(1.7rem, 7.5vw, 2.2rem);
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+  .hero-subtitulo { font-size: 0.92rem; margin-top: 12px; }
+  .hero-acciones { flex-direction: column; align-items: stretch; margin-top: 20px; }
+  .hero-acciones .btn { width: 100%; justify-content: center; }
+  .hero-mini { gap: 10px; margin-top: 18px; }
+  .hero-mini > span { font-size: 0.72rem; }
+  .hero-visual { min-height: 230px; }
+}
