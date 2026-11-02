@@ -29,9 +29,11 @@ export default async function PapeleraPage() {
           <Trash2 size={28} />
         </div>
         <div>
-          <p className="eyebrow">Espacio familiar / Papelera</p>
-          <h1 className="page-title">Papelera de Reciclaje</h1>
-          <p className="page-subtitle">Archivos eliminados que puedes restaurar o borrar definitivamente.</p>
+          <p className="eyebrow">Tu espacio / Papelera</p>
+          <h1 className="page-title">Papelera</h1>
+          <p className="page-subtitle">
+            Nada se pierde de golpe: restaura lo que quieras recuperar o bórralo para siempre.
+          </p>
         </div>
       </div>
 

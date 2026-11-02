@@ -119,7 +119,7 @@ export default function TrashFileCard({
             display: 'flex',
             padding: '4px',
             borderRadius: '8px',
-            background: 'rgba(13, 18, 32, 0.9)',
+            background: 'rgba(255, 255, 255, 0.94)',
             border: '1px solid var(--color-border-hover)',
           }}
           onClick={(e) => e.stopPropagation()}

@@ -6,8 +6,8 @@
   "scope": "/",
   "id": "/",
   "display": "standalone",
-  "background_color": "#0a0f1e",
-  "theme_color": "#0a0f1e",
+  "background_color": "#f4f7fc",
+  "theme_color": "#f4f7fc",
   "orientation": "portrait",
   "share_target": {
     "action": "/api/recibir",

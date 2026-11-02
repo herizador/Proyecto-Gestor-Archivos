@@ -74,9 +74,11 @@ export default async function CajaFuertePage({
           <Lock size={28} />
         </div>
         <div>
-          <p className="eyebrow">Espacio familiar / Caja fuerte</p>
-          <h1 className="page-title" style={{ fontSize: '1.4rem' }}>Mi Caja Fuerte</h1>
-          <p className="page-subtitle">Nadie más de tu familia puede ver estos archivos.</p>
+          <p className="eyebrow">Tu espacio / Caja fuerte</p>
+          <h1 className="page-title" style={{ fontSize: '1.55rem' }}>Caja fuerte</h1>
+          <p className="page-subtitle">
+            Solo tú puedes ver lo que guardas aquí. Ni siquiera el administrador entra.
+          </p>
           {carpetaActual && (
             <nav className="breadcrumb" aria-label="Ruta de carpetas">
               <Link href="/mi-caja-fuerte" className="breadcrumb-link">
@@ -97,12 +99,12 @@ export default async function CajaFuertePage({
         <div className="empty-state">
           <FileX size={64} className="empty-state-icon" />
           <h3 className="empty-state-title">
-            {carpetaActual ? 'Esta carpeta está vacía' : 'Caja Fuerte Vacía'}
+            {carpetaActual ? 'Esta carpeta está vacía' : 'Tu caja fuerte está vacía'}
           </h3>
           <p className="empty-state-text">
             {carpetaActual
-              ? 'Sube archivos o crea subcarpetas para organizar tu contenido privado.'
-              : 'Aquí aparecerán los archivos que subas como privados.'}
+              ? 'Sube archivos o crea subcarpetas para organizar lo que quieras guardar a salvo.'
+              : 'Sube aquí los documentos que solo quieras ver tú.'}
           </p>
         </div>
       ) : (

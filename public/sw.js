@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gestor-familiar-v5';
+const CACHE_NAME = 'gestor-familiar-v6';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',

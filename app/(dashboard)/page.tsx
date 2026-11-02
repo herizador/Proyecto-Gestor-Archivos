@@ -69,16 +69,24 @@ export default async function DashboardComun({
         style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}
       >
         <div>
-          <p className="eyebrow">Espacio familiar / Área común / {carpetaActual?.nombre ?? ''}</p>
-          <h1 className="page-title">Área Común</h1>
-          <p className="page-subtitle">Documentos visibles para toda la familia</p>
-          <nav className="breadcrumb" aria-label="Ruta de carpetas">
-            <Link href="/todos" className="breadcrumb-link">
-              <Home size={14} /> Raíz
-            </Link>
-            <ChevronRight size={14} className="breadcrumb-sep" />
-            <span>{carpetaActual?.nombre}</span>
-          </nav>
+          <p className="eyebrow">
+            Tu espacio / Mis archivos{carpetaActual ? ` / ${carpetaActual.nombre}` : ''}
+          </p>
+          <h1 className="page-title">{carpetaActual?.nombre ?? 'Mis archivos'}</h1>
+          <p className="page-subtitle">
+            {carpetaActual
+              ? 'Carpeta del área común, visible para toda la familia.'
+              : 'Los documentos que comparte toda la familia.'}
+          </p>
+          {carpetaActual && (
+            <nav className="breadcrumb" aria-label="Ruta de carpetas">
+              <Link href="/todos" className="breadcrumb-link">
+                <Home size={14} /> Mis archivos
+              </Link>
+              <ChevronRight size={14} className="breadcrumb-sep" />
+              <span>{carpetaActual.nombre}</span>
+            </nav>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           <NewFolderModalWrapper carpetaPadreId={carpetaActualId} />

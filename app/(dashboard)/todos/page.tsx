@@ -65,9 +65,11 @@ export default async function TodosPage() {
   return (
     <div className="page-content animate-fade-in">
       <div className="page-header">
-        <p className="eyebrow">Espacio familiar / Todos los archivos</p>
-        <h1 className="page-title">Todos los archivos</h1>
-        <p className="page-subtitle">Todo lo visible, en un solo sitio</p>
+        <p className="eyebrow">Tu espacio / Mis archivos</p>
+        <h1 className="page-title">Mis archivos</h1>
+        <p className="page-subtitle">
+          Todo lo que puedes ver, en un solo sitio. Busca, ordena o cambia a vista de lista.
+        </p>
       </div>
 
       <ResumenFamiliar

@@ -31,7 +31,7 @@ export default async function RecientesPage() {
   return (
     <div className="page-content animate-fade-in">
       <div className="page-header">
-        <p className="eyebrow">Espacio familiar / Recientes</p>
+        <p className="eyebrow">Tu espacio / Recientes</p>
         <h1 className="page-title">Recientes</h1>
         <p className="page-subtitle">Lo último que se ha movido en la familia</p>
       </div>

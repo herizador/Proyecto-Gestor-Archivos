@@ -1,9 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Files, Users, Clock, HardDrive, Folder, ArrowRight, ShieldCheck } from 'lucide-react'
+import {
+  Files, Users, Clock, HardDrive, Folder, ArrowRight, ShieldCheck,
+  FolderOpen, LockKeyhole, Sparkles,
+} from 'lucide-react'
 import RecordatoriosPortada from '@/components/RecordatoriosPortada'
 import AnilloProgreso from '@/components/AnilloProgreso'
+import Canvas3D from '@/components/inicio/Canvas3D'
+import UploadModalWrapper from '../UploadModalWrapper'
+import { NAV_SECUNDARIA } from '@/components/navegacion'
 import { formatoCorto } from '@/lib/formatos'
 import { listarRecordatorios } from '@/actions/recordatorios'
 import { listarActividadReciente } from '@/actions/storage'
@@ -94,7 +100,7 @@ function describir(a: HistorialConPerfil, miId: string): { titulo: string; detal
   }
 }
 
-// Portada: saludo, indicadores, accesos, actividad (según rol) y recordatorios.
+// Portada: saludo, hero 3D, indicadores, accesos, actividad (según rol) y recordatorios.
 export default async function InicioPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -156,80 +162,148 @@ export default async function InicioPage() {
 
   return (
     <div className="page-content animate-fade-in">
-      <div className="page-header">
-        <p className="eyebrow">Espacio familiar / Inicio</p>
-        <h1 className="page-title">{saludo()}, {nombre}</h1>
-        <p className="page-subtitle" style={vencidos > 0 ? { color: 'var(--color-danger)' } : undefined}>
-          {vencidos > 0
-            ? `Tienes ${vencidos} recordatorio${vencidos !== 1 ? 's' : ''} vencido${vencidos !== 1 ? 's' : ''}.`
-            : 'Todo está en orden. Aquí tienes lo más importante de tu archivo familiar.'}
-        </p>
-      </div>
+      <section className="hero-inicio" aria-labelledby="hero-titulo">
+        <div className="hero-texto">
+          <p className="eyebrow hero-eyebrow">
+            <Sparkles size={13} /> Tu archivo familiar
+          </p>
+          <h1 className="hero-titulo" id="hero-titulo">
+            {saludo()}, <span>{nombre}</span>
+          </h1>
+          <p className="hero-subtitulo">
+            Los documentos importantes de la familia, en un solo lugar tranquilo.
+            Busca, guarda y comparte sin perderte por menús.
+          </p>
 
-      <div className="grid-stats">
-        <div className="card" style={{ padding: '20px' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '6px' }}>
-            <Files size={16} /> Mis archivos
-          </p>
-          <p style={{ fontSize: '1.6rem', fontWeight: 700 }}>{miosRes.count ?? 0}</p>
-          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>+{nuevosRes.count ?? 0} esta semana</p>
-        </div>
-        <div className="card" style={{ padding: '20px' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '6px' }}>
-            <Users size={16} /> Compartidos
-          </p>
-          <p style={{ fontSize: '1.6rem', fontWeight: 700 }}>{conmigoRes.count ?? 0}</p>
-          <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>contigo · {miosCedidosRes.count ?? 0} cedes tú</p>
-        </div>
-        <div className="card" style={{ padding: '20px' }}>
-          <p style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '6px' }}>
-            <Clock size={16} /> Recordatorios
-          </p>
-          <p style={{ fontSize: '1.6rem', fontWeight: 700 }}>{pendientes.length}</p>
-          <p style={{ fontSize: '0.75rem', color: vencidos > 0 ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
-            {vencidos > 0 ? `${vencidos} vencidos` : 'ninguno vencido'}
-          </p>
-        </div>
-        <div className="card" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '6px' }}>
-              <HardDrive size={16} /> Almacenamiento
-            </p>
-            <p style={{ fontSize: '1.6rem', fontWeight: 700 }}>{formatoCorto(usoBytes)}</p>
-            <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>de 9 GB utilizados</p>
+          <div className="hero-acciones">
+            <Link href="/todos" className="btn btn-primary btn-lg">
+              <FolderOpen size={18} /> Ver mis archivos
+            </Link>
+            <UploadModalWrapper
+              scope="comun"
+              className="btn btn-ghost btn-lg"
+              label="Subir un archivo"
+              iconSize={18}
+            />
+            <Link href="/mi-caja-fuerte" className="btn btn-ghost btn-lg">
+              <LockKeyhole size={18} /> Caja fuerte
+            </Link>
           </div>
-          <AnilloProgreso pct={(usoBytes / LIMITE_BYTES) * 100} />
+
+          <div className="hero-mini">
+            <span><ShieldCheck size={15} /> Privado por defecto</span>
+            <span><Users size={15} /> Comparte solo lo que quieras</span>
+            <span><HardDrive size={15} /> {formatoCorto(usoBytes)} de 9 GB</span>
+            {vencidos > 0 && (
+              <span style={{ color: 'var(--color-danger)', fontWeight: 600 }}>
+                <Clock size={15} /> {vencidos} recordatorio{vencidos !== 1 ? 's' : ''} vencido{vencidos !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <Canvas3D />
+      </section>
+
+      <div className="grid-stats" style={{ marginTop: '20px' }}>
+        <div className="card stat-card">
+          <span className="stat-icono"><Files size={19} /></span>
+          <span className="stat-etiqueta">Mis archivos</span>
+          <span className="stat-valor">{miosRes.count ?? 0}</span>
+          <span className="stat-pista">+{nuevosRes.count ?? 0} esta semana</span>
+        </div>
+
+        <div className="card stat-card">
+          <span className="stat-icono verde"><Users size={19} /></span>
+          <span className="stat-etiqueta">Compartidos contigo</span>
+          <span className="stat-valor">{conmigoRes.count ?? 0}</span>
+          <span className="stat-pista">{miosCedidosRes.count ?? 0} compartes tú</span>
+        </div>
+
+        <div className="card stat-card">
+          <span className="stat-icono ambar"><Clock size={19} /></span>
+          <span className="stat-etiqueta">Recordatorios</span>
+          <span className="stat-valor">{pendientes.length}</span>
+          <span className="stat-pista" style={vencidos > 0 ? { color: 'var(--color-danger)', fontWeight: 600 } : undefined}>
+            {vencidos > 0 ? `${vencidos} vencido${vencidos !== 1 ? 's' : ''}` : 'Ninguno vencido'}
+          </span>
+        </div>
+
+        <div className="card stat-card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '3px' }}>
+              <span className="stat-icono violeta" style={{ marginBottom: '8px' }}><HardDrive size={19} /></span>
+              <span className="stat-etiqueta">Almacenamiento</span>
+              <span className="stat-valor">{formatoCorto(usoBytes)}</span>
+              <span className="stat-pista">de 9 GB utilizados</span>
+            </div>
+            <AnilloProgreso pct={(usoBytes / LIMITE_BYTES) * 100} />
+          </div>
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '12px' }}>
-        <h2 className="section-title" style={{ marginBottom: 0 }}>Accesos rápidos</h2>
-        <Link href="/todos" className="breadcrumb-link" style={{ marginLeft: 'auto', fontSize: '0.8rem' }}>
-          Ver todos
+      <div className="seccion-cabecera">
+        <h2 className="section-title">Tus carpetas</h2>
+        <Link href="/todos" className="enlace-ver">
+          Ver todas <ArrowRight size={14} />
         </Link>
       </div>
-      <div className="grid-folders" style={{ marginBottom: '24px' }}>
-        {raices.map((c, i) => (
-          <Link key={c.id} href={`${c.base}?carpeta=${c.id}`} className="card card-hover" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', textDecoration: 'none' }}>
-            <span className={`folder-card-icon fc-${c.color ?? 'indigo'}`} style={{ padding: '10px', marginBottom: 0 }}>
-              <Folder size={20} />
+
+      {raices.length === 0 ? (
+        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '18px 20px' }}>
+          <span className="stat-icono" style={{ marginBottom: 0 }}><Folder size={19} /></span>
+          <p style={{ fontSize: '0.88rem', color: 'var(--color-text-muted)' }}>
+            Todavía no hay carpetas. Crea la primera desde <Link href="/todos" className="breadcrumb-link">Mis archivos</Link>.
+          </p>
+        </div>
+      ) : (
+        <div
+          className="grid-folders"
+          style={{ marginBottom: '6px', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}
+        >
+          {raices.map((c, i) => (
+            <Link key={c.id} href={`${c.base}?carpeta=${c.id}`} className="card card-hover acceso-carpeta">
+              <span className={`folder-card-icon fc-${c.color ?? 'indigo'}`} style={{ padding: '10px', marginBottom: 0 }}>
+                <Folder size={20} />
+              </span>
+              <span className="acceso-carpeta-texto">
+                <span className="acceso-carpeta-nombre">{c.nombre}</span>
+                <span className="acceso-carpeta-meta">
+                  {conteosCarpetas[i]?.count ?? 0} archivo{(conteosCarpetas[i]?.count ?? 0) !== 1 ? 's' : ''}
+                  {' · '}
+                  {c.base === '/' ? 'Familiar' : 'Caja fuerte'}
+                </span>
+              </span>
+              <ArrowRight size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+            </Link>
+          ))}
+        </div>
+      )}
+
+      <div className="seccion-cabecera">
+        <h2 className="section-title">También te puede interesar</h2>
+      </div>
+      <div className="accesos-secundarios">
+        {NAV_SECUNDARIA.map((item) => (
+          <Link key={item.href} href={item.href} className="mini-acceso">
+            <span className="mini-acceso-icono">{item.icono}</span>
+            <span className="mini-acceso-texto">
+              <span className="mini-acceso-titulo">{item.texto}</span>
+              <span className="mini-acceso-desc">{item.descripcion}</span>
             </span>
-            <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.nombre}</span>
-              <span style={{ display: 'block', fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{conteosCarpetas[i]?.count ?? 0} archivos</span>
-            </span>
-            <ArrowRight size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
           </Link>
         ))}
       </div>
 
-      <div className="dos-columnas">
-        <section className="card" style={{ padding: '20px', minWidth: 0 }}>
+      <div className="dos-columnas" style={{ marginTop: '28px' }}>
+        <section className="card" style={{ padding: '22px', minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', marginBottom: '4px' }}>
-            <h2 className="section-title" style={{ marginBottom: 0 }}>{isAdmin ? 'Actividad reciente' : 'Tu actividad'}</h2>
+            <h2 className="section-title" style={{ marginBottom: 0 }}>
+              {isAdmin ? 'Actividad reciente' : 'Tu actividad'}
+            </h2>
             {isAdmin && (
-              <Link href="/admin/historial" className="breadcrumb-link" style={{ marginLeft: 'auto', fontSize: '0.8rem' }}>
-                Ver todo
+              <Link href="/admin/historial" className="enlace-ver">
+                Ver todo <ArrowRight size={14} />
               </Link>
             )}
           </div>
@@ -262,18 +336,17 @@ export default async function InicioPage() {
           )}
         </section>
 
-        <section className="card" style={{ padding: '20px', minWidth: 0 }}>
+        <section className="card" style={{ padding: '22px', minWidth: 0 }}>
           <RecordatoriosPortada iniciales={recordatorios} />
         </section>
       </div>
 
-      <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px 20px', marginTop: '16px', background: 'linear-gradient(135deg, rgba(79,142,247,0.08), transparent)' }}>
-        <ShieldCheck size={22} style={{ color: 'var(--color-accent)', flexShrink: 0 }} />
-        <p style={{ fontSize: '0.85rem' }}>
-          <strong>Tu archivo familiar está protegido.</strong>{' '}
-          <span style={{ color: 'var(--color-text-muted)' }}>
-            Tu caja fuerte solo la ves tú{isAdmin ? ' (y tú ves todo como admin)' : ' y el administrador'}. Nada se borra solo: los avisos no tocan archivos.
-          </span>
+      <div className="nota-privacidad">
+        <span className="nota-privacidad-icono"><ShieldCheck size={18} /></span>
+        <p>
+          <strong>Tu espacio privado, de verdad.</strong>{' '}
+          La caja fuerte solo la ves tú. Compartir es siempre una decisión tuya y nada se borra solo:
+          los recordatorios no tocan archivos.
         </p>
       </div>
     </div>

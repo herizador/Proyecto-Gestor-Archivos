@@ -18,8 +18,9 @@ export default async function AjustesPage() {
   return (
     <div className="page-content animate-fade-in">
       <div className="page-header">
+        <p className="eyebrow">Tu espacio / Ajustes</p>
         <h1 className="page-title">Ajustes</h1>
-        <p className="page-subtitle">Acceso a tus archivos desde fuera de la app</p>
+        <p className="page-subtitle">Conecta tus dispositivos y revisa tus accesos</p>
       </div>
 
       <div className="card" style={{ marginBottom: '16px' }}>
@@ -29,8 +30,8 @@ export default async function AjustesPage() {
         </div>
         <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '16px' }}>
           Crea una contraseña de Explorador por dispositivo y conéctala como unidad de red
-          para ver tus archivos sin descargarlos. Es de solo lectura: desde ahí no se
-          puede borrar ni modificar nada. Si pierdes un dispositivo, revoca su token.
+          para abrir tus archivos sin descargarlos. Si pierdes un dispositivo, revoca su
+          token desde aquí.
         </p>
         <TokensDav iniciales={tokens ?? []} isAdmin={isAdmin} />
       </div>

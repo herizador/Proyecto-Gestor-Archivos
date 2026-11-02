@@ -23,7 +23,7 @@ export default async function CompartidoPage() {
   return (
     <div className="page-content animate-fade-in">
       <div className="page-header">
-        <p className="eyebrow">Espacio familiar / Compartido conmigo</p>
+        <p className="eyebrow">Tu espacio / Compartido contigo</p>
         <h1 className="page-title">Compartido conmigo</h1>
         <p className="page-subtitle">Lo que otros miembros te han cedido directamente</p>
       </div>

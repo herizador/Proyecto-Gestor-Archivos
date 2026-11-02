@@ -22,7 +22,7 @@ export default async function FavoritosPage() {
   return (
     <div className="page-content animate-fade-in">
       <div className="page-header">
-        <p className="eyebrow">Espacio familiar / Favoritos</p>
+        <p className="eyebrow">Tu espacio / Favoritos</p>
         <h1 className="page-title">Favoritos</h1>
         <p className="page-subtitle">Tus accesos directos personales (solo los ves tú)</p>
       </div>

@@ -21,20 +21,24 @@
     "r2:cors": "node --env-file=.env.local scripts/r2.mjs cors"
   },
   "dependencies": {
-    "next": "16.2.6",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
     "@aws-sdk/client-s3": "^3.1052.0",
     "@aws-sdk/s3-request-presigner": "^3.1052.0",
+    "@react-three/fiber": "^9.8.2",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.1",
     "date-fns": "^4.2.1",
-    "lucide-react": "^1.16.0"
+    "gsap": "^3.15.0",
+    "lucide-react": "^1.16.0",
+    "next": "16.2.6",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.187.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "typescript": "^5"

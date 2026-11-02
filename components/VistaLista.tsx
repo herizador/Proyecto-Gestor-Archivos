@@ -21,12 +21,12 @@ type CarpetaConAutor = Carpeta & {
 }
 
 const COLOR_TIPO: Record<string, string> = {
-  image: '#34d399',
-  pdf: '#f87171',
-  video: '#a78bfa',
-  audio: '#22d3ee',
-  archive: '#fbbf24',
-  doc: '#6ba3ff',
+  image: '#0b8a63',
+  pdf: '#c43d3d',
+  video: '#7048c9',
+  audio: '#087f96',
+  archive: '#946108',
+  doc: '#355fd4',
 }
 
 function kindDe(mime: string): string {
