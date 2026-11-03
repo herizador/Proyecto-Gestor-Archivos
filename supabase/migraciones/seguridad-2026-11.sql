@@ -295,7 +295,8 @@ CREATE POLICY "accesos_insert_propio" ON public.accesos_directos
 
 -- -----------------------------------------------------------------------------
 -- 8. RLS: lotes_recibidos (staging privado y claves auditables)
--- -----------------------------------------------------------------------------DROP POLICY IF EXISTS "lotes_select_propio" ON public.lotes_recibidos;
+-- -----------------------------------------------------------------------------
+DROP POLICY IF EXISTS "lotes_select_propio" ON public.lotes_recibidos;
 CREATE POLICY "lotes_select_propio" ON public.lotes_recibidos
   FOR SELECT USING (usuario_id = auth.uid());
 
