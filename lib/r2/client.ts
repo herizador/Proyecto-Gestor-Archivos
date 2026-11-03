@@ -1,6 +1,20 @@
-import { S3Client, GetObjectCommand, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+  CopyObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+} from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { randomUUID } from 'node:crypto'
 import { toBrowserSafePresignedUrl } from '@/lib/presigned-url'
+import {
+  normalizarTipoMime,
+  nombreParaCabecera,
+  tipoParaVista,
+  tipoSeguroParaInline,
+} from '@/lib/archivos-seguros'
 
 if (!process.env.CLOUDFLARE_R2_ENDPOINT) throw new Error('CLOUDFLARE_R2_ENDPOINT no definido')
 if (!process.env.CLOUDFLARE_R2_ACCESS_KEY_ID) throw new Error('CLOUDFLARE_R2_ACCESS_KEY_ID no definido')
@@ -30,22 +44,25 @@ async function presignAndNormalize(
 }
 
 function sanitizeFileNameForDisposition(fileName: string): string {
-  return fileName.replace(/["\\]/g, '_')
+  return nombreParaCabecera(fileName)
 }
 
 /**
- * Genera una URL pre-firmada para VISUALIZAR en el navegador (inline).
+ * Genera una URL pre-firmada para VISUALIZAR en el navegador.
+ * Solo los tipos seguros se sirven inline; HTML/SVG/XML/JS se fuerzan como
+ * descarga binaria para que un archivo subido no ejecute contenido activo.
  */
 export async function getPresignedViewUrl(
   key: string,
   contentType?: string,
   expiresIn = 900
 ): Promise<string> {
+  const seguro = tipoSeguroParaInline(contentType)
   const command = new GetObjectCommand({
     Bucket: BUCKET,
     Key: key,
-    ResponseContentDisposition: 'inline',
-    ...(contentType ? { ResponseContentType: contentType } : {}),
+    ResponseContentDisposition: seguro ? 'inline' : 'attachment',
+    ResponseContentType: seguro ? tipoParaVista(contentType) : 'application/octet-stream',
   })
   return presignAndNormalize(command, expiresIn)
 }
@@ -73,14 +90,34 @@ export async function getPresignedDownloadUrl(
 export async function getPresignedUploadUrl(
   key: string,
   contentType: string,
+  contentLength: number,
   expiresIn = 300
 ): Promise<string> {
   const command = new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,
-    ContentType: contentType,
+    ContentType: normalizarTipoMime(contentType),
+    // Se firma el tamaño declarado: el navegador envía Content-Length de forma
+    // automática y, si el fichero real no coincide, R2 rechaza la firma. Así una
+    // URL de subida no sirve para colar objetos mucho mayores de 20 MB.
+    ContentLength: contentLength,
   })
   return presignAndNormalize(command, expiresIn)
+}
+
+/**
+ * Tamaño real del objeto en R2. Devuelve null si no existe o no se puede leer:
+ * el llamador debe tratarlo como subida incompleta, nunca como 0 bytes.
+ */
+export async function getR2ObjectSize(key: string): Promise<number | null> {
+  try {
+    const cabeceras = await r2Client.send(
+      new HeadObjectCommand({ Bucket: BUCKET, Key: key })
+    )
+    return typeof cabeceras.ContentLength === 'number' ? cabeceras.ContentLength : null
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -104,7 +141,7 @@ export async function putToR2(
     Bucket: BUCKET,
     Key: key,
     Body: body,
-    ContentType: contentType,
+    ContentType: normalizarTipoMime(contentType),
   })
   await r2Client.send(command)
 }
@@ -133,11 +170,14 @@ export function buildStagingKey(params: {
   fileName: string
 }): string {
   const safeName = params.fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_')
-  return `compartidos-pendientes/${params.userId}/${Date.now()}_${safeName}`
+  const sello = `${Date.now()}_${randomUUID().slice(0, 8)}`
+  return `compartidos-pendientes/${params.userId}/${sello}_${safeName}`
 }
 
 /**
  * Construye la ruta (key) en R2 según el tipo de carpeta.
+ * El sufijo aleatorio evita colisiones y hace las keys menos adivinables: la
+ * key es la última barrera si una fila de BD llegara a manipularse.
  */
 export function buildR2Key(params: {
   userId: string
@@ -145,13 +185,13 @@ export function buildR2Key(params: {
   scope: 'comun' | 'publico' | 'privado'
 }): string {
   const safeName = params.fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_')
-  const timestamp = Date.now()
+  const sello = `${Date.now()}_${randomUUID().slice(0, 8)}`
   switch (params.scope) {
     case 'comun':
-      return `comun/${timestamp}_${safeName}`
+      return `comun/${sello}_${safeName}`
     case 'publico':
-      return `usuarios/${params.userId}/publico/${timestamp}_${safeName}`
+      return `usuarios/${params.userId}/publico/${sello}_${safeName}`
     case 'privado':
-      return `usuarios/${params.userId}/privado/${timestamp}_${safeName}`
+      return `usuarios/${params.userId}/privado/${sello}_${safeName}`
   }
 }

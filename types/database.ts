@@ -486,6 +486,10 @@ export type Database = {
         Args: Record<string, never>
         Returns: 'admin' | 'miembro'
       }
+      registrar_actividad: {
+        Args: { p_accion: ActivityAction; p_detalles?: Json | null }
+        Returns: undefined
+      }
     }
   }
 }

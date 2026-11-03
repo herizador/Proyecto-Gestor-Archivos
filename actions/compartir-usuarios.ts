@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { logActivity } from '@/actions/storage'
+import { esUuidValido } from '@/lib/archivos-seguros'
 import { revalidatePath } from 'next/cache'
 import type { ArchivoConAutor, Carpeta } from '@/types/database'
 
@@ -13,7 +14,8 @@ type Recurso = 'archivo' | 'carpeta'
 
 // ---------------------------------------------------------------------------
 // Cesiones nominales entre miembros (ver docs/diseno/compartidos.md).
-// Solo el dueño o el admin ceden; el destinatario debe ser otro miembro.
+// Solo el dueño (o el admin, únicamente sobre contenido no privado) cede; el
+// destinatario debe ser otro miembro. La Caja fuerte es privada para el admin.
 // ---------------------------------------------------------------------------
 async function soyDuenoOAdmin(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -21,20 +23,36 @@ async function soyDuenoOAdmin(
   tipo: Recurso,
   id: string
 ) {
+  if (!esUuidValido(id)) return false
+
   if (tipo === 'archivo') {
-    const { data } = await supabase.from('archivos').select('subido_por').eq('id', id).single()
+    const { data } = await supabase
+      .from('archivos')
+      .select('subido_por, ruta_r2')
+      .eq('id', id)
+      .single()
     if (!data) return false
     if (data.subido_por === userId) return true
+    if (data.ruta_r2.includes('/privado/')) return false
   } else {
-    const { data } = await supabase.from('carpetas').select('creado_por').eq('id', id).single()
+    const { data } = await supabase
+      .from('carpetas')
+      .select('creado_por, es_privada')
+      .eq('id', id)
+      .single()
     if (!data) return false
     if (data.creado_por === userId) return true
+    if (data.es_privada) return false
   }
   const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', userId).single()
   return perfil?.rol === 'admin'
 }
 
 export async function compartirCon(params: { tipo: Recurso; id: string; usuarioId: string }) {
+  if (!esUuidValido(params.id) || !esUuidValido(params.usuarioId)) {
+    return { error: 'Elemento o miembro no válido.' }
+  }
+
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
@@ -54,7 +72,7 @@ export async function compartirCon(params: { tipo: Recurso; id: string; usuarioI
   })
   if (error) {
     if (error.code === '23505') return { success: true, duplicado: true }
-    return { error: error.message }
+    return { error: 'No se pudo compartir el elemento.' }
   }
 
   await logActivity({
@@ -67,6 +85,10 @@ export async function compartirCon(params: { tipo: Recurso; id: string; usuarioI
 }
 
 export async function dejarDeCompartir(params: { tipo: Recurso; id: string; usuarioId: string }) {
+  if (!esUuidValido(params.id) || !esUuidValido(params.usuarioId)) {
+    return { error: 'Esa cesión no existe.' }
+  }
+
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
@@ -84,8 +106,14 @@ export async function dejarDeCompartir(params: { tipo: Recurso; id: string; usua
   const puedo = fila.creado_por === user.id || fila.compartido_con === user.id || perfil?.rol === 'admin'
   if (!puedo) return { error: 'Sin permiso.' }
 
-  const { error } = await supabase.from('compartidos').delete().eq('id', fila.id)
-  if (error) return { error: error.message }
+  const { data: borradas, error } = await supabase
+    .from('compartidos')
+    .delete()
+    .eq('id', fila.id)
+    .select('id')
+  if (error || !borradas || borradas.length === 0) {
+    return { error: 'No se pudo revocar la cesión.' }
+  }
 
   await logActivity({
     accion: 'COMPARTIR_USUARIO',

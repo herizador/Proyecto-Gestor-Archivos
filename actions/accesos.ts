@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { logActivity } from '@/actions/storage'
+import { esUuidValido, keyValidaParaFila, sanitizarNombreArchivo } from '@/lib/archivos-seguros'
 import type { AccesoConObjetivo, AccesoDirecto, Carpeta } from '@/types/database'
 import { revalidatePath } from 'next/cache'
 
@@ -195,32 +196,61 @@ async function validarYCrearAcceso(
   carpetaContenedoraId: string,
   nombrePersonalizado?: string | null
 ): Promise<{ ok: true } | { ok: false; error: string; duplicado: boolean }> {
-  // La contenedora debe existir y ser visible (RLS); si no, error
+  if (!esUuidValido(objetivoId) || !esUuidValido(carpetaContenedoraId)) {
+    return { ok: false, error: 'Elemento no válido.', duplicado: false }
+  }
+
+  // La contenedora debe existir y ser visible (RLS); si no, error. Tampoco se
+  // escribe dentro de una carpeta privada ajena (aunque esté compartida).
   const { data: contenedora, error: contError } = await supabase
     .from('carpetas')
-    .select('id')
+    .select('id, es_privada, creado_por')
     .eq('id', carpetaContenedoraId)
     .single()
   if (contError || !contenedora) return { ok: false, error: 'Carpeta de destino no válida.', duplicado: false }
+  if (contenedora.es_privada && contenedora.creado_por !== userId) {
+    return { ok: false, error: 'No puedes enlazar dentro de una carpeta privada que no es tuya.', duplicado: false }
+  }
+  // Un elemento privado solo puede enlazarse dentro de una carpeta privada
+  // propia: si no, se publicaría en el Área común.
+  const contenedoraPrivadaPropia = contenedora.es_privada && contenedora.creado_por === userId
 
   if (objetivoTipo === 'archivo') {
     const { data: objetivo, error: objError } = await supabase
       .from('archivos')
-      .select('id, estado')
+      .select('id, estado, ruta_r2, subido_por')
       .eq('id', objetivoId)
       .single()
     if (objError || !objetivo) return { ok: false, error: 'Archivo no encontrado o sin permisos.', duplicado: false }
     if (objetivo.estado !== 'activo') return { ok: false, error: 'Solo se puede enlazar archivos activos.', duplicado: false }
+    if (!keyValidaParaFila(objetivo.ruta_r2, objetivo.subido_por)) {
+      return { ok: false, error: 'Archivo no encontrado o sin permisos.', duplicado: false }
+    }
+    const esPrivado = objetivo.ruta_r2.includes('/privado/')
+    if (esPrivado && !contenedoraPrivadaPropia) {
+      return {
+        ok: false,
+        error: 'Un archivo privado solo puede enlazarse dentro de una carpeta privada tuya.',
+        duplicado: false,
+      }
+    }
   } else {
     if (objetivoId === carpetaContenedoraId) {
       return { ok: false, error: 'Una carpeta no puede enlazarse a sí misma.', duplicado: false }
     }
     const { data: objetivo, error: objError } = await supabase
       .from('carpetas')
-      .select('id')
+      .select('id, es_privada, creado_por')
       .eq('id', objetivoId)
       .single()
     if (objError || !objetivo) return { ok: false, error: 'Carpeta no encontrada o sin permisos.', duplicado: false }
+    if (objetivo.es_privada && !contenedoraPrivadaPropia) {
+      return {
+        ok: false,
+        error: 'Una carpeta privada solo puede enlazarse dentro de una carpeta privada tuya.',
+        duplicado: false,
+      }
+    }
     // Anti-ciclo: la contenedora no puede ser descendiente del objetivo
     let cursor: string | null = carpetaContenedoraId
     for (let i = 0; i < 50 && cursor; i++) {
@@ -242,7 +272,9 @@ async function validarYCrearAcceso(
     carpeta_contenedora_id: carpetaContenedoraId,
     archivo_objetivo_id: objetivoTipo === 'archivo' ? objetivoId : null,
     carpeta_objetivo_id: objetivoTipo === 'carpeta' ? objetivoId : null,
-    nombre_personalizado: nombrePersonalizado?.trim() || null,
+    nombre_personalizado: nombrePersonalizado
+      ? sanitizarNombreArchivo(nombrePersonalizado, 120)
+      : null,
   })
 
   if (insertError) {
@@ -339,6 +371,8 @@ export async function crearAccesosBatch(params: {
 // Eliminar un acceso (nunca toca R2 ni al original)
 // ---------------------------------------------------------------------------
 export async function eliminarAcceso(accesoId: string) {
+  if (!esUuidValido(accesoId)) return { error: 'Enlace no encontrado o sin permisos.' }
+
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
@@ -350,8 +384,14 @@ export async function eliminarAcceso(accesoId: string) {
     .single()
   if (fetchError || !acceso) return { error: 'Enlace no encontrado o sin permisos.' }
 
-  const { error } = await supabase.from('accesos_directos').delete().eq('id', accesoId)
-  if (error) return { error: error.message }
+  const { data: borrados, error } = await supabase
+    .from('accesos_directos')
+    .delete()
+    .eq('id', accesoId)
+    .select('id')
+  if (error || !borrados || borrados.length === 0) {
+    return { error: 'No se pudo eliminar el enlace.' }
+  }
 
   await logActivity({
     accion: 'ELIMINAR_ACCESO',

@@ -14,6 +14,10 @@ Guías de uso y documentos de diseño del Gestor Familiar. El esquema completo d
 - [Puente WebDAV](diseno/webdav.md): Worker de Cloudflare de solo lectura sobre R2.
 - [Escritura WebDAV](diseno/webdav-escritura.md): especificación futura, aún no implementada.
 
+## Seguridad
+
+- [Auditoría 2026-11](seguridad/auditoria-2026-11.md): hallazgos, correcciones y checklist operativa.
+
 ## Referencia interna
 
 - [`../AGENTS.md`](../AGENTS.md): convenciones del proyecto, arquitectura y decisiones de implementación.

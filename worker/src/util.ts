@@ -22,6 +22,9 @@ export function cabecerasPrivadas(extra?: Record<string, string>): Record<string
   return {
     'Cache-Control': 'no-store, no-cache, must-revalidate',
     'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy': "frame-ancestors 'none'; object-src 'none'",
     ...(extra ?? {}),
   }
 }
@@ -214,13 +217,55 @@ export function mimePorExtension(nombre: string): string {
   return MIME_POR_EXTENSION[ext] ?? 'application/octet-stream'
 }
 
+const MIME_VALIDO = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/i
+
+// Normaliza el tipo recibido: sin parámetros, en minúsculas y con forma MIME.
+// Cualquier valor raro cae a application/octet-stream.
+export function normalizarTipoMime(tipo: string | null | undefined): string {
+  const limpio = (tipo ?? '').split(';')[0].trim().toLowerCase()
+  return MIME_VALIDO.test(limpio) && limpio.length <= 120 ? limpio : 'application/octet-stream'
+}
+
+// Tipos que se pueden mostrar en línea sin ejecutar contenido activo.
+export function tipoSeguroInline(tipo: string | null | undefined): boolean {
+  const t = normalizarTipoMime(tipo)
+  const peligrosos = new Set([
+    'image/svg+xml',
+    'image/svg',
+    'text/html',
+    'application/xhtml+xml',
+    'application/xml',
+    'text/xml',
+    'application/javascript',
+    'text/javascript',
+    'application/ecmascript',
+    'text/ecmascript',
+    'application/x-javascript',
+  ])
+  if (peligrosos.has(t)) return false
+  if (t.startsWith('image/') || t.startsWith('audio/') || t.startsWith('video/')) return true
+  return (
+    t === 'application/pdf' ||
+    t === 'text/plain' ||
+    t === 'text/csv' ||
+    t === 'application/json'
+  )
+}
+
+// Nombre seguro para Content-Disposition: sin comillas, barras ni CRLF.
+export function nombreParaCabecera(nombre: string): string {
+  const limpio = String(nombre ?? '')
+    .replace(/[\u0000-\u001f\u007f"\\]/g, '_')
+    .slice(0, 200)
+  return limpio || 'archivo'
+}
+
 // Los navegadores y Windows suelen mandar application/octet-stream para todo;
-// en ese caso manda la extensión. Si el cliente da un tipo concreto, se respeta.
+// en ese caso manda la extensión. Si el cliente da un tipo concreto, se respeta
+// pero siempre normalizado (nunca con parámetros ni saltos de línea).
 export function mimeEfectivo(nombre: string, contentType: string | null): string {
-  const limpio = (contentType ?? '').split(';')[0].trim().toLowerCase()
-  if (limpio && limpio !== 'application/octet-stream' && limpio !== 'binary/octet-stream') {
-    return (contentType ?? '').trim()
-  }
+  const limpio = normalizarTipoMime(contentType)
+  if (limpio !== 'application/octet-stream' && limpio !== 'binary/octet-stream') return limpio
   return mimePorExtension(nombre)
 }
 

@@ -2,7 +2,14 @@
 
 import type { Env, FilaArchivo, UsuarioDav } from './env'
 import { auditar, tocarToken } from './supabase'
-import { cabecerasPrivadas, etagDe, responderError } from './util'
+import {
+  cabecerasPrivadas,
+  etagDe,
+  nombreParaCabecera,
+  normalizarTipoMime,
+  responderError,
+  tipoSeguroInline,
+} from './util'
 
 function parseRange(
   cab: string | null,
@@ -55,10 +62,13 @@ export async function responderArchivo(
   const total = archivo.tamano_bytes
   const etag = etagDe(archivo)
   const fecha = new Date(archivo.fecha_subida)
+  // HTML, SVG, XML y JavaScript se sirven como descarga binaria: un archivo
+  // subido por un miembro no debe ejecutar contenido activo en este dominio.
+  const seguro = tipoSeguroInline(archivo.tipo_mime)
   const cabeceras: Record<string, string> = {
-    'Content-Type': archivo.tipo_mime || 'application/octet-stream',
+    'Content-Type': seguro ? normalizarTipoMime(archivo.tipo_mime) : 'application/octet-stream',
     'Accept-Ranges': 'bytes',
-    'Content-Disposition': `inline; filename="${archivo.nombre_original.replace(/["\\]/g, '_')}"`,
+    'Content-Disposition': `${seguro ? 'inline' : 'attachment'}; filename="${nombreParaCabecera(archivo.nombre_original)}"`,
     ETag: etag,
     ...(Number.isNaN(fecha.getTime()) ? {} : { 'Last-Modified': fecha.toUTCString() }),
     ...cabecerasPrivadas(),

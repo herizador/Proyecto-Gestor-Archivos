@@ -1,11 +1,19 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { moverEnR2, deleteFromR2, buildR2Key } from '@/lib/r2/client'
+import { moverEnR2, deleteFromR2, buildR2Key, getR2ObjectSize } from '@/lib/r2/client'
+import {
+  esUuidValido,
+  keyDeStagingPropia,
+  normalizarTipoMime,
+  sanitizarNombreArchivo,
+} from '@/lib/archivos-seguros'
 import type { FicheroEnLote, Json } from '@/types/database'
 import { revalidatePath } from 'next/cache'
 
 const LOTE_TTL_MS = 24 * 60 * 60 * 1000 // los lotes staging caducan en 24 h
+const MAX_FILE_SIZE = 20 * 1024 * 1024 // 20 MB, igual que la subida normal
+const MAX_FICHEROS_LOTE = 10
 
 function parsearFicheros(metadatos: Json): FicheroEnLote[] {
   if (!Array.isArray(metadatos)) return []
@@ -24,25 +32,38 @@ function parsearFicheros(metadatos: Json): FicheroEnLote[] {
 // ---------------------------------------------------------------------------
 export async function limpiarLotesCaducados() {
   const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { limpiados: 0 }
+
   const limite = new Date(Date.now() - LOTE_TTL_MS).toISOString()
 
   const { data: lotes, error } = await supabase
     .from('lotes_recibidos')
-    .select('id, claves_r2, metadatos')
+    .select('id, usuario_id, claves_r2, metadatos')
     .lt('fecha_creacion', limite)
   if (error || !lotes || lotes.length === 0) return { limpiados: 0 }
 
-  const claves = new Set<string>()
+  const ids: string[] = []
   for (const lote of lotes) {
-    if (Array.isArray(lote.claves_r2)) {
-      for (const c of lote.claves_r2) if (typeof c === 'string') claves.add(c)
+    // Solo se borran objetos de staging del dueño de la fila. Así una fila
+    // manipulada con una key ajena no puede borrar archivos de otra persona.
+    for (const c of Array.isArray(lote.claves_r2) ? lote.claves_r2 : []) {
+      if (typeof c === 'string' && keyDeStagingPropia(c, lote.usuario_id)) {
+        await deleteFromR2(c).catch(() => {})
+      }
     }
-    for (const f of parsearFicheros(lote.metadatos)) claves.add(f.clave)
+    for (const f of parsearFicheros(lote.metadatos)) {
+      if (keyDeStagingPropia(f.clave, lote.usuario_id)) {
+        await deleteFromR2(f.clave).catch(() => {})
+      }
+    }
+    ids.push(lote.id)
   }
-  await Promise.all([...claves].map((c) => deleteFromR2(c).catch(() => {})))
-  await supabase.from('lotes_recibidos').delete().lt('fecha_creacion', limite)
+  if (ids.length > 0) {
+    await supabase.from('lotes_recibidos').delete().in('id', ids)
+  }
 
-  return { limpiados: lotes.length }
+  return { limpiados: ids.length }
 }
 
 // ---------------------------------------------------------------------------
@@ -70,7 +91,11 @@ export async function confirmarGuardado(params: {
 
   if (Date.now() - new Date(lote.fecha_creacion).getTime() > LOTE_TTL_MS) {
     const ficheros = parsearFicheros(lote.metadatos)
-    await Promise.all(ficheros.map((f) => deleteFromR2(f.clave).catch(() => {})))
+    await Promise.all(
+      ficheros
+        .filter((f) => keyDeStagingPropia(f.clave, user.id))
+        .map((f) => deleteFromR2(f.clave).catch(() => {}))
+    )
     await supabase.from('lotes_recibidos').delete().eq('id', lote.id)
     return { error: 'El lote caducó (más de 24 h). Comparte de nuevo los archivos.' }
   }
@@ -78,28 +103,60 @@ export async function confirmarGuardado(params: {
   // Validar destino: la carpeta debe existir, ser visible (RLS) y concordar
   // el scope con su privacidad. Con carpeta null se guarda en la raíz del scope.
   if (params.carpetaDestinoId) {
+    if (!esUuidValido(params.carpetaDestinoId)) {
+      return { error: 'Carpeta de destino no válida.' }
+    }
     const { data: carpeta, error: carpetaError } = await supabase
       .from('carpetas')
-      .select('id, es_privada')
+      .select('id, es_privada, creado_por')
       .eq('id', params.carpetaDestinoId)
       .single()
     if (carpetaError || !carpeta) return { error: 'Carpeta de destino no válida.' }
     if ((params.scope === 'privado') !== carpeta.es_privada) {
       return { error: 'El destino no concuerda con el ámbito elegido.' }
     }
+    // La Caja fuerte es privada también para el admin: no se guarda en la de otro.
+    if (carpeta.es_privada && carpeta.creado_por !== user.id) {
+      return { error: 'No puedes guardar en una carpeta privada que no es tuya.' }
+    }
   }
 
-  const ficheros = parsearFicheros(lote.metadatos)
-  if (ficheros.length === 0) {
+  const todos = parsearFicheros(lote.metadatos)
+  if (todos.length === 0) {
     await supabase.from('lotes_recibidos').delete().eq('id', lote.id)
     return { error: 'El lote está vacío.' }
   }
 
+  const ficheros = todos.slice(0, MAX_FICHEROS_LOTE)
   let guardados = 0
   const pendientes: string[] = []
   let cupoLleno = false
+
+  // Un lote manipulado no puede traer más de 10 ficheros ni claves ajenas:
+  // solo se limpia el staging propio que no se va a guardar.
+  for (const sobrante of todos.slice(MAX_FICHEROS_LOTE)) {
+    if (keyDeStagingPropia(sobrante.clave, user.id)) pendientes.push(sobrante.clave)
+  }
+
   for (const fichero of ficheros) {
-    const destinoKey = buildR2Key({ userId: user.id, fileName: fichero.nombre, scope: params.scope })
+    // La clave debe estar bajo compartidos-pendientes/<uid>/: nunca se mueve
+    // ni se borra un objeto de otra persona aunque la fila lo indique.
+    if (!keyDeStagingPropia(fichero.clave, user.id)) continue
+
+    const tamano = await getR2ObjectSize(fichero.clave)
+    if (tamano === null) {
+      // No se pudo verificar (objeto ausente o R2 caído). No se borra: si era
+      // un fallo temporal, el fichero sigue en staging y no se pierde.
+      continue
+    }
+    if (tamano > MAX_FILE_SIZE) {
+      await deleteFromR2(fichero.clave).catch(() => {})
+      continue
+    }
+
+    const nombre = sanitizarNombreArchivo(fichero.nombre)
+    const tipo = normalizarTipoMime(fichero.tipo)
+    const destinoKey = buildR2Key({ userId: user.id, fileName: nombre, scope: params.scope })
     try {
       await moverEnR2(fichero.clave, destinoKey)
     } catch {
@@ -108,10 +165,10 @@ export async function confirmarGuardado(params: {
     }
 
     const { error: insertError } = await supabase.from('archivos').insert({
-      nombre_original: fichero.nombre,
+      nombre_original: nombre,
       ruta_r2: destinoKey,
-      tamano_bytes: fichero.tamano,
-      tipo_mime: fichero.tipo,
+      tamano_bytes: tamano,
+      tipo_mime: tipo,
       carpeta_id: params.carpetaDestinoId,
       subido_por: user.id,
       estado: 'activo',

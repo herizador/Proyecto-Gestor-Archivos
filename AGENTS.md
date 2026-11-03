@@ -32,6 +32,16 @@ npm run lint     # ESLint (sin prettier/biome)
 - Expiraciones: subida 300 s, vista/descarga 900 s. Vista = `inline` (`getPresignedViewUrl`), descarga = `attachment; filename="..."` (`getPresignedDownloadUrl`).
 - **Bloqueo de LaLiga a IPs de Cloudflare**: durante las ventanas de partidos, algunos operadores españoles bloquean un conjunto de IPs de Cloudflare y R2 deja de responder. Síntomas: `ERR_CERT_AUTHORITY_INVALID`, `Failed to fetch` al subir, `No 'Access-Control-Allow-Origin'` (la respuesta es la página de bloqueo, no R2) y la nota del Juzgado Mercantil nº 6 al abrir un archivo. **No es un fallo de CORS ni de la app**: comprobar con `npm run r2:diagnostico` (`Server: nginx` + HTML = bloqueo; R2 real = `Server: cloudflare` + XML). Detalle y salidas en `docs/guias/incidencias-r2.md`. El endpoint EU no sirve para buckets de jurisdicción normal (`AccessDenied`).
 
+## Seguridad de archivos (2026-11)
+- Detalle completo en `docs/seguridad/auditoria-2026-11.md`; la migración `supabase/migraciones/seguridad-2026-11.sql` **se aplica a mano** en Supabase → SQL Editor y es idempotente.
+- Toda key de R2 debe pertenecer a `comun/<archivo>` o `usuarios/<uid>/publico|privado/<archivo>`; el staging solo vive en `compartidos-pendientes/<uid>/<archivo>`. Usar `keyPerteneceAUsuario()`, `keyDeStagingPropia()` y `keyValidaParaFila()` (`lib/archivos-seguros.ts`) antes de firmar, mover o borrar.
+- Nombres y MIME se sanean siempre (`sanitizarNombreArchivo`, `normalizarTipoMime`). Inline solo tipos seguros (imágenes sin SVG, PDF, texto/CSV/JSON, audio y vídeo); HTML/SVG/XML/JS se descargan como binario.
+- El tamaño que manda es el real de R2 (`HeadObject`), no el declarado por el cliente. La URL de subida firma `Content-Length`.
+- La Caja fuerte es privada **también para el admin**: ninguna acción de servidor, policy o Worker debe permitir leer/mover/borrar/publicar contenido privado ajeno.
+- La auditoría se escribe solo con la RPC `registrar_actividad()`; nunca insertar en `historial_actividad` desde el cliente.
+- Enlaces compartidos: lectura con service-role validando token, expiración, UUIDs y `esCompartible()` (del creador o de ámbito no privado). No volver a abrir un SELECT público de `enlaces_compartidos`.
+- No añadir `alert`/`confirm` nativos; usar `avisar()`/`confirmar()`.
+
 ## Visualizar vs descargar
 - `FileCard.tsx`: visualizar abre `<a target="_blank">` con URL `inline`; descargar usa atributo `download`. No unificar: `/compartir` reutiliza el motor de vista.
 - Auditoría: `visualizarArchivo` → `VISUALIZAR_ARCHIVO`, `descargarArchivo` → `DESCARGAR_ARCHIVO`, `generarEnlaceCompartido` → `COMPARTIR_ENLACE`. Todo vía `logActivity()` (`actions/storage.ts`), nunca insert directo desde cliente.

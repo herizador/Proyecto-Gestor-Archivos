@@ -4,7 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import { logActivity } from '@/actions/storage'
 import type { Carpeta } from '@/types/database'
 import { esColorCarpeta, COLOR_POR_DEFECTO } from '@/lib/colores-carpetas'
+import { esUuidValido, sanitizarNombreArchivo } from '@/lib/archivos-seguros'
 import { revalidatePath } from 'next/cache'
+
+const MAX_NOMBRE_CARPETA = 100
 
 export async function crearCarpeta(params: {
   nombre: string
@@ -12,50 +15,68 @@ export async function crearCarpeta(params: {
   carpetaPadreId: string | null
   color?: string
 }) {
+  const nombre = sanitizarNombreArchivo(params.nombre, MAX_NOMBRE_CARPETA)
+  if (!nombre.trim()) return { error: 'El nombre de la carpeta no es válido.' }
+
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
 
   // El padre debe existir y ser visible (RLS); si no, el insert quedaría huérfano
-  if (params.carpetaPadreId) {
+  let esPrivada = params.esPrivada === true
+  if (params.carpetaPadreId !== null) {
+    if (!esUuidValido(params.carpetaPadreId)) {
+      return { error: 'Carpeta padre no válida.' }
+    }
     const { data: padre, error: padreError } = await supabase
       .from('carpetas')
-      .select('id')
+      .select('id, es_privada')
       .eq('id', params.carpetaPadreId)
       .single()
     if (padreError || !padre) return { error: 'Carpeta padre no válida.' }
+    // La privacidad se hereda: una carpeta pública dentro de una privada
+    // expondría todo su contenido a la familia.
+    if (padre.es_privada) esPrivada = true
   }
 
   const color = esColorCarpeta(params.color) ? params.color : COLOR_POR_DEFECTO
-  const { error } = await supabase.from('carpetas').insert({
-    nombre: params.nombre,
-    creado_por: user.id,
-    es_privada: params.esPrivada,
-    carpeta_padre_id: params.carpetaPadreId,
-    color,
-  })
+  const { data: creada, error } = await supabase
+    .from('carpetas')
+    .insert({
+      nombre,
+      creado_por: user.id,
+      es_privada: esPrivada,
+      carpeta_padre_id: params.carpetaPadreId,
+      color,
+    })
+    .select('id')
+    .single()
 
-  if (error) {
+  if (error || !creada) {
     // Compatibilidad: si la columna color aún no existe en la BD (migración
     // pendiente), se reintenta sin ella en vez de romper la creación
-    if (/color/i.test(error.message)) {
-      const { error: error2 } = await supabase.from('carpetas').insert({
-        nombre: params.nombre,
-        creado_por: user.id,
-        es_privada: params.esPrivada,
-        carpeta_padre_id: params.carpetaPadreId,
-      })
-      if (error2) return { error: error2.message }
+    if (/color/i.test(error?.message ?? '')) {
+      const { data: creada2, error: error2 } = await supabase
+        .from('carpetas')
+        .insert({
+          nombre,
+          creado_por: user.id,
+          es_privada: esPrivada,
+          carpeta_padre_id: params.carpetaPadreId,
+        })
+        .select('id')
+        .single()
+      if (error2 || !creada2) return { error: 'No se pudo crear la carpeta.' }
     } else {
-      return { error: error.message }
+      return { error: 'No se pudo crear la carpeta.' }
     }
   }
 
   await logActivity({
     accion: 'CREAR_CARPETA',
     detalles: {
-      nombre: params.nombre,
-      es_privada: params.esPrivada,
+      nombre,
+      es_privada: esPrivada,
       carpeta_padre_id: params.carpetaPadreId,
     },
   })
@@ -70,9 +91,10 @@ export async function crearCarpeta(params: {
 // Renombrar carpeta (solo cambia el nombre visible)
 // ---------------------------------------------------------------------------
 export async function renombrarCarpeta(carpetaId: string, nombre: string) {
-  const limpio = nombre.trim()
-  if (!limpio) return { error: 'El nombre no puede estar vacío.' }
-  if (limpio.length > 100) return { error: 'Máximo 100 caracteres.' }
+  if (!esUuidValido(carpetaId)) return { error: 'Carpeta no encontrada o sin permisos.' }
+  if (!String(nombre ?? '').trim()) return { error: 'El nombre no puede estar vacío.' }
+  const limpio = sanitizarNombreArchivo(nombre, MAX_NOMBRE_CARPETA)
+  if (!limpio) return { error: 'El nombre no es válido.' }
 
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -80,19 +102,29 @@ export async function renombrarCarpeta(carpetaId: string, nombre: string) {
 
   const { data: carpeta } = await supabase
     .from('carpetas')
-    .select('id, nombre, creado_por')
+    .select('id, nombre, creado_por, es_privada')
     .eq('id', carpetaId)
     .single()
   if (!carpeta) return { error: 'Carpeta no encontrada o sin permisos.' }
 
   const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single()
-  if (carpeta.creado_por !== user.id && perfil?.rol !== 'admin') {
-    return { error: 'Sin permiso para renombrar esta carpeta.' }
+  const isAdmin = perfil?.rol === 'admin'
+  if (carpeta.creado_por !== user.id) {
+    // La Caja fuerte es privada también para el administrador.
+    if (!isAdmin || carpeta.es_privada) {
+      return { error: 'Sin permiso para renombrar esta carpeta.' }
+    }
   }
   if (carpeta.nombre === limpio) return { success: true }
 
-  const { error } = await supabase.from('carpetas').update({ nombre: limpio }).eq('id', carpetaId)
-  if (error) return { error: error.message }
+  const { data: actualizadas, error } = await supabase
+    .from('carpetas')
+    .update({ nombre: limpio })
+    .eq('id', carpetaId)
+    .select('id')
+  if (error || !actualizadas || actualizadas.length === 0) {
+    return { error: 'No se pudo renombrar la carpeta.' }
+  }
 
   await logActivity({
     accion: 'RENOMBRAR_CARPETA',
@@ -109,6 +141,7 @@ export async function renombrarCarpeta(carpetaId: string, nombre: string) {
 // Cambiar el color de una carpeta (cosmético, sin auditoría)
 // ---------------------------------------------------------------------------
 export async function cambiarColorCarpeta(carpetaId: string, color: string) {
+  if (!esUuidValido(carpetaId)) return { error: 'Carpeta no encontrada o sin permisos.' }
   if (!esColorCarpeta(color)) return { error: 'Color no válido.' }
 
   const supabase = await createClient()
@@ -117,22 +150,27 @@ export async function cambiarColorCarpeta(carpetaId: string, color: string) {
 
   const { data: carpeta } = await supabase
     .from('carpetas')
-    .select('id, creado_por')
+    .select('id, creado_por, es_privada')
     .eq('id', carpetaId)
     .single()
   if (!carpeta) return { error: 'Carpeta no encontrada o sin permisos.' }
 
   const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single()
-  if (carpeta.creado_por !== user.id && perfil?.rol !== 'admin') {
+  const isAdmin = perfil?.rol === 'admin'
+  if (carpeta.creado_por !== user.id && (!isAdmin || carpeta.es_privada)) {
     return { error: 'Sin permiso para editar esta carpeta.' }
   }
 
-  const { error } = await supabase.from('carpetas').update({ color }).eq('id', carpetaId)
-  if (error) {
-    if (/color/i.test(error.message)) {
+  const { data: actualizadas, error } = await supabase
+    .from('carpetas')
+    .update({ color })
+    .eq('id', carpetaId)
+    .select('id')
+  if (error || !actualizadas || actualizadas.length === 0) {
+    if (/color/i.test(error?.message ?? '')) {
       return { error: 'Falta aplicar la migración de color en la base de datos.' }
     }
-    return { error: error.message }
+    return { error: 'No se pudo cambiar el color de la carpeta.' }
   }
 
   revalidatePath('/')
@@ -142,14 +180,42 @@ export async function cambiarColorCarpeta(carpetaId: string, color: string) {
 }
 
 export async function eliminarCarpeta(carpetaId: string) {
+  if (!esUuidValido(carpetaId)) return { error: 'Carpeta no encontrada o sin permisos.' }
+
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
 
-  const { error } = await supabase.from('carpetas').delete().eq('id', carpetaId)
-  if (error) return { error: error.message }
+  const { data: carpeta } = await supabase
+    .from('carpetas')
+    .select('id, nombre, creado_por, es_privada')
+    .eq('id', carpetaId)
+    .single()
+  if (!carpeta) return { error: 'Carpeta no encontrada o sin permisos.' }
+
+  const { data: perfil } = await supabase.from('perfiles').select('rol').eq('id', user.id).single()
+  const isAdmin = perfil?.rol === 'admin'
+  if (carpeta.creado_por !== user.id && (!isAdmin || carpeta.es_privada)) {
+    return { error: 'Sin permiso para eliminar esta carpeta.' }
+  }
+
+  const { data: borradas, error } = await supabase
+    .from('carpetas')
+    .delete()
+    .eq('id', carpetaId)
+    .select('id')
+  if (error || !borradas || borradas.length === 0) {
+    return { error: 'No se pudo eliminar la carpeta.' }
+  }
+
+  await logActivity({
+    accion: 'ELIMINAR_CARPETA',
+    detalles: { carpeta_id: carpetaId, nombre: carpeta.nombre, es_privada: carpeta.es_privada },
+  })
 
   revalidatePath('/')
+  revalidatePath('/familia')
+  revalidatePath('/mi-caja-fuerte')
   return { success: true }
 }
 
@@ -157,7 +223,7 @@ export async function eliminarCarpeta(carpetaId: string) {
 // Búsqueda de carpetas visibles por nombre (para la paleta ⌘K)
 // ---------------------------------------------------------------------------
 export async function buscarCarpetas(termino: string) {
-  const trimmed = termino.trim()
+  const trimmed = String(termino ?? '').trim().slice(0, MAX_NOMBRE_CARPETA)
   if (!trimmed) return { data: [] as Carpeta[] }
 
   const supabase = await createClient()

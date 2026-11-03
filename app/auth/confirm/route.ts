@@ -7,6 +7,16 @@ import { crearServiceClient } from '@/lib/supabase/service'
 const TIPOS_VALIDOS: EmailOtpType[] = ['signup', 'invite', 'magiclink', 'recovery', 'email_change', 'email']
 const RECLAMO_MINUTOS = 30
 
+// `next` solo puede ser una ruta interna. Se rechazan `//host`, `/\host`,
+// barras invertidas y caracteres de control (open redirect / header splitting).
+function rutaInternaSegura(pedido: string | null): string {
+  if (!pedido) return '/'
+  if (!pedido.startsWith('/')) return '/'
+  if (pedido.startsWith('//') || pedido.includes('\\')) return '/'
+  if (/[\u0000-\u001f\u007f]/.test(pedido)) return '/'
+  return pedido
+}
+
 // Intercambia el token del email por acceso.
 // - type=invite: el enlace SOLO autoriza a definir la contraseña (nunca a
 //   navegar). Se canjea el OTP, se cierra la sesión de inmediato y se emite un
@@ -17,7 +27,7 @@ export async function GET(request: NextRequest) {
   const token_hash = params.get('token_hash')
   const type = params.get('type')
   const pedido = params.get('next') ?? '/'
-  const next = pedido.startsWith('/') && !pedido.startsWith('//') ? pedido : '/'
+  const next = rutaInternaSegura(pedido)
 
   if (token_hash && type && (TIPOS_VALIDOS as string[]).includes(type)) {
     if (type === 'invite') {

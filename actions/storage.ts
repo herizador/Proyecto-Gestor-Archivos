@@ -11,11 +11,13 @@ export async function logActivity(params: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
-  await supabase.from('historial_actividad').insert({
-    usuario_id: user.id,
-    accion: params.accion,
-    detalles: params.detalles ?? null,
+  // RPC SECURITY DEFINER: la tabla solo acepta inserciones de triggers y de
+  // esta función. El usuario no puede escribir filas de auditoría a mano.
+  const { error } = await supabase.rpc('registrar_actividad', {
+    p_accion: params.accion,
+    p_detalles: params.detalles ?? null,
   })
+  if (error) console.error('[auditoría] no se pudo registrar:', error.message)
 }
 
 export async function logLogin() {

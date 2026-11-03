@@ -2,6 +2,7 @@
 
 import { createHash, randomBytes } from 'node:crypto'
 import { createClient } from '@/lib/supabase/server'
+import { esUuidValido } from '@/lib/archivos-seguros'
 import { revalidatePath } from 'next/cache'
 
 export type TokenDavVisible = {
@@ -47,7 +48,10 @@ export async function crearTokenDav(nombre: string) {
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
 
-  const limpio = nombre.trim().slice(0, 60)
+  const limpio = String(nombre ?? '')
+    .replace(/[\u0000-\u001f\u007f"<>|]/g, '')
+    .trim()
+    .slice(0, 60)
   if (!limpio) return { error: 'Ponle un nombre (p. ej. "Portátil trabajo").' }
 
   // 256 bits en hex; el hash es lo único que se guarda
@@ -59,31 +63,47 @@ export async function crearTokenDav(nombre: string) {
     .insert({ usuario_id: user.id, nombre: limpio, token_hash: tokenHash })
     .select('id, nombre, fecha_creacion')
     .single()
-  if (error || !data) return { error: error?.message ?? 'No se pudo crear el token.' }
+  if (error || !data) return { error: 'No se pudo crear el token.' }
 
   revalidatePath('/ajustes')
   return { success: true, token, id: data.id as string }
 }
 
 export async function revocarTokenDav(id: string) {
+  if (!esUuidValido(id)) return { error: 'Token no encontrado o sin permisos.' }
+
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
 
-  const { error } = await supabase.from('tokens_dav').update({ revocado: true }).eq('id', id)
-  if (error) return { error: error.message }
+  const { data: actualizados, error } = await supabase
+    .from('tokens_dav')
+    .update({ revocado: true })
+    .eq('id', id)
+    .select('id')
+  if (error || !actualizados || actualizados.length === 0) {
+    return { error: 'No se pudo revocar el token.' }
+  }
 
   revalidatePath('/ajustes')
   return { success: true }
 }
 
 export async function eliminarTokenDav(id: string) {
+  if (!esUuidValido(id)) return { error: 'Token no encontrado o sin permisos.' }
+
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
 
-  const { error } = await supabase.from('tokens_dav').delete().eq('id', id)
-  if (error) return { error: error.message }
+  const { data: borrados, error } = await supabase
+    .from('tokens_dav')
+    .delete()
+    .eq('id', id)
+    .select('id')
+  if (error || !borrados || borrados.length === 0) {
+    return { error: 'No se pudo eliminar el token.' }
+  }
 
   revalidatePath('/ajustes')
   return { success: true }

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { buildR2Key, moverEnR2 } from '@/lib/r2/client'
+import { esUuidValido, keyValidaParaFila } from '@/lib/archivos-seguros'
 import { logActivity } from '@/actions/storage'
 import type { ObjetivoEnlace } from '@/actions/accesos'
 import { revalidatePath } from 'next/cache'
@@ -43,15 +44,22 @@ export async function moverElementosBatch(params: {
   // Destino: debe existir, ser visible (RLS) y concordar con el ámbito elegido
   let destinoEsPrivada: boolean | null = null
   if (params.destinoCarpetaId) {
+    if (!esUuidValido(params.destinoCarpetaId)) {
+      return { error: 'Carpeta de destino no válida.' }
+    }
     const { data: destino, error: destError } = await supabase
       .from('carpetas')
-      .select('id, es_privada')
+      .select('id, es_privada, creado_por')
       .eq('id', params.destinoCarpetaId)
       .single()
     if (destError || !destino) return { error: 'Carpeta de destino no válida.' }
     destinoEsPrivada = destino.es_privada
     if ((params.scope === 'privado') !== destino.es_privada) {
       return { error: 'El destino no concuerda con el ámbito elegido.' }
+    }
+    // No se escribe dentro de una carpeta privada ajena, ni siquiera compartida.
+    if (destino.es_privada && destino.creado_por !== user.id) {
+      return { error: 'No puedes mover contenido a una carpeta privada que no es tuya.' }
     }
   }
 
@@ -88,6 +96,7 @@ async function moverArchivo(
   destinoCarpetaId: string | null,
   scope: Scope
 ): Promise<'ok' | 'omitido' | string> {
+  if (!esUuidValido(archivoId)) return 'Archivo no encontrado o sin permisos.'
   const { data: archivo } = await supabase
     .from('archivos')
     .select('id, nombre_original, ruta_r2, carpeta_id, subido_por, estado')
@@ -96,10 +105,28 @@ async function moverArchivo(
   if (!archivo) return 'Archivo no encontrado o sin permisos.'
   if (archivo.subido_por !== userId && !isAdmin) return 'Sin permiso para mover este archivo.'
   if (archivo.estado !== 'activo') return 'Solo se pueden mover archivos activos.'
+
+  // Un admin puede reubicar contenido público, pero nunca llevarlo a un ámbito
+  // privado: los bytes seguirían siendo del dueño original.
+  if (archivo.subido_por !== userId && scope === 'privado') {
+    return 'Solo el dueño puede mover un archivo a un ámbito privado.'
+  }
+
+  // La key debe pertenecer al dueño de la fila. Sin esta comprobación, una fila
+  // manipulada podría usar Copy+Delete para mover bytes privados ajenos.
+  if (!keyValidaParaFila(archivo.ruta_r2, archivo.subido_por)) {
+    return 'Ruta de almacenamiento no válida.'
+  }
   if ((archivo.carpeta_id ?? null) === destinoCarpetaId) return 'omitido'
 
   const scopeKey = scopeDeKey(archivo.ruta_r2)
   if (!scopeKey) return 'Ruta de almacenamiento no válida.'
+
+  // La Caja fuerte es privada también para el administrador: nadie más puede
+  // sacar de ahí los bytes de otra persona.
+  if (scopeKey === 'privado' && archivo.subido_por !== userId) {
+    return 'Solo el dueño puede mover un archivo de su Caja fuerte.'
+  }
 
   if (scopeKey !== scope && scopeKey !== 'publico') {
     // Cambio de ámbito: los bytes se mudan a una key del ámbito destino
@@ -109,23 +136,27 @@ async function moverArchivo(
     } catch {
       return `No se pudo trasladar «${nombre}» en el almacenamiento.`
     }
-    const { error: upError } = await supabase
+    const { data: actualizados, error: upError } = await supabase
       .from('archivos')
       .update({ ruta_r2: nuevaKey, carpeta_id: destinoCarpetaId })
       .eq('id', archivoId)
-    if (upError) {
+      .select('id')
+    if (upError || !actualizados || actualizados.length === 0) {
       // Reversión best-effort: devolver los bytes a su key original
       await moverEnR2(nuevaKey, archivo.ruta_r2).catch(() => {})
-      return upError.message
+      return 'No se pudo actualizar la ubicación del archivo.'
     }
   } else if (scopeKey === 'publico' && scope !== 'comun') {
     return 'Este archivo heredado (ámbito público) solo puede moverse al Área común.'
   } else {
-    const { error: upError } = await supabase
+    const { data: actualizados, error: upError } = await supabase
       .from('archivos')
       .update({ carpeta_id: destinoCarpetaId })
       .eq('id', archivoId)
-    if (upError) return upError.message
+      .select('id')
+    if (upError || !actualizados || actualizados.length === 0) {
+      return 'No se pudo mover el archivo.'
+    }
   }
 
   await logActivity({
@@ -144,6 +175,7 @@ async function moverCarpeta(
   scope: Scope,
   destinoEsPrivada: boolean | null
 ): Promise<'ok' | 'omitido' | string> {
+  if (!esUuidValido(carpetaId)) return 'Carpeta no encontrada o sin permisos.'
   const { data: carpeta } = await supabase
     .from('carpetas')
     .select('id, es_privada, carpeta_padre_id, creado_por')
@@ -151,6 +183,10 @@ async function moverCarpeta(
     .single()
   if (!carpeta) return 'Carpeta no encontrada o sin permisos.'
   if (carpeta.creado_por !== userId && !isAdmin) return 'Sin permiso para mover esta carpeta.'
+  // La Caja fuerte es privada también para el administrador.
+  if (carpeta.es_privada && carpeta.creado_por !== userId) {
+    return 'Solo el dueño puede mover una carpeta de su Caja fuerte.'
+  }
   if ((carpeta.carpeta_padre_id ?? null) === destinoCarpetaId) return 'omitido'
   if (destinoCarpetaId === carpetaId) return 'Una carpeta no puede moverse dentro de sí misma.'
 
@@ -173,11 +209,14 @@ async function moverCarpeta(
     cursor = padre?.carpeta_padre_id ?? null
   }
 
-  const { error: upError } = await supabase
+  const { data: actualizadas, error: upError } = await supabase
     .from('carpetas')
     .update({ carpeta_padre_id: destinoCarpetaId })
     .eq('id', carpetaId)
-  if (upError) return upError.message
+    .select('id')
+  if (upError || !actualizadas || actualizadas.length === 0) {
+    return 'No se pudo mover la carpeta.'
+  }
 
   await logActivity({
     accion: 'MOVER',

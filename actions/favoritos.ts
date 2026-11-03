@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { esUuidValido } from '@/lib/archivos-seguros'
 import { revalidatePath } from 'next/cache'
 import type { ArchivoConAutor, Carpeta } from '@/types/database'
 
@@ -27,9 +28,17 @@ export async function listarIdsFavoritos(): Promise<string[]> {
 }
 
 export async function alternarFavorito(params: { tipo: 'archivo' | 'carpeta'; id: string }) {
+  if (!esUuidValido(params.id)) return { error: 'Elemento no válido.' }
+
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
   if (authError || !user) return { error: 'No autenticado.' }
+
+  // Solo se marca lo que el usuario puede ver (RLS): un UUID ajeno no entra.
+  const { data: visible } = params.tipo === 'archivo'
+    ? await supabase.from('archivos').select('id').eq('id', params.id).maybeSingle()
+    : await supabase.from('carpetas').select('id').eq('id', params.id).maybeSingle()
+  if (!visible) return { error: 'Elemento no encontrado o sin permisos.' }
 
   const campo = params.tipo === 'archivo' ? 'archivo_id' : 'carpeta_id'
   const { data: existente } = await supabase
@@ -40,15 +49,21 @@ export async function alternarFavorito(params: { tipo: 'archivo' | 'carpeta'; id
     .maybeSingle()
 
   if (existente) {
-    const { error } = await supabase.from('favoritos').delete().eq('id', existente.id)
-    if (error) return { error: error.message }
+    const { data: borrados, error } = await supabase
+      .from('favoritos')
+      .delete()
+      .eq('id', existente.id)
+      .select('id')
+    if (error || !borrados || borrados.length === 0) {
+      return { error: 'No se pudo quitar de favoritos.' }
+    }
   } else {
     const { error } = await supabase.from('favoritos').insert({
       usuario_id: user.id,
       archivo_id: params.tipo === 'archivo' ? params.id : null,
       carpeta_id: params.tipo === 'carpeta' ? params.id : null,
     })
-    if (error) return { error: error.message }
+    if (error) return { error: 'No se pudo añadir a favoritos.' }
   }
 
   revalidatePath('/favoritos')

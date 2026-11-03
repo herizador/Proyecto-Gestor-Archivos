@@ -30,7 +30,7 @@ export default function UploadModal({
 
     try {
       // 1. Pedir URL pre-firmada al servidor
-      const { uploadUrl, key, error: urlError } = await getUploadUrl({
+      const { uploadUrl, key, contentType: tipoFirmado, error: urlError } = await getUploadUrl({
         fileName: file.name,
         contentType,
         fileSize: file.size,
@@ -49,7 +49,7 @@ export default function UploadModal({
         r2Response = await fetch(uploadUrl, {
           method: 'PUT',
           body: file,
-          headers: { 'Content-Type': contentType },
+          headers: { 'Content-Type': tipoFirmado ?? contentType },
           credentials: 'omit',
         })
       } catch {
@@ -71,7 +71,7 @@ export default function UploadModal({
         nombreOriginal: file.name,
         rutaR2: key,
         tamanoBytes: file.size,
-        tipoMime: contentType,
+        tipoMime: tipoFirmado ?? contentType,
         carpetaId,
       })
 

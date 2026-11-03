@@ -7,12 +7,15 @@ import { cookies } from 'next/headers'
 import { logLogin } from './storage' // Usamos logLogin que ya creamos
 
 export async function login(formData: FormData) {
-  const email = formData.get('email') as string
-  const password = formData.get('password') as string
+  const email = String(formData.get('email') ?? '').trim().toLowerCase()
+  const password = String(formData.get('password') ?? '')
   const recordar = formData.get('recordar') === 'on'
 
   if (!email || !password) {
     return { error: 'Email y contraseña son obligatorios.' }
+  }
+  if (email.length > 254 || password.length > 200) {
+    return { error: 'Email o contraseña incorrectos.' }
   }
 
   // Sin "Recordar este dispositivo" la sesión se emite como cookie de sesión:
@@ -25,7 +28,9 @@ export async function login(formData: FormData) {
   })
 
   if (error) {
-    return { error: error.message }
+    // Mensaje genérico: no se revela si el correo existe o si la contraseña
+    // es incorrecta.
+    return { error: 'Email o contraseña incorrectos.' }
   }
 
   // Marca de preferencia (sin secretos). El middleware la lee para no devolver
@@ -64,6 +69,9 @@ export async function definirPasswordInvitacion(password: string) {
   if (!password || password.length < 8) {
     return { error: 'La contraseña debe tener al menos 8 caracteres.' }
   }
+  if (password.length > 200) {
+    return { error: 'La contraseña es demasiado larga.' }
+  }
 
   const servicio = crearServiceClient()
   if (!servicio) return { error: 'Servicio no configurado.' }
@@ -88,7 +96,7 @@ export async function definirPasswordInvitacion(password: string) {
   if (userError || !user?.email) return { error: 'Cuenta no válida. Pide otra invitación.' }
 
   const { error: passError } = await servicio.auth.admin.updateUserById(reclamo.usuario_id, { password })
-  if (passError) return { error: passError.message }
+  if (passError) return { error: 'No se pudo establecer la contraseña. Inténtalo de nuevo.' }
 
   await servicio.from('invitaciones_pendientes').update({ usada: true }).eq('id', reclamo.id)
   jar.set('inv_claim', '', { maxAge: 0, path: '/' })
