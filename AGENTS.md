@@ -47,7 +47,7 @@ npm run lint     # ESLint (sin prettier/biome)
 - Auditoría: `visualizarArchivo` → `VISUALIZAR_ARCHIVO`, `descargarArchivo` → `DESCARGAR_ARCHIVO`, `generarEnlaceCompartido` → `COMPARTIR_ENLACE`. Todo vía `logActivity()` (`actions/storage.ts`), nunca insert directo desde cliente.
 
 ## Caché / PWA (pantallas congeladas en móvil)
-- `public/sw.js` (`CACHE_NAME = 'gestor-familiar-v6'`) es **network-first** con fallback a caché solo sin red, y el evento `activate` borra cachés viejas + `clients.claim()`. Solo cachea `/` y `/manifest.json`: **no cachear rutas del dashboard ni URLs firmadas**.
+- `public/sw.js` (`CACHE_NAME = 'gestor-familiar-v7'`) es **network-first** con fallback a caché solo sin red, y el evento `activate` borra cachés viejas + `clients.claim()`. Solo precachea `/manifest.json`, `/favicon.ico` e iconos: **no cachear HTML ni rutas del dashboard ni URLs firmadas**. Antes se cacheaba `/`, que redirige a `/login`: offline servía la pantalla de login y parecía que la app estaba congelada. El fallback sin red es una página propia con cabecera `x-sw-offline: 1` (así se distingue de un `503` real del servidor).
 - Al desplegar un cambio que afecte al SW, **sube la versión de `CACHE_NAME`** o los móviles seguirán con la vieja.
 - `next.config.ts` inyecta `Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate` + `Pragma: no-cache` + `Expires: 0` en rutas dinámicas, **excluyendo** `/_next/static|_next/image|icons` (pisarlos obligaba a re-descargar JS/CSS en cada navegación). No añadir caché HTTP a vistas dinámicas.
 

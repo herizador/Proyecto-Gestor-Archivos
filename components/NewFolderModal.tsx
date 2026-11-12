@@ -37,25 +37,31 @@ export default function NewFolderModal({
     setLoading(true)
     setError(null)
 
-    const result = await crearCarpeta({
-      nombre: trimmed,
-      esPrivada,
-      carpetaPadreId,
-      color,
-    })
+    try {
+      const result = await crearCarpeta({
+        nombre: trimmed,
+        esPrivada,
+        carpetaPadreId,
+        color,
+      })
 
-    setLoading(false)
+      if (result.error) {
+        setError(result.error)
+        return
+      }
 
-    if (result.error) {
-      setError(result.error)
-      return
+      setNombre('')
+      setEsPrivada(soloPrivada)
+      setColor(COLOR_POR_DEFECTO)
+      onClose()
+      router.refresh()
+    } catch {
+      // La acción puede rechazar (red caída, 503 de la plataforma). Sin esto el
+      // botón se quedaba girando para siempre y no se mostraba ningún error.
+      setError('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.')
+    } finally {
+      setLoading(false)
     }
-
-    setNombre('')
-    setEsPrivada(soloPrivada)
-    setColor(COLOR_POR_DEFECTO)
-    onClose()
-    router.refresh()
   }
 
   return (

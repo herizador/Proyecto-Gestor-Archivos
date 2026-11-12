@@ -10,7 +10,7 @@ Guía para no confundir un fallo de la app con un bloqueo de red.
 | `No 'Access-Control-Allow-Origin' header is present` en el `PUT` | La respuesta no viene de R2, sino de la página de bloqueo (que no pone cabeceras CORS). |
 | `Failed to fetch` al subir | El `PUT` a R2 no llega a destino: conexión cortada o página de bloqueo. |
 | Al abrir un archivo aparece la nota de la **Sentencia de 18/12/2024 (Juzgado Mercantil nº 6 de Barcelona)** | Página de bloqueo de LaLiga servida en lugar del archivo. |
-| `503` en `/todos` | Fallo puntual de Vercel (despliegue o plataforma). No está relacionado con R2. |
+| `503` en `/todos` | Casi siempre el **service worker** (sin red) o un fallo puntual de Vercel. No está relacionado con R2: míralo en §"503 en la propia app". |
 
 **Causa habitual:** LaLiga solicita a los operadores españoles bloquear un conjunto reducido de IPs de Cloudflare durante las jornadas. R2 vive en esas IPs, así que la app deja de poder firmar, subir y ver archivos aunque el código esté perfecto. El bloqueo suele ser **temporal** (ventana de partidos) y afecta solo a algunas redes.
 
@@ -38,6 +38,35 @@ node --env-file=.env.local scripts/r2.mjs diagnostico --escritura
 ```
 
 > El endpoint EU (`<cuenta>.eu.r2.cloudflarestorage.com`, IPs `141.101.90.x`) solo sirve buckets creados con jurisdicción EU. Un bucket normal responde `AccessDenied`; no es una salida sin migrar el bucket.
+
+## 503 en la propia app
+
+La app **nunca emite un 503**: solo hay dos fuentes posibles.
+
+1. **El service worker** (`public/sw.js`). Si el `fetch` falla (sin red, cambio de
+   WiFi a datos, conexión cortada), devuelve una página "Sin conexión" con
+   `status 503` y la cabecera **`x-sw-offline: 1`**. Es el caso habitual en móvil.
+   Solución: recuperar la conexión y pulsar *Reintentar*. Si se repite, es la red
+   del dispositivo, no la app.
+2. **Vercel/edge.** En ese caso la respuesta trae `x-vercel-error`
+   (`DEPLOYMENT_PAUSED`, `FUNCTION_THROTTLED`, `NO_RESPONSE`…). Solución:
+   Deployments → ⋯ → **Redeploy**. Si sigue, revisar los Runtime Logs.
+
+Cómo distinguirlos en 10 segundos:
+
+```js
+// En la consola del navegador, con la pestaña en la app
+fetch(location.href, { cache: 'no-store' })
+  .then(r => console.log(r.status, r.headers.get('x-sw-offline'), r.headers.get('x-vercel-error')))
+```
+
+- `x-sw-offline: 1` → service worker, problema de red.
+- `x-vercel-error` presente → plataforma.
+- `200` → el documento está bien; el fallo era puntual.
+
+Comprobación desde fuera (sin sesión): `/login`, `/compartir`, `/recibir`,
+`/establecer-password` deben dar `200`, y `/` debe dar `307` hacia `/login`. Un
+`503` ahí sí sería plataforma.
 
 ## Qué hacer
 
