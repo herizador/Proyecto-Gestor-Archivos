@@ -40,39 +40,38 @@ export async function crearCarpeta(params: {
   }
 
   const color = esColorCarpeta(params.color) ? params.color : COLOR_POR_DEFECTO
-  const { data: creada, error } = await supabase
-    .from('carpetas')
-    .insert({
-      nombre,
-      creado_por: user.id,
-      es_privada: esPrivada,
-      carpeta_padre_id: params.carpetaPadreId,
-      color,
-    })
-    .select('id')
-    .single()
 
-  if (error || !creada) {
-    console.error('[crearCarpeta] insert falló:', error?.code, error?.message)
+  // NUNCA encadenar .select() a este insert. El RETURNING de un INSERT vuelve a
+  // evaluar la policy SELECT de `carpetas`, y `carpeta_visible_para()` es STABLE:
+  // lee la tabla con el snapshot de la sentencia y no puede ver la fila que se
+  // acaba de insertar, así que devuelve FALSE y Postgres aborta con
+  //   42501: new row violates row-level security policy for table "carpetas"
+  // (por eso subir archivos sí funcionaba: `registrarArchivo` inserta sin RETURNING).
+  const { error } = await supabase.from('carpetas').insert({
+    nombre,
+    creado_por: user.id,
+    es_privada: esPrivada,
+    carpeta_padre_id: params.carpetaPadreId,
+    color,
+  })
+
+  if (error) {
+    console.error('[crearCarpeta] insert falló:', error.code, error.message)
     // Compatibilidad: si la columna color aún no existe en la BD (migración
     // pendiente), se reintenta sin ella en vez de romper la creación
-    if (/color/i.test(error?.message ?? '')) {
-      const { data: creada2, error: error2 } = await supabase
-        .from('carpetas')
-        .insert({
-          nombre,
-          creado_por: user.id,
-          es_privada: esPrivada,
-          carpeta_padre_id: params.carpetaPadreId,
-        })
-        .select('id')
-        .single()
-      if (error2 || !creada2) {
-        console.error('[crearCarpeta] reintento sin color falló:', error2?.code, error2?.message)
-        return { error: `No se pudo crear la carpeta (${error2?.code ?? 'sin código'}: ${error2?.message ?? 'sin detalle'}).` }
+    if (/color/i.test(error.message)) {
+      const { error: error2 } = await supabase.from('carpetas').insert({
+        nombre,
+        creado_por: user.id,
+        es_privada: esPrivada,
+        carpeta_padre_id: params.carpetaPadreId,
+      })
+      if (error2) {
+        console.error('[crearCarpeta] reintento sin color falló:', error2.code, error2.message)
+        return { error: `No se pudo crear la carpeta (${error2.code ?? 'sin código'}: ${error2.message}).` }
       }
     } else {
-      return { error: `No se pudo crear la carpeta (${error?.code ?? 'sin código'}: ${error?.message ?? 'sin detalle'}).` }
+      return { error: `No se pudo crear la carpeta (${error.code ?? 'sin código'}: ${error.message}).` }
     }
   }
 

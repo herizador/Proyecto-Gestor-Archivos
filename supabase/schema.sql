@@ -288,9 +288,13 @@ ALTER TABLE public.carpetas ENABLE ROW LEVEL SECURITY;
 
 -- Ver: pública, propia, compartida conmigo o con un ancestro visible (herencia).
 -- Sin bypass de admin: «Mi caja fuerte» es privada también para el administrador.
+-- `creado_por = auth.uid()` es redundante para la lectura, pero imprescindible
+-- para el RETURNING de un INSERT: ahí la fila nueva aún no existe para
+-- carpeta_visible_para() (STABLE) y el INSERT fallaría con 42501.
 CREATE POLICY "carpetas_select" ON public.carpetas
   FOR SELECT USING (
-    public.carpeta_visible_para(auth.uid(), carpetas.id)
+    creado_por = auth.uid()
+    OR public.carpeta_visible_para(auth.uid(), carpetas.id)
   );
 
 -- Crear: cualquier usuario autenticado, pero el padre debe ser visible (RLS) y

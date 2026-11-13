@@ -147,3 +147,30 @@ que no se aplica.
 - `next.config.ts`: cabeceras de seguridad.
 - `supabase/schema.sql` y `supabase/migraciones/seguridad-2026-11.sql`: RLS,
   triggers y auditoría.
+
+## Lección: INSERT … RETURNING y RLS
+
+El endurecimiento añadió `.select('id')` al insert de `crearCarpeta` para
+"confirmar" que la fila se había creado. Eso rompió la creación de carpetas con
+`42501: new row violates row-level security policy for table "carpetas"`,
+mientras subir archivos seguía funcionando.
+
+**Por qué:** el `RETURNING` de un `INSERT` vuelve a evaluar la policy `SELECT`.
+`carpeta_visible_para(auth.uid(), carpetas.id)` es `STABLE` y `SECURITY DEFINER`:
+consulta la tabla con el snapshot de la sentencia y **no ve la fila que se acaba
+de insertar en esa misma sentencia**, así que devolvía `FALSE` y Postgres
+abortaba el `INSERT` (el `WITH CHECK` sí se cumplía). `registrarArchivo()` no
+falló nunca porque inserta sin `RETURNING`.
+
+**Reglas que quedan:**
+
+- No encadenar `.select()` a un `INSERT` si la policy `SELECT` de esa tabla
+  depende de una función que relee la tabla (`carpeta_visible_para`,
+  `get_user_role`, contadores…). Insertar sin `RETURNING` y, si hace falta el
+  id, consultarlo en una sentencia aparte.
+- Los `UPDATE … RETURNING` sí funcionan: la versión anterior de la fila sigue
+  siendo visible para el snapshot de la misma sentencia.
+- `supabase/migraciones/carpetas-select-returning.sql` añade
+  `creado_por = auth.uid()` a `carpetas_select` como red de seguridad (no
+  amplía la visibilidad, porque la función ya devuelve `TRUE` para el creador).
+
