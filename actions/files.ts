@@ -49,7 +49,7 @@ async function validarCarpetaDestino(
     .select('id, es_privada, creado_por')
     .eq('id', carpetaId)
     .single()
-  if (error || !carpeta) return { error: 'Carpeta de destino no válida.', scope }
+  if (error || !carpeta) return { error: `Carpeta de destino no válida (${error?.code ?? 'sin código'}: ${error?.message ?? 'sin detalle'}).`, scope }
   // La Caja fuerte es privada también para el admin: no se sube a la de otro.
   if (carpeta.es_privada && carpeta.creado_por !== userId) {
     return { error: 'No puedes subir a una carpeta privada que no es tuya.', scope }
@@ -159,12 +159,13 @@ export async function registrarArchivo(params: {
   })
 
   if (error) {
+    console.error('[registrarArchivo] insert falló:', error.code, error.message)
     // El trigger de 9 GB devuelve un mensaje específico
     if (error.message.includes('LIMITE_ALMACENAMIENTO')) {
       await deleteFromR2(key).catch(() => {})
       return { error: 'El almacenamiento familiar ha alcanzado el límite de 9 GB. Contacta al administrador.' }
     }
-    return { error: 'No se pudo registrar el archivo. Inténtalo de nuevo.' }
+    return { error: `No se pudo registrar el archivo (${error.code ?? 'sin código'}: ${error.message}).` }
   }
 
   revalidatePath('/')

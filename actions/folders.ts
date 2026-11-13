@@ -33,7 +33,7 @@ export async function crearCarpeta(params: {
       .select('id, es_privada')
       .eq('id', params.carpetaPadreId)
       .single()
-    if (padreError || !padre) return { error: 'Carpeta padre no válida.' }
+    if (padreError || !padre) return { error: `Carpeta padre no válida (${padreError?.code ?? 'sin código'}: ${padreError?.message ?? 'sin detalle'}).` }
     // La privacidad se hereda: una carpeta pública dentro de una privada
     // expondría todo su contenido a la familia.
     if (padre.es_privada) esPrivada = true
@@ -53,6 +53,7 @@ export async function crearCarpeta(params: {
     .single()
 
   if (error || !creada) {
+    console.error('[crearCarpeta] insert falló:', error?.code, error?.message)
     // Compatibilidad: si la columna color aún no existe en la BD (migración
     // pendiente), se reintenta sin ella en vez de romper la creación
     if (/color/i.test(error?.message ?? '')) {
@@ -66,9 +67,12 @@ export async function crearCarpeta(params: {
         })
         .select('id')
         .single()
-      if (error2 || !creada2) return { error: 'No se pudo crear la carpeta.' }
+      if (error2 || !creada2) {
+        console.error('[crearCarpeta] reintento sin color falló:', error2?.code, error2?.message)
+        return { error: `No se pudo crear la carpeta (${error2?.code ?? 'sin código'}: ${error2?.message ?? 'sin detalle'}).` }
+      }
     } else {
-      return { error: 'No se pudo crear la carpeta.' }
+      return { error: `No se pudo crear la carpeta (${error?.code ?? 'sin código'}: ${error?.message ?? 'sin detalle'}).` }
     }
   }
 
