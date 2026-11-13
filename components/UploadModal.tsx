@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { UploadCloud, X, Loader2 } from 'lucide-react'
 import { getUploadUrl, registrarArchivo } from '@/actions/files'
+import PortalModal from '@/components/PortalModal'
 
 export default function UploadModal({ 
   isOpen, 
@@ -91,41 +92,43 @@ export default function UploadModal({
   }
 
   return (
-    <div className="modal-overlay">
-      <div className="modal">
-        <div className="modal-header">
-          <h2 className="modal-title">Subir Documento</h2>
-          <button onClick={onClose} className="btn-ghost btn-icon"><X size={20} /></button>
-        </div>
-        
-        {error && (
-          <div className="error-msg" style={{ marginBottom: '16px' }}>
-            <span>{error}</span>
+    <PortalModal>
+      <div className="modal-overlay">
+        <div className="modal">
+          <div className="modal-header">
+            <h2 className="modal-title">Subir Documento</h2>
+            <button onClick={onClose} className="btn-ghost btn-icon"><X size={20} /></button>
           </div>
-        )}
 
-        <div className="dropzone" onClick={() => document.getElementById('fileInput')?.click()}>
-          <UploadCloud size={48} className="dropzone-icon" />
-          {file ? (
-            <p className="dropzone-text"><strong>{file.name}</strong> ({(file.size / 1024 / 1024).toFixed(2)} MB)</p>
-          ) : (
-            <p className="dropzone-text">Haz clic para seleccionar un archivo<br/><small>Máximo 20 MB</small></p>
+          {error && (
+            <div className="error-msg" style={{ marginBottom: '16px' }}>
+              <span>{error}</span>
+            </div>
           )}
-          <input 
-            type="file" 
-            id="fileInput" 
-            style={{ display: 'none' }} 
-            onChange={(e) => setFile(e.target.files?.[0] || null)} 
-          />
-        </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
-          <button className="btn btn-ghost" onClick={onClose} disabled={loading}>Cancelar</button>
-          <button className="btn btn-primary" onClick={handleUpload} disabled={!file || loading}>
-            {loading ? <Loader2 size={16} className="animate-spin" /> : 'Subir Archivo'}
-          </button>
+          <div className="dropzone" onClick={() => document.getElementById('fileInput')?.click()}>
+            <UploadCloud size={48} className="dropzone-icon" />
+            {file ? (
+              <p className="dropzone-text"><strong>{file.name}</strong> ({(file.size / 1024 / 1024).toFixed(2)} MB)</p>
+            ) : (
+              <p className="dropzone-text">Haz clic para seleccionar un archivo<br/><small>Máximo 20 MB</small></p>
+            )}
+            <input
+              type="file"
+              id="fileInput"
+              style={{ display: 'none' }}
+              onChange={(e) => setFile(e.target.files?.[0] || null)}
+            />
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+            <button className="btn btn-ghost" onClick={onClose} disabled={loading}>Cancelar</button>
+            <button className="btn btn-primary" onClick={handleUpload} disabled={!file || loading}>
+              {loading ? <Loader2 size={16} className="animate-spin" /> : 'Subir Archivo'}
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </PortalModal>
   )
 }

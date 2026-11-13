@@ -50,6 +50,11 @@ export default function AnimacionesScroll() {
               y: 0,
               duration: 0.65,
               ease: 'power3.out',
+              // GSAP deja `transform: translate(0, 0)` inline y eso convierte al
+              // elemento en containing block del `position: fixed`: los modales
+              // abiertos dentro de la cabecera se recortaban. Al terminar se
+              // limpia el transform (el resultado visual es el mismo).
+              clearProps: 'transform',
               scrollTrigger: {
                 trigger: el,
                 start: 'top 88%',
